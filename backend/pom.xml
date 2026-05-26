@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.0.4</version>
+		<relativePath/>
+	</parent>
+
+	<groupId>com.marketscout</groupId>
+	<artifactId>backend</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name>MarketScout Backend</name>
+	<description>Trade partner verification SaaS — Team ARAM #278</description>
+
+	<properties>
+		<java.version>21</java.version>
+
+		<!-- Versions không được quản lý bởi Spring Boot BOM -->
+		<jjwt.version>0.12.6</jjwt.version>
+		<springdoc.version>3.0.1</springdoc.version>
+		<modelmapper.version>3.2.1</modelmapper.version>
+	</properties>
+
+	<dependencies>
+
+		<!-- ══════════════════════════════════════════════════
+             NHÓM 1: WEB & API
+             Cần cho: REST endpoints, validation input
+             ══════════════════════════════════════════════════ -->
+
+		<!-- REST API — @RestController, @GetMapping, @PostMapping... -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+
+		<!-- Validation — @Valid, @NotNull, @Email, @Size... -->
+		<!-- Dùng trong request DTO: LoginRequest, RegisterRequest -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
+
+		<!-- ══════════════════════════════════════════════════
+             NHÓM 2: DATABASE
+             Cần cho: kết nối SQL Server, ORM, query
+             ══════════════════════════════════════════════════ -->
+
+		<!-- JPA + Hibernate — @Entity, @Repository, findById()... -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+
+		<!-- SQL Server JDBC driver — kết nối tới SSMS -->
+		<!-- scope runtime: chỉ cần khi chạy, không cần khi compile -->
+		<dependency>
+			<groupId>com.microsoft.sqlserver</groupId>
+			<artifactId>mssql-jdbc</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+
+		<!-- ══════════════════════════════════════════════════
+             NHÓM 3: SECURITY & AUTH
+             Cần cho: login, logout, bảo vệ endpoint, JWT
+
+             LƯU Ý Spring Boot 4.0:
+             jjwt-jackson KHÔNG tương thích với Jackson 3.0
+             → Phải dùng jjwt-gson thay thế
+             ══════════════════════════════════════════════════ -->
+
+		<!-- Spring Security — filter chain, authentication, authorization -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+
+		<!-- JWT API — interface để tạo và parse JWT token -->
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+			<version>${jjwt.version}</version>
+		</dependency>
+
+		<!-- JWT implementation — logic thực thi (runtime only) -->
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<version>${jjwt.version}</version>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- JWT serialization với GSON thay vì Jackson
+             QUAN TRỌNG: Spring Boot 4.0 dùng Jackson 3, jjwt-jackson
+             không tương thích → dùng jjwt-gson -->
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-gson</artifactId>
+			<version>${jjwt.version}</version>
+			<scope>runtime</scope>
+		</dependency>
+
+
+
+
+		<!-- ══════════════════════════════════════════════════
+             NHÓM 4: DOCUMENTATION
+             Cần cho: Swagger UI, test API không cần Postman
+             Spring Boot 4.0 → SpringDoc 3.x
+             ══════════════════════════════════════════════════ -->
+
+		<!-- Swagger UI — truy cập tại http://localhost:8080/swagger-ui.html -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>${springdoc.version}</version>
+		</dependency>
+
+
+		<!-- ══════════════════════════════════════════════════
+             NHÓM 5: MONITORING & OPS
+             Cần cho: health check, metrics, admin dashboard
+             ══════════════════════════════════════════════════ -->
+
+		<!-- Actuator — /actuator/health, /actuator/info -->
+		<!-- DevOps dùng để monitor service có đang sống không -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-actuator</artifactId>
+		</dependency>
+
+
+		<!-- ══════════════════════════════════════════════════
+             NHÓM 6: DEV UTILITIES
+             Giảm boilerplate, tăng tốc độ code
+             ══════════════════════════════════════════════════ -->
+
+		<!-- Lombok — @Data, @Builder, @Slf4j, @RequiredArgsConstructor
+             Không cần viết getter/setter/constructor thủ công -->
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- ModelMapper — convert Entity ↔ DTO tự động
+             Ví dụ: userEntity → UserResponse DTO -->
+		<dependency>
+			<groupId>org.modelmapper</groupId>
+			<artifactId>modelmapper</artifactId>
+			<version>${modelmapper.version}</version>
+		</dependency>
+
+		<!-- DevTools — auto restart khi thay đổi code
+             optional: không được đưa vào production build -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-devtools</artifactId>
+			<scope>runtime</scope>
+			<optional>true</optional>
+		</dependency>
+
+
+		<!-- ══════════════════════════════════════════════════
+             NHÓM 7: TESTING
+             ══════════════════════════════════════════════════ -->
+
+		<!-- Spring Boot Test — @SpringBootTest, MockMvc, @WebMvcTest -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- ══════════════════════════════════════════════════
+             NHÓM 8: PHASE 2 — BỎ COMMENT KHI CẦN
+             Chưa cần ngay, thêm khi implement feature tương ứng
+             ══════════════════════════════════════════════════ -->
+
+		<!-- dotenv handled natively via spring.config.import -->
+
+		<!-- Redis — refresh token, blacklist token -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+
+
+		<!-- MinIO — lưu ảnh nhà máy (Pillar 8)
+             Thêm khi implement image upload
+        <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>8.5.17</version>
+        </dependency>
+        -->
+
+		<!-- Async / WebSocket — notification real-time khi report xong
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-websocket</artifactId>
+        </dependency>
+        -->
+
+	</dependencies>
+
+	<build>
+		<plugins>
+
+			<!-- Spring Boot Maven Plugin — build jar, run app -->
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<!-- Exclude Lombok khỏi final jar -->
+				<configuration>
+					<excludes>
+						<exclude>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+						</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
+
+		</plugins>
+	</build>
+
+</project>

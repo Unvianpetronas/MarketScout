@@ -1,0 +1,55 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Secrets
+.env
+*.env
+!*.env.example
+
+# SSL / keys
+*.p12
+*.jks
+*.keystore
+*.pem
+*.key
+
+# Local profile overrides
+application-local.properties
+application-local.yml
+application-prod.properties
+application-prod.yml
+
+# Logs
+*.log
+app-err.log
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
