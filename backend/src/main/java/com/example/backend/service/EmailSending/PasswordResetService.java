@@ -21,8 +21,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PasswordResetService {
 
-    private static final String PREFIX = "pr:";
-    private static final Duration TOKEN_TTL = Duration.ofHours(1);
+    // token → userId  (lookup khi click link)
+    private static final String PREFIX       = "pr:";
+    // userId → token  (để invalidate token cũ khi user reset lại)
+    private static final String USER_PREFIX  = "pr_user:";
+    private static final Duration TOKEN_TTL  = Duration.ofHours(1);
 
     private final StringRedisTemplate redis;
     private final RestTemplate restTemplate;
@@ -45,16 +48,30 @@ public class PasswordResetService {
     private String frontendUrl;
 
     public void sendResetToken(UUID userId, String toEmail, String language) {
+        // ── Xóa token cũ nếu user reset nhiều lần ──────────────────
+        String oldToken = redis.opsForValue().get(USER_PREFIX + userId);
+        if (oldToken != null) {
+            redis.delete(PREFIX + oldToken);       // xóa token cũ
+            redis.delete(USER_PREFIX + userId);    // xóa mapping cũ
+        }
+
+        // ── Tạo token mới ───────────────────────────────────────────
         String token = UUID.randomUUID().toString().replace("-", "");
+
+        // Lưu token → userId (dùng khi click link)
         redis.opsForValue().set(PREFIX + token, userId.toString(), TOKEN_TTL);
 
+        // Lưu userId → token (dùng để invalidate lần sau)
+        redis.opsForValue().set(USER_PREFIX + userId, token, TOKEN_TTL);
+
+        // ── Gửi email ───────────────────────────────────────────────
         String resetUrl = frontendUrl + "/reset-password?token=" + token;
         boolean isVi = !"en".equalsIgnoreCase(language);
 
         send(
-            toEmail,
-            isVi ? "Đặt lại mật khẩu - MarketScout" : "Reset your password - MarketScout",
-            buildHtml(resetUrl, isVi)
+                toEmail,
+                isVi ? "Đặt lại mật khẩu - MarketScout" : "Reset your password - MarketScout",
+                buildHtml(resetUrl, isVi)
         );
     }
 
@@ -72,8 +89,12 @@ public class PasswordResetService {
         user.setUpdatedAt(Instant.now());
         usersRepository.save(user);
 
+        // Xóa cả 2 key sau khi dùng xong
         redis.delete(PREFIX + token);
+        redis.delete(USER_PREFIX + userIdStr);
     }
+
+    // ── Private helpers ──────────────────────────────────────────────────────
 
     private void send(String toEmail, String subject, String html) {
         HttpHeaders headers = new HttpHeaders();
@@ -98,16 +119,16 @@ public class PasswordResetService {
     private String buildHtml(String resetUrl, boolean isVi) {
         String title    = isVi ? "Đặt lại mật khẩu"       : "Reset your password";
         String greeting = isVi ? "Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản <strong>MarketScout</strong> của bạn."
-                               : "We received a request to reset the password for your <strong>MarketScout</strong> account.";
+                : "We received a request to reset the password for your <strong>MarketScout</strong> account.";
         String body     = isVi ? "Nhấn vào nút bên dưới để đặt mật khẩu mới:"
-                               : "Click the button below to set a new password:";
+                : "Click the button below to set a new password:";
         String btnText  = isVi ? "Đặt lại mật khẩu"       : "Reset password";
         String orCopy   = isVi ? "Hoặc copy link sau vào trình duyệt:"
-                               : "Or copy this link into your browser:";
+                : "Or copy this link into your browser:";
         String validity = isVi ? "Link có hiệu lực trong <strong>1 giờ</strong>."
-                               : "This link is valid for <strong>1 hour</strong>.";
+                : "This link is valid for <strong>1 hour</strong>.";
         String ignore   = isVi ? "Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này. Mật khẩu của bạn sẽ không thay đổi."
-                               : "If you did not request a password reset, you can safely ignore this email. Your password will not change.";
+                : "If you did not request a password reset, you can safely ignore this email. Your password will not change.";
 
         return """
             <!DOCTYPE html>
