@@ -39,9 +39,7 @@ public class WebhookConfig {
     private String secretHash;
 
     @NotNull
-    @Nationalized
-    @Lob
-    @Column(name = "event_types", nullable = false)
+    @Column(name = "event_types", nullable = false, columnDefinition = "text")
     private String eventTypes;
 
     @NotNull

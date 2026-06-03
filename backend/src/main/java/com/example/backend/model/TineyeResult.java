@@ -29,9 +29,7 @@ public class TineyeResult {
     @Column(name = "match_count", nullable = false)
     private Integer matchCount;
 
-    @Nationalized
-    @Lob
-    @Column(name = "matches")
+    @Column(name = "matches", columnDefinition = "text")
     private String matches;
 
 

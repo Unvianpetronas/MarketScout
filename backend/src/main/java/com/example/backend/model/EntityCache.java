@@ -25,9 +25,7 @@ public class EntityCache {
     private Short pillarNo;
 
     @NotNull
-    @Nationalized
-    @Lob
-    @Column(name = "cached_data", nullable = false)
+    @Column(name = "cached_data", nullable = false, columnDefinition = "text")
     private String cachedData;
 
     @NotNull

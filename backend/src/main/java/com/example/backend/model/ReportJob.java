@@ -36,9 +36,7 @@ public class ReportJob {
     @Column(name = "attempt_count", nullable = false)
     private Integer attemptCount;
 
-    @Nationalized
-    @Lob
-    @Column(name = "error_message")
+    @Column(name = "error_message", columnDefinition = "text")
     private String errorMessage;
 
     @Column(name = "started_at")

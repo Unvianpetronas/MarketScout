@@ -34,15 +34,11 @@ public class ScoringConfig {
     private String configVersion;
 
     @NotNull
-    @Nationalized
-    @Lob
-    @Column(name = "pillar_weights", nullable = false)
+    @Column(name = "pillar_weights", nullable = false, columnDefinition = "text")
     private String pillarWeights;
 
     @NotNull
-    @Nationalized
-    @Lob
-    @Column(name = "thresholds", nullable = false)
+    @Column(name = "thresholds", nullable = false, columnDefinition = "text")
     private String thresholds;
 
     @NotNull

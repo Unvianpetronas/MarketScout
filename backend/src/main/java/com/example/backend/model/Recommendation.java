@@ -32,9 +32,7 @@ public class Recommendation {
     private String recType;
 
     @NotNull
-    @Nationalized
-    @Lob
-    @Column(name = "content", nullable = false)
+    @Column(name = "content", nullable = false, columnDefinition = "text")
     private String content;
 
     @NotNull

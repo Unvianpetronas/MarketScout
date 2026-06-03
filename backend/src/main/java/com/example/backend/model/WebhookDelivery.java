@@ -35,9 +35,7 @@ public class WebhookDelivery {
     @Column(name = "http_status")
     private Integer httpStatus;
 
-    @Nationalized
-    @Lob
-    @Column(name = "error")
+    @Column(name = "error", columnDefinition = "text")
     private String error;
 
     @NotNull
