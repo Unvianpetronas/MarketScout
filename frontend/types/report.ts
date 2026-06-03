@@ -21,3 +21,13 @@ export interface VerificationReport {
   hardStop: boolean;
   pillarResults: PillarResult[];
 }
+
+export interface DeepVerifyRequest {
+  entityName: string;
+  countryIso2: string;
+}
+
+export interface DeepVerifyResponse {
+  verificationId: string;
+  status: string;
+}
