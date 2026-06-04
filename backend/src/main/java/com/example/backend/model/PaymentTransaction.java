@@ -53,9 +53,7 @@ public class PaymentTransaction {
     @Column(name = "amount_vnd", nullable = false, precision = 18)
     private BigDecimal amountVnd;
 
-    @Nationalized
-    @Lob
-    @Column(name = "provider_response")
+    @Column(name = "provider_response", columnDefinition = "text")
     private String providerResponse;
 
     @Size(max = 255)

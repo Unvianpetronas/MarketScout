@@ -38,9 +38,7 @@ public class SystemAlert {
     private String severity;
 
     @NotNull
-    @Nationalized
-    @Lob
-    @Column(name = "message", nullable = false)
+    @Column(name = "message", nullable = false, columnDefinition = "text")
     private String message;
 
     @NotNull

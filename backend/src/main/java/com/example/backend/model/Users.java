@@ -115,19 +115,13 @@ public class Users {
     @Column(name = "annual_revenue", length = 50)
     private String annualRevenue;
 
-    @Nationalized
-    @Lob
-    @Column(name = "business_desc")
+    @Column(name = "business_desc", columnDefinition = "text")
     private String businessDesc;
 
-    @Nationalized
-    @Lob
-    @Column(name = "target_markets")
+    @Column(name = "target_markets", columnDefinition = "text")
     private String targetMarkets;
 
-    @Nationalized
-    @Lob
-    @Column(name = "certifications")
+    @Column(name = "certifications", columnDefinition = "text")
     private String certifications;
 
     @Size(max = 10)

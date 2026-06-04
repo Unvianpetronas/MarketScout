@@ -56,20 +56,21 @@ public class UserService {
                 .role("USER")
                 .quotaRemaining(2)
                 .quotaUsedThisCycle(0)
+                .cycleResetAt(Instant.now().plus(30, ChronoUnit.DAYS))
                 .isActive(true)
-                .emailVerified(false)       // chưa verify
+                .emailVerified(false)
                 .theme("system")
                 .language("vi")
                 .aiOptimization(true)
                 .createdAt(Instant.now())
-                .plan(planRepository.findByName("free").orElseThrow())
+                .plan(planRepository.findByNameIgnoreCase("free").orElseThrow())
                 .build();
         usersRepository.save(user);
 
         // Tạo subscription free
         Subscription sub = Subscription.builder()
                 .user(user)
-                .plan(planRepository.findByName("free").orElseThrow())
+                .plan(planRepository.findByNameIgnoreCase("free").orElseThrow())
                 .status("active")
                 .billingCycle("monthly")
                 .currentPeriodStart(Instant.now())

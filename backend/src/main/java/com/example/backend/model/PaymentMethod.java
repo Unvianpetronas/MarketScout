@@ -50,9 +50,7 @@ public class PaymentMethod {
     @Column(name = "provider_token", nullable = false, length = 500)
     private String providerToken;
 
-    @Nationalized
-    @Lob
-    @Column(name = "metadata")
+    @Column(name = "metadata", columnDefinition = "text")
     private String metadata;
 
     @NotNull

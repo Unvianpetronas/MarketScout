@@ -18,8 +18,6 @@
 # ── Spring Boot — local profile overrides (may contain real values) ───
 application-local.properties
 application-local.yml
-application-prod.properties
-application-prod.yml
 
 # ── IntelliJ IDEA ─────────────────────────────────────────────────────
 .idea/
@@ -51,3 +49,12 @@ frontend/.cache/
 # ── Logs ──────────────────────────────────────────────────────────────
 *.log
 logs/
+
+# ── Design & internal documents (not for the repo) ───────────────────
+*.docx
+*.doc
+*.xlsx
+*.xls
+marketscout-system-design-guide.txt
+quota-service-explanation.txt
+auth-explanation.txt

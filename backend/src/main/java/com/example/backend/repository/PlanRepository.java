@@ -8,4 +8,5 @@ import java.util.Optional;
 
 public interface PlanRepository extends JpaRepository<Plan, Integer> {
     Optional<Plan> findByName(String planName);
+    Optional<Plan> findByNameIgnoreCase(String planName);
 }

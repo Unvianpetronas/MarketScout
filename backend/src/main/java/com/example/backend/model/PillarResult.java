@@ -26,14 +26,10 @@ public class PillarResult {
     @Column(name = "score")
     private Short score;
 
-    @Nationalized
-    @Lob
-    @Column(name = "findings")
+    @Column(name = "findings", columnDefinition = "text")
     private String findings;
 
-    @Nationalized
-    @Lob
-    @Column(name = "sources_used")
+    @Column(name = "sources_used", columnDefinition = "text")
     private String sourcesUsed;
 
     @Column(name = "latency_ms")

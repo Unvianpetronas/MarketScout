@@ -24,9 +24,7 @@ public class VisionAnalysis {
     @JoinColumn(name = "asset_id", nullable = false)
     private ImageAsset asset;
 
-    @Nationalized
-    @Lob
-    @Column(name = "ai_analysis")
+    @Column(name = "ai_analysis", columnDefinition = "text")
     private String aiAnalysis;
 
 

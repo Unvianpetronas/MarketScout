@@ -26,9 +26,7 @@ public class Plan {
     @ColumnDefault("1")
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
-    @Nationalized
-    @Lob
-    @Column(name = "features")
+    @Column(name = "features", columnDefinition = "text")
     private String features;
     @Size(max = 20)
     @NotNull

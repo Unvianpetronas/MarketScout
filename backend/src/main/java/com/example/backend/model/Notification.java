@@ -38,14 +38,10 @@ public class Notification {
     @Column(name = "title", nullable = false, length = 200)
     private String title;
 
-    @Nationalized
-    @Lob
-    @Column(name = "body")
+    @Column(name = "body", columnDefinition = "text")
     private String body;
 
-    @Nationalized
-    @Lob
-    @Column(name = "payload")
+    @Column(name = "payload", columnDefinition = "text")
     private String payload;
 
     @NotNull

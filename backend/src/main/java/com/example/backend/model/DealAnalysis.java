@@ -29,9 +29,7 @@ public class DealAnalysis {
     @Column(name = "payment_method", length = 10)
     private String paymentMethod;
 
-    @Nationalized
-    @Lob
-    @Column(name = "risk_factors")
+    @Column(name = "risk_factors", columnDefinition = "text")
     private String riskFactors;
 
 

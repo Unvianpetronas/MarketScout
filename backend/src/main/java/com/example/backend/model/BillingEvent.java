@@ -32,9 +32,7 @@ public class BillingEvent {
     @Column(name = "event_type", nullable = false, length = 100)
     private String eventType;
 
-    @Nationalized
-    @Lob
-    @Column(name = "payload")
+    @Column(name = "payload", columnDefinition = "text")
     private String payload;
 
     @NotNull

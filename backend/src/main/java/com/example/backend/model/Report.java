@@ -52,9 +52,7 @@ public class Report {
     @Column(name = "hard_stop", nullable = false)
     private Boolean hardStop;
 
-    @Nationalized
-    @Lob
-    @Column(name = "raw_data")
+    @Column(name = "raw_data", columnDefinition = "text")
     private String rawData;
 
     @NotNull

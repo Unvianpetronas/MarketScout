@@ -49,9 +49,7 @@ public class VietqrPayment {
     @Column(name = "expected_amount_vnd", nullable = false, precision = 18)
     private BigDecimal expectedAmountVnd;
 
-    @Nationalized
-    @Lob
-    @Column(name = "qr_data_url")
+    @Column(name = "qr_data_url", columnDefinition = "text")
     private String qrDataUrl;
 
     @Size(max = 20)

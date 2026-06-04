@@ -39,9 +39,7 @@ public class AuditLog {
     @Column(name = "target_id")
     private UUID targetId;
 
-    @Nationalized
-    @Lob
-    @Column(name = "payload")
+    @Column(name = "payload", columnDefinition = "text")
     private String payload;
 
     @Size(max = 45)
