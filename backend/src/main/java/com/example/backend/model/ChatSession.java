@@ -1,40 +1,43 @@
 package com.example.backend.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
+import lombok.*;
 
 import java.time.Instant;
 import java.util.UUID;
 
-@Getter
-@Setter
 @Entity
 @Table(name = "chat_sessions")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class ChatSession {
+
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
-    @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private Users user;
 
-    @Size(max = 300)
-    @Nationalized
     @Column(name = "title", length = 300)
     private String title;
 
-    @NotNull
-    @ColumnDefault("getutcdate()")
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @PrePersist
+    protected void onCreate() {
+        Instant now = Instant.now();
+        createdAt = now;
+        updatedAt = now;
+    }
 
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = Instant.now();
+    }
 }

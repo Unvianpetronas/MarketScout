@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
 
@@ -16,7 +15,6 @@ import java.time.Instant;
 public class EntityCache {
     @Id
     @Size(max = 450)
-    @Nationalized
     @Column(name = "cache_key", nullable = false, length = 450)
     private String cacheKey;
 
@@ -32,5 +30,13 @@ public class EntityCache {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    // v3: VN | JP | US ... to distinguish VN vs international cache
+    @Size(max = 2)
+    @Column(name = "country_iso2", length = 2)
+    private String countryIso2;
 
+    // v3: vietqr | gleif | opensanctions | masothue | tavily
+    @Size(max = 50)
+    @Column(name = "data_source", length = 50)
+    private String dataSource;
 }

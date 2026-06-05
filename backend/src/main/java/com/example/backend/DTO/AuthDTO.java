@@ -160,7 +160,7 @@ public class AuthDTO {
     public static class ResetPasswordRequest {
         @NotBlank
         private String token;
-        @NotBlank @Size(min = 6, message = "Mật khẩu ít nhất 6 ký tự")
+        @NotBlank @Size(min = 6, message = "Password must be at least 6 characters")
         private String newPassword;
     }
 

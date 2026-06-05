@@ -56,9 +56,9 @@ public class JwtService {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (ExpiredJwtException e) {
-            throw new RuntimeException("Token đã hết hạn, vui lòng đăng nhập lại");
+            throw new RuntimeException("Token expired, please log in again");
         } catch (JwtException e) {
-            throw new RuntimeException("Token không hợp lệ");
+            throw new RuntimeException("Invalid token");
         }
     }
 

@@ -28,7 +28,7 @@ public class QuotaDTO {
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class AdminSetRequest {
         @NotNull
-        @Min(value = 0, message = "Quota không được âm")
+        @Min(value = 0, message = "Quota cannot be negative")
         private Integer quota;
     }
 

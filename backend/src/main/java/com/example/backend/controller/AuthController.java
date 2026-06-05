@@ -63,7 +63,7 @@ public class AuthController {
         if (req != null && req.getRefreshToken() != null) {
             refreshTokenService.revokeByToken(req.getRefreshToken());
         }
-        return ResponseEntity.ok(Map.of("message", "Đăng xuất thành công"));
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 
     @PostMapping("/refresh")
@@ -88,7 +88,7 @@ public class AuthController {
     public ResponseEntity<Map<String, String>> resendVerification(
             @Valid @RequestBody AuthDTO.ResendVerificationRequest req) {
         emailVerificationService.resend(req.getEmail());
-        return ResponseEntity.ok(Map.of("message", "Email xác thực đã được gửi lại"));
+        return ResponseEntity.ok(Map.of("message", "Verification email has been resent"));
     }
 
     @GetMapping("/me")
@@ -112,7 +112,7 @@ public class AuthController {
     public ResponseEntity<Map<String, String>> forgotPassword(
             @Valid @RequestBody AuthDTO.ForgotPasswordRequest req) {
         userService.forgotPassword(req);
-        return ResponseEntity.ok(Map.of("message", "Email đặt lại mật khẩu đã được gửi"));
+        return ResponseEntity.ok(Map.of("message", "Password reset email has been sent"));
     }
 
     // ── Reset password — user submits token from email link ────────
@@ -120,7 +120,7 @@ public class AuthController {
     public ResponseEntity<Map<String, String>> resetPassword(
             @Valid @RequestBody AuthDTO.ResetPasswordRequest req) {
         passwordResetService.resetPassword(req.getToken(), req.getNewPassword());
-        return ResponseEntity.ok(Map.of("message", "Mật khẩu đã được đặt lại thành công"));
+        return ResponseEntity.ok(Map.of("message", "Password has been reset successfully"));
     }
 
     // ── Change password — logged-in user ──────────────────────────
@@ -131,6 +131,6 @@ public class AuthController {
         String token = authHeader.replace("Bearer ", "");
         Claims claims = jwtService.parseToken(token);
         userService.changePassword(jwtService.getEmail(claims), req);
-        return ResponseEntity.ok(Map.of("message", "Đổi mật khẩu thành công"));
+        return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
     }
 }

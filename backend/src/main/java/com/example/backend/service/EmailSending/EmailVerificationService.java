@@ -63,11 +63,11 @@ public class EmailVerificationService {
     public void verify(String token) {
         String userIdStr = redis.opsForValue().get(PREFIX + token);
         if (userIdStr == null) {
-            throw new RuntimeException("Link xác thực không hợp lệ hoặc đã hết hạn");
+            throw new RuntimeException("Verification link is invalid or has expired");
         }
 
         Users user = usersRepository.findById(UUID.fromString(userIdStr))
-                .orElseThrow(() -> new RuntimeException("Người dùng không tồn tại"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!user.getEmailVerified()) {
             user.setEmailVerified(true);
@@ -80,10 +80,10 @@ public class EmailVerificationService {
 
     public void resend(String email) {
         Users user = usersRepository.findByEmail(email.trim().toLowerCase())
-                .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+                .orElseThrow(() -> new RuntimeException("Email not found"));
 
         if (user.getEmailVerified()) {
-            throw new RuntimeException("Email đã được xác thực trước đó");
+            throw new RuntimeException("Email has already been verified");
         }
 
         sendVerification(user.getId(), user.getEmail(), user.getLanguage());
@@ -109,7 +109,7 @@ public class EmailVerificationService {
         try {
             restTemplate.postForEntity(apiUrl, request, String.class);
         } catch (Exception e) {
-            throw new RuntimeException("Không thể gửi email: " + e.getMessage());
+            throw new RuntimeException("Failed to send email: " + e.getMessage());
         }
     }
 

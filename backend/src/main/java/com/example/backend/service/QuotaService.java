@@ -91,7 +91,7 @@ public class QuotaService {
     @Transactional
     public void adminSetQuota(UUID userId, int newQuota) {
         if (newQuota < 0) {
-            throw new AppException(AppException.ErrorCode.BAD_REQUEST, "Quota không được âm");
+            throw new AppException(AppException.ErrorCode.BAD_REQUEST, "Quota cannot be negative");
         }
         requireUserExists(userId);
         usersRepository.setQuotaRemaining(userId, newQuota);

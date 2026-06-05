@@ -10,4 +10,10 @@ import java.util.UUID;
 @Repository
 public interface ReportRepository extends JpaRepository<Report, UUID> {
     List<Report> findByUserIdOrderByCreatedAtDesc(UUID userId);
+
+    // idx_reports_status — backend status polling
+    List<Report> findByStatusOrderByUpdatedAtDesc(String status);
+
+    // idx_reports_source — filter by origin flow
+    List<Report> findByUserIdAndSourceOrderByCreatedAtDesc(UUID userId, String source);
 }

@@ -36,7 +36,7 @@ public class UserService {
         String email = request.getEmail().trim().toLowerCase();
 
         if (usersRepository.existsByEmail(email)) {
-            throw new RuntimeException("Email đã được sử dụng");
+            throw new RuntimeException("Email is already in use");
         }
 
         Users user = Users.builder()
@@ -83,7 +83,7 @@ public class UserService {
         emailVerificationService.sendVerification(user.getId(), user.getEmail(), user.getLanguage());
 
         return AuthDTO.RegisterResponse.builder()
-                .message("Đăng ký thành công! Vui lòng kiểm tra email để xác thực tài khoản.")
+                .message("Registration successful! Please check your email to verify your account.")
                 .email(user.getEmail())
                 .build();
     }
@@ -94,19 +94,18 @@ public class UserService {
         String email = request.getEmail().trim().toLowerCase();
 
         Users user = usersRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Email hoặc mật khẩu không đúng"));
+                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
 
         if (!user.getIsActive()) {
-            throw new RuntimeException("Tài khoản đã bị vô hiệu hóa");
+            throw new RuntimeException("Account has been deactivated");
         }
 
-        // Check email đã verify chưa
         if (!user.getEmailVerified()) {
             throw new RuntimeException("EMAIL_NOT_VERIFIED");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("Email hoặc mật khẩu không đúng");
+            throw new RuntimeException("Invalid email or password");
         }
 
         user.setLastLoginAt(Instant.now());
@@ -145,7 +144,7 @@ public class UserService {
     public AuthDTO.RefreshResponse refresh(String refreshToken) {
         RefreshTokenService.RotateResult result = refreshTokenService.validateAndRotate(refreshToken);
         Users user = usersRepository.findById(result.userId())
-                .orElseThrow(() -> new RuntimeException("Người dùng không tồn tại"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
         String newAccessToken = jwtService.generateToken(
                 user.getId(), user.getEmail(), user.getRole(), user.getFullName());
         return AuthDTO.RefreshResponse.builder()
@@ -158,7 +157,7 @@ public class UserService {
     @Transactional(readOnly = true)
     public AuthDTO.MeResponse getMe(String email) {
         Users user = usersRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Người dùng không tồn tại"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         return AuthDTO.MeResponse.builder()
                 .id(user.getId())
@@ -187,7 +186,7 @@ public class UserService {
     @Transactional
     public AuthDTO.UserResponse updateMe(String email, AuthDTO.UpdateUserRequest request) {
         Users user = usersRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Người dùng không tồn tại"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (request.getFullName() != null)        user.setFullName(request.getFullName());
         if (request.getCompanyName() != null)     user.setCompanyName(request.getCompanyName());
@@ -232,14 +231,14 @@ public class UserService {
         String email = request.getEmail().trim().toLowerCase();
 
         Users user = usersRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Email không tồn tại"));
+                .orElseThrow(() -> new RuntimeException("Email not found"));
 
         if (!user.getIsActive()) {
-            throw new RuntimeException("Tài khoản đã bị vô hiệu hóa");
+            throw new RuntimeException("Account has been deactivated");
         }
 
         if (!user.getEmailVerified()) {
-            throw new RuntimeException("Email chưa được xác thực");
+            throw new RuntimeException("Email has not been verified");
         }
 
         passwordResetService.sendResetToken(user.getId(), user.getEmail(), user.getLanguage());
@@ -249,10 +248,10 @@ public class UserService {
     @Transactional
     public void changePassword(String email, AuthDTO.ChangePasswordRequest request) {
         Users user = usersRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Người dùng không tồn tại"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("Mật khẩu hiện tại không đúng");
+            throw new RuntimeException("Current password is incorrect");
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));

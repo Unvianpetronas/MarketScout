@@ -79,11 +79,11 @@ public class PasswordResetService {
     public void resetPassword(String token, String newPassword) {
         String userIdStr = redis.opsForValue().get(PREFIX + token);
         if (userIdStr == null) {
-            throw new RuntimeException("Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn");
+            throw new RuntimeException("Password reset link is invalid or has expired");
         }
 
         Users user = usersRepository.findById(UUID.fromString(userIdStr))
-                .orElseThrow(() -> new RuntimeException("Người dùng không tồn tại"));
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setUpdatedAt(Instant.now());
@@ -112,7 +112,7 @@ public class PasswordResetService {
         try {
             restTemplate.postForEntity(apiUrl, request, String.class);
         } catch (Exception e) {
-            throw new RuntimeException("Không thể gửi email: " + e.getMessage());
+            throw new RuntimeException("Failed to send email: " + e.getMessage());
         }
     }
 

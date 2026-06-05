@@ -30,7 +30,7 @@ public class RefreshTokenService {
     public RotateResult validateAndRotate(String token) {
         String userIdStr = redis.opsForValue().get(PREFIX + token);
         if (userIdStr == null) {
-            throw new RuntimeException("Refresh token không hợp lệ hoặc đã hết hạn");
+            throw new RuntimeException("Invalid or expired refresh token");
         }
 
         redis.delete(PREFIX + token);

@@ -2,10 +2,10 @@ package com.example.backend.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.util.UUID;
 
@@ -15,9 +15,14 @@ import java.util.UUID;
 @Table(name = "pillar_results")
 public class PillarResult {
     @Id
-    @ColumnDefault("newid()")
+    @ColumnDefault("gen_random_uuid()")
     @Column(name = "id", nullable = false)
     private UUID id;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "report_id", nullable = false)
+    private Report report;
 
     @NotNull
     @Column(name = "pillar_no", nullable = false)
@@ -35,5 +40,22 @@ public class PillarResult {
     @Column(name = "latency_ms")
     private Integer latencyMs;
 
+    // v3: array of { type: PASS|WARN|FAIL, text, source } as JSONB
+    @Column(name = "evidences", columnDefinition = "jsonb")
+    private String evidences;
 
+    // v3: PASS | WARN | FAIL | SKIP
+    @Size(max = 10)
+    @Column(name = "status", length = 10)
+    private String status;
+
+    // v3: HIGH | MEDIUM | LOW
+    @Size(max = 10)
+    @Column(name = "confidence", length = 10)
+    private String confidence;
+
+    // v3: denormalized pillar name for FE rendering
+    @Size(max = 50)
+    @Column(name = "pillar_name", length = 50)
+    private String pillarName;
 }

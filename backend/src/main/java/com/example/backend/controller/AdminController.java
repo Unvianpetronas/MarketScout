@@ -40,7 +40,7 @@ public class AdminController {
         return ResponseEntity.ok(new QuotaDTO.QuotaResponse(
                 id,
                 user.getQuotaRemaining(),
-                "Quota đã được cập nhật thành công"
+                "Quota updated successfully"
         ));
     }
 
@@ -58,7 +58,7 @@ public class AdminController {
         return ResponseEntity.ok(new QuotaDTO.QuotaResponse(
                 id,
                 user.getQuotaRemaining(),
-                "Hoàn 1 quota thành công"
+                "Quota refunded successfully"
         ));
     }
 }

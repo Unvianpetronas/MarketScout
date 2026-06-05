@@ -39,14 +39,14 @@ public class GlobalExceptionHandler {
     // Catches legacy RuntimeException throws in UserService until they are migrated to AppException
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntime(RuntimeException ex) {
-        String msg = ex.getMessage() != null ? ex.getMessage() : "Lỗi hệ thống";
+        String msg = ex.getMessage() != null ? ex.getMessage() : "Internal server error";
 
         HttpStatus status;
-        if ("EMAIL_NOT_VERIFIED".equals(msg) || "Tài khoản đã bị vô hiệu hóa".equals(msg)) {
+        if ("EMAIL_NOT_VERIFIED".equals(msg) || "Account has been deactivated".equals(msg)) {
             status = HttpStatus.FORBIDDEN;
-        } else if ("Email hoặc mật khẩu không đúng".equals(msg)) {
+        } else if ("Invalid email or password".equals(msg)) {
             status = HttpStatus.UNAUTHORIZED;
-        } else if (msg.startsWith("Email đã")) {
+        } else if (msg.startsWith("Email is already")) {
             status = HttpStatus.CONFLICT;
         } else {
             log.error("Unhandled RuntimeException", ex);
