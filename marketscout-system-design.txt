@@ -1,0 +1,410 @@
+MarketScout
+System Design Guide
+Backend Phase 1  ·  Team ARAM #278  ·  EXE101  ·  v2.0
+AI Stack: Gemini 2.0 Flash API
+
+============================================================
+1. Tổng quan hệ thống
+============================================================
+MarketScout là SaaS giúp SME Việt Nam xác minh đối tác thương mại quốc tế và tìm kiếm đối tác mới qua chat tự nhiên. User nhập yêu cầu → hệ thống thu thập dữ liệu từ nhiều nguồn → chấm điểm 8 tiêu chí → báo cáo 0–100 + đề xuất giao dịch an toàn.
+
+1.1 Luồng tổng thể
+------------------
+
+  Bước | Hành động                                                | Tier            | Quota
+  -----+----------------------------------------------------------+-----------------+---------
+  1    | Chat Box: nhập yêu cầu tự nhiên (tìm đối tác / xác minh) | Tier 0 — Chat   | Miễn phí
+  2    | Manager Agent tìm kiếm → trả danh sách công ty           | Tier 1 — Search | Miễn phí
+  3    | Quick Scan P1 + P6, ~30 giây                             | Tier 2 — Quick  | Miễn phí
+  4    | Deep Verify 8 pillars, 5–8 phút                          | Tier 3 — Deep   | -1 quota
+  5    | Report: score 0–100 + 8 pillar details + Deal Safety     | Output          | —
+
+
+1.2 Các thành phần backend
+--------------------------
+
+  Thành phần         | Vai trò                                         | File chính
+  -------------------+-------------------------------------------------+--------------------------------
+  Chat Service       | Chat box, conversation history, intent routing  | ChatService, ChatController
+  Manager Agent      | Gemini: detect intent, tìm đối tác, orchestrate | ManagerAgent
+  Auth Service       | Đăng ký, đăng nhập, JWT, email verify           | UserService, AuthController
+  Quota Service      | Kiểm tra và trừ quota trước Deep Verify         | QuotaService
+  Crawler Service    | Thu thập data: MST, GLEIF, VCCI, Tavily...      | CrawlerService, *Crawler.java
+  Scoring Engine     | Chạy 8 pillar, tính điểm, Hard Stop             | ScoringEngineService
+  Report Service     | Tạo report, quản lý job pipeline                | ReportService, ReportController
+  Deal Safety Engine | Đề xuất Incoterm, payment method                | DealSafetyService
+  Email Service      | Gửi email verify, reset pass — Mailtrap         | EmailVerificationService
+  Redis              | Refresh token, verify token, blacklist          | RefreshTokenService
+
+
+1.3 AI Stack — Gemini 2.0 Flash
+-------------------------------
+  * Thay toàn bộ LM Studio local — không còn chạy model trên máy
+  * Free tier: 1,500 requests/ngày — đủ cho MVP đến hàng trăm users
+  * Giá: $0.075/1M input, $0.3/1M output — ~22 VND/request
+  * Spring AI abstraction: đổi provider chỉ cần đổi config, không đổi code
+  application.yml
+spring:
+ai:
+google:
+genai:
+api-key: ${GEMINI_API_KEY}
+chat:
+options:
+model: gemini-2.0-flash
+temperature: 0.3
+
+============================================================
+2. Trạng thái hiện tại
+============================================================
+
+  Module                                    | Status    | Ghi chú
+  ------------------------------------------+-----------+----------------------------------------
+  Auth: Register / Login / Logout / Refresh | ✅ Xong    | JWT + refresh token + blacklist
+  Auth: Email verification                  | ✅ Xong    | Redis + Mailtrap API
+  Auth: Forgot / Reset password             | ✅ Xong    | Redis, invalidate old token
+  Auth: Get me / Update me                  | ✅ Xong    | —
+  Database schema (PostgreSQL)              | ✅ Xong    | 33+ bảng, V2 migration cần chạy
+  Chat Box + Conversation History           | ⬜ Cần làm | ChatService + Gemini Manager Agent
+  Quota Logic                               | ⬜ Cần làm | QuotaService + atomic deduct
+  8-Pillar Scoring Engine                   | ⬜ Cần làm | ScoringEngineService
+  Crawler — MST (VN), GLEIF (quốc tế)       | ⬜ Cần làm | GLEIF thay OpenCorporates (free)
+  Crawler — Tavily Search (Find Partners)   | ⬜ Cần làm | TavilyClient + ManagerAgent
+  SWIFT/BIC + VCCI Certificate              | ⬜ Cần làm | P6 + P3
+  OpenSanctions self-hosted                 | ⬜ Cần làm | Docker, bắt buộc cho P6
+  Payment — VietQR                          | ⬜ Cần làm | Schema đã có: invoices, vietqr_payments
+  Admin Dashboard                           | ⬜ Cần làm | Users, conversations, revenue, AI cost
+  Deal Safety Engine                        | ⬜ Cần làm | Sau khi Scoring xong
+  Deploy — Railway + Gemini API             | ⬜ Cần làm | Deadline 30/6
+
+
+============================================================
+3. Chat Box & Find Partners
+============================================================
+Chat Box là entry point của toàn bộ app. User không dùng form — họ chat tự nhiên. Manager Agent (Gemini) detect intent và route đến đúng service.
+
+3.1 Intent routing
+------------------
+
+  Intent         | Action         | Ví dụ input
+  ---------------+----------------+-----------------------------------------
+  find_partner   | FIND_PARTNERS  | "tìm nhà cung cấp vải cotton Trung Quốc"
+  verify_company | TRIGGER_VERIFY | "xác minh công ty Alibaba Group"
+  ask_report     | GET_REPORT     | "kết quả verify lúc nãy thế nào"
+  general        | CHAT_RESPONSE  | "Incoterm FOB là gì?"
+
+
+3.2 Nguồn dữ liệu Find Partners
+-------------------------------
+
+  Nguồn             | Data gì                  | Free tier      | Ghi chú
+  ------------------+--------------------------+----------------+--------------------------------
+  Tavily Search API | Web search có cấu trúc   | 1,000/tháng    | Find Partners flow
+  GLEIF API         | Legal Entity Identifier  | Không giới hạn | ISO 17442 — thay OpenCorporates
+  api.tracuunnt.com | MST công ty VN           | Không giới hạn | Tổng cục Thuế, P1 source
+  Google Places API | Địa chỉ, phone, rating   | $200 credit/T  | Verify physical existence
+  OpenSanctions     | OFAC/EU/UN sanctions     | Self-host free | Docker, P6 bắt buộc
+  VCCI eCoSys       | Certificate of Origin VN | Không giới hạn | Scrape, P3 source
+
+OpenCorporates đã bị loại: gói rẻ nhất £2,250/năm, không có free tier cho commercial use. Thay bằng GLEIF — miễn phí, uy tín hơn, ISO standard.
+
+3.3 Database V2 migration (cần chạy)
+------------------------------------
+-- Fix chat_messages: thiếu FK session_id
+ALTER TABLE chat_messages
+ADD COLUMN session_id UUID NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+ADD COLUMN metadata   JSONB NULL,
+ADD COLUMN model_used VARCHAR(100) NULL;
+-- Fix pillar_results: thiếu FK report_id
+ALTER TABLE pillar_results
+ADD COLUMN report_id   UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+ADD COLUMN data_source VARCHAR(200) NULL,
+ADD COLUMN scored_at   TIMESTAMPTZ NULL;
+-- Fix report_jobs: thiếu FK report_id
+ALTER TABLE report_jobs
+ADD COLUMN report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE;
+
+3.4 API Endpoints — Chat
+------------------------
+
+  Method | Endpoint                            | Mô tả                  | Auth
+  -------+-------------------------------------+------------------------+-----
+  POST   | /api/v1/chat/sessions               | Tạo session mới        | ✓
+  GET    | /api/v1/chat/sessions               | Lấy list sessions      | ✓
+  DELETE | /api/v1/chat/sessions/{id}          | Xóa session            | ✓
+  POST   | /api/v1/chat/sessions/{id}/messages | Gửi message → AI xử lý | ✓
+  GET    | /api/v1/chat/sessions/{id}/messages | Load message history   | ✓
+
+
+============================================================
+4. Quota Logic
+============================================================
+Quota là số lần Deep Verify user được phép trong chu kỳ billing. Chat và Quick Scan không tốn quota.
+
+4.1 Business rules
+------------------
+
+  Rule              | Chi tiết
+  ------------------+-------------------------------------------------------------------------
+  Free plan         | 2 verify LIFETIME — không reset (cycle_reset_at = NULL)
+  Paid plans        | Reset theo ngày anniversary, không phải ngày 1 mỗi tháng
+  Chat + Quick Scan | Không trừ quota — miễn phí vĩnh viễn
+  Deep Verify       | Trừ 1 quota NGAY KHI BẮT ĐẦU, không phải khi xong
+  Lý do trừ trước   | Tránh user refresh liên tục → gọi API nhiều lần miễn phí
+  Quota = 0         | Block Deep Verify, hiện upsell modal. Vẫn cho Chat + Search + Quick Scan
+  Report fail       | Admin hoàn quota thủ công qua PATCH /admin/users/{id}/quota
+
+
+4.2 Atomic deduct query
+-----------------------
+@Modifying
+@Query("UPDATE Users u SET u.quotaRemaining = u.quotaRemaining - 1,"
++ "u.quotaUsedThisCycle = u.quotaUsedThisCycle + 1 "
++ "WHERE u.id = :userId AND u.quotaRemaining > 0")
+int deductOneQuota(@Param("userId") UUID userId);
+// 1 = OK  |  0 = hết quota  |  race condition safe
+
+============================================================
+5. 8-Pillar Scoring Pipeline
+============================================================
+Deep Verify chạy 8 pillar theo thứ tự. P6 (Sanctions) có Hard Stop — phát hiện cấm vận → dừng toàn bộ pipeline ngay.
+
+5.1 8 Pillars
+-------------
+
+  #  | Pillar    | Check gì                                   | Weight | Hard Stop | Nguồn data
+  ---+-----------+--------------------------------------------+--------+-----------+---------------------------
+  P1 | Pháp lý   | Tax code, đăng ký, trạng thái active       | 18%    | Không     | MST (VN), GLEIF (quốc tế)
+  P2 | Digital   | Domain age, website, LinkedIn presence     | 10%    | Không     | WHOIS
+  P3 | Trade     | Xuất nhập khẩu thực tế, số năm hoạt động   | 18%    | Không     | VCCI eCoSys, ITC Trade Map
+  P4 | Identity  | Tên/địa chỉ khớp giữa các nguồn            | 12%    | Không     | Cross-check
+  P5 | Tài chính | Thuế, nợ thuế, báo cáo tài chính           | 14%    | Không     | Tổng cục Thuế VN
+  P6 | Sanctions | OFAC, EU, UN cấm vận. SWIFT/BIC validation | 12%    | CÓ ⚠      | OpenSanctions, SWIFT
+  P7 | Deal      | Incoterm thường dùng, payment history      | 8%     | Không     | Trade history
+  P8 | Physical  | Ảnh nhà xưởng — TinEye + Gemini vision     | 8%     | Không     | TinEye, user upload
+
+
+5.2 Cache TTL
+-------------
+
+  Pillar       | TTL     | Lý do
+  -------------+---------+----------------------------------------
+  P1 Pháp lý   | 7 ngày  | Đăng ký thay đổi chậm
+  P2 Digital   | 3 ngày  | Domain, website thay đổi vừa phải
+  P3 Trade     | 7 ngày  | Lịch sử thương mại ổn định
+  P6 Sanctions | 24 giờ  | Danh sách cấm vận cập nhật thường xuyên
+  P8 Images    | 30 ngày | Ảnh nhà xưởng hiếm khi thay đổi
+
+
+5.3 Tính overall score
+----------------------
+Weighted average của các pillar CÓ score — pillar null bị bỏ qua, weight được renormalize. Không phạt user vì thiếu data.
+// P8 null → tổng weight 7 pillar còn lại = 92%
+overallScore = sum(score[i] * weight[i]) / 92
+
+5.4 Pipeline flow
+-----------------
+POST /api/v1/reports/deep-verify { entityName, countryIso2 }
+→ 1. quotaService.deductQuota(userId)   ← ATOMIC
+→ 2. Tạo Report (score = null) + ReportJob (status = queued)
+→ 3. Return 202 Accepted { reportId }
+→ [ASYNC] ScoringEngineService.runDeepVerify(reportId)
+Loop i = 1→8: crawl → score → save pillar
+if (i==6 && score==0) → HARD STOP
+calculateOverallScore() → save
+→ [Frontend] GET /reports/{id}/status  mỗi 3s
+
+============================================================
+6. Crawler & Data Sources
+============================================================
+Crawler thu thập dữ liệu trước khi Scoring Engine chấm điểm. Kết quả cache theo entity + pillar để tránh gọi lặp.
+
+6.1 Nguồn dữ liệu theo pillar
+-----------------------------
+
+  Pillar     | Nguồn                             | Loại        | Free tier
+  -----------+-----------------------------------+-------------+------------------
+  P1 VN      | api.tracuunnt.com (Tổng cục Thuế) | HTTP REST   | Không giới hạn
+  P1 quốc tế | GLEIF API (gleif.org)             | REST API    | Không giới hạn
+  P2         | WHOIS (domaintools.com)           | HTTP scrape | Không giới hạn
+  P3         | VCCI eCoSys, ITC Trade Map        | HTTP scrape | Giới hạn (ITC)
+  P4         | Google Places API                 | REST API    | $200 credit/tháng
+  P5         | Tổng cục Thuế VN                  | HTTP scrape | Không giới hạn
+  P6         | OpenSanctions (self-hosted)       | Local DB    | Miễn phí tự host
+  P6 Bank    | SWIFT Directory                   | HTTP scrape | Không giới hạn
+  P8         | TinEye API                        | REST API    | 150 lookups/tháng
+  Search     | Tavily Search API                 | REST API    | 1,000 calls/tháng
+
+
+6.2 Entity Cache
+----------------
+Cache key format: {pillar_no}:{entity_name_lowercase}:{country_iso2}
+// Ví dụ: "1:acme gmbh:de"
+cache = entityCacheRepo.findById(cacheKey)
+if (cache != null && cache.expiresAt > now) return cache.data
+// Sau khi gọi API thành công → save cache
+
+6.3 GLEIF API
+-------------
+Thay thế OpenCorporates. Chuẩn ISO 17442, IMF/BIS/FSB bảo trợ. Miễn phí, không cần API key.
+GET https://api.gleif.org/api/v1/fuzzycompletions?field=fulltext&q=Deutsche+Bank
+GET https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Alibaba
+
+6.4 SWIFT/BIC flow (P6)
+-----------------------
+
+  Bước | Hành động                                        | Source
+  -----+--------------------------------------------------+--------------------------
+  1    | User cung cấp SWIFT code của ngân hàng đối tác   | Input từ form verify
+  2    | Validate format: 8 hoặc 11 ký tự AAAA-BB-CC-XXX  | Regex validation
+  3    | Lookup → tìm tên ngân hàng, quốc gia             | SWIFT Directory scrape
+  4    | Kiểm tra ngân hàng có trong sanctions list không | OpenSanctions cross-check
+  5    | Trả kết quả: valid/invalid + tên ngân hàng thật  | Score P6
+
+
+============================================================
+7. Tổ chức Package
+============================================================
+com.example.backend/
+├── config/
+│   ├── AppConfig.java          @Bean: RestTemplate, GeminiChatClient
+│   ├── SecurityConfig.java     JWT filter, CORS, permissions
+│   └── JwtService.java         Generate + validate JWT
+│
+├── controller/
+│   ├── AuthController.java     /api/v1/auth/**
+│   ├── ChatController.java     /api/v1/chat/**          ← MỚI
+│   ├── ReportController.java   /api/v1/reports/**
+│   └── AdminController.java    /api/v1/admin/**         (ROLE_ADMIN)
+│
+├── service/
+│   ├── ChatService.java        Chat flow + Gemini + history   ← MỚI
+│   ├── UserService.java, QuotaService.java
+│   ├── ReportService.java, ScoringEngineService.java
+│   └── DealSafetyService.java, RefreshTokenService.java
+│
+├── service/agent/              ← MỚI — Gemini Agents
+│   ├── ManagerAgent.java       Intent detection + find partners
+│   ├── ScoringAgent.java       Parse crawler data → scoring hints
+│   └── DealSafetyAgent.java    Incoterm + payment recommendation
+│
+├── service/crawler/
+│   ├── CrawlerService.java     Orchestrator
+│   ├── MstCrawler.java         Tổng cục Thuế (P1 VN)
+│   ├── GleifCrawler.java       GLEIF API (P1 quốc tế)    ← thay OpenCorporates
+│   ├── TavilyClient.java       Find Partners              ← MỚI
+│   ├── SanctionsCrawler.java   OpenSanctions (P6)
+│   ├── SwiftBicService.java    SWIFT validation (P6)
+│   └── VcciCrawler.java        VCCI eCoSys (P3)
+│
+├── model/
+│   ├── Users.java, Plan.java, Subscription.java
+│   ├── ChatSession.java, ChatMessage.java  ← MỚI
+│   ├── Report.java, ReportJob.java, PillarResult.java
+│   └── ScoringConfig.java
+│
+├── repository/
+│   ├── ChatSessionRepository.java, ChatMessageRepository.java  ← MỚI
+│   ├── UsersRepository.java    + deductOneQuota, refundOneQuota
+│   └── ReportRepository.java, PillarResultRepository.java
+│
+├── dto/
+│   ├── AuthDTO.java, ChatDTO.java (← MỚI), ReportDTO.java
+│
+└── exception/
+└── GlobalExceptionHandler.java
+
+============================================================
+8. API Endpoints
+============================================================
+
+8.1 Auth — đã xong
+------------------
+
+  Method | Endpoint                     | Mô tả                       | Auth
+  -------+------------------------------+-----------------------------+-----
+  POST   | /api/v1/auth/register        | Đăng ký tài khoản mới       |
+  POST   | /api/v1/auth/login           | Đăng nhập → JWT + refresh   |
+  POST   | /api/v1/auth/logout          | Logout, blacklist token     | ✓
+  POST   | /api/v1/auth/refresh         | Đổi refresh → access token  |
+  GET    | /api/v1/auth/verify-email    | Xác thực email ?token=      |
+  POST   | /api/v1/auth/forgot-password | Gửi email reset             |
+  POST   | /api/v1/auth/reset-password  | Đặt mật khẩu mới            |
+  GET    | /api/v1/auth/me              | Lấy thông tin user hiện tại | ✓
+  PUT    | /api/v1/auth/me              | Cập nhật profile            | ✓
+
+
+8.2 Chat — cần làm
+------------------
+
+  Method | Endpoint                            | Mô tả
+  -------+-------------------------------------+----------------------------------
+  POST   | /api/v1/chat/sessions               | Tạo session mới
+  GET    | /api/v1/chat/sessions               | Lấy list sessions (sidebar)
+  DELETE | /api/v1/chat/sessions/{id}          | Xóa session
+  POST   | /api/v1/chat/sessions/{id}/messages | Gửi message → AI xử lý → response
+  GET    | /api/v1/chat/sessions/{id}/messages | Load message history
+
+
+8.3 Reports — cần làm
+---------------------
+
+  Method | Endpoint                    | Mô tả                            | Quota
+  -------+-----------------------------+----------------------------------+---------
+  POST   | /api/v1/reports/quick-scan  | Quick Scan P1+P6, ~30s           | Miễn phí
+  POST   | /api/v1/reports/deep-verify | Deep Verify 8 pillars, 5–8 phút  | -1 quota
+  GET    | /api/v1/reports             | Danh sách report của user        | —
+  GET    | /api/v1/reports/{id}        | Report detail + 8 pillar results | —
+  GET    | /api/v1/reports/{id}/status | Poll job status khi đang chạy    | —
+  GET    | /api/v1/reports/{id}/deal   | Deal Safety recommendations      | —
+
+
+8.4 Admin — cần làm
+-------------------
+
+  Method | Endpoint                       | Mô tả
+  -------+--------------------------------+-------------------------------------------
+  GET    | /api/v1/admin/users            | Danh sách tất cả users
+  PATCH  | /api/v1/admin/users/{id}/quota | Override quota (hoàn thủ công)
+  GET    | /api/v1/admin/reports          | Tất cả reports
+  GET    | /api/v1/admin/chat/sessions    | Tất cả conversations
+  GET    | /api/v1/admin/stats            | Thống kê: users, reports, revenue, AI cost
+  GET    | /api/v1/admin/model-run-logs   | Gemini API cost tracking
+
+
+============================================================
+9. Thứ tự làm việc
+============================================================
+
+9.1 Critical path
+-----------------
+  * Chat Box + ChatService phải xong trước — đây là entry point của toàn bộ app
+  * Gemini API config phải xong trước khi test bất kỳ AI feature nào
+  * QuotaService phải xong trước khi test Deep Verify
+  * ScoringEngineService mock phải chạy để Frontend test UI
+  * OpenSanctions Docker phải setup trước Tuần 4
+
+9.2 Sprint plan
+---------------
+
+  Tuần             | Task                                                                                                                                                                        | Output kiểm tra
+  -----------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------
+  Tuần 3 (2–6/6)   | 1. Gemini API config + ChatService 2. ChatController + conversation history 3. ManagerAgent intent detection 4. QuotaService + atomic deduct 5. ScoringEngineService (mock) | Chat hoạt động. POST /chat/sessions/{id}/messages → response từ Gemini. POST /deep-verify → 202 + mock score.
+  Tuần 4 (9–13/6)  | 6. MstCrawler + GleifCrawler 7. TavilyClient + Find Partners flow 8. SanctionsCrawler (OpenSanctions Docker) 9. EntityCache integration                                     | Report có data thật. Find Partners → danh sách từ Tavily. P6 check sanctions thật.
+  Tuần 4 (13–16/6) | 10. SwiftBicService 11. VcciCrawler 12. Payment — VietQR                                                                                                                    | P6 SWIFT check. P3 VCCI CO count. VietQR QR code generate.
+  Tuần 5 (16–20/6) | 13. DealSafetyService + DealSafetyAgent 14. Admin Dashboard APIs 15. Frontend integrate API 16. Deploy Railway + Gemini production                                          | Full flow end-to-end. Admin thấy conversations + AI cost. Deploy Railway chạy.
+
+
+9.3 Phân công
+-------------
+
+  Role         | Task
+  -------------+------------------------------------------------------------------------------
+  PM + BE Lead | ChatService, ManagerAgent (Gemini), QuotaService, ScoringEngine mock, gắn kết
+  Backend Dev  | MstCrawler, GleifCrawler, TavilyClient, SanctionsCrawler
+  DevOps       | OpenSanctions Docker, Railway deploy config, Gemini API key env
+  Frontend     | Next.js, mock API, Chat UI, Auth screens
+  QA           | Test: quota logic, hard stop, conversation history, Find Partners
+
+Câu hỏi → Discord #marketscout-dev · tag @PM
+MarketScout · Team ARAM #278 · v2.0
