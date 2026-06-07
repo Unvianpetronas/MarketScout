@@ -187,10 +187,23 @@
 
 		<!-- dotenv handled natively via spring.config.import -->
 
-		<!-- Redis — refresh token, blacklist token -->
+		<!-- Redis — refresh token, blacklist token, crawler cache -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-redis</artifactId>
+		</dependency>
+
+		<!-- Jsoup — HTML scraping for P1 masothue.vn, P3 VCCI, P5 dangkykinhdoanh -->
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.18.3</version>
+		</dependency>
+
+		<!-- Jackson for ObjectMapper (used by CacheService, FactExtractor) -->
+		<dependency>
+			<groupId>com.fasterxml.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-jsr310</artifactId>
 		</dependency>
 
 
