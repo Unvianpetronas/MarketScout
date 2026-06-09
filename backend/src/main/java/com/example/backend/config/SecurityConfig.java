@@ -1,6 +1,6 @@
 package com.example.backend.config;
 
-import com.example.backend.repository.UsersRepository;
+import com.example.backend.domain.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;

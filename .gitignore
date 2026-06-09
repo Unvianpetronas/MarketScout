@@ -58,3 +58,4 @@ logs/
 marketscout-system-design-guide.txt
 quota-service-explanation.txt
 auth-explanation.txt
+*.sql

@@ -1,6 +1,6 @@
 package com.example.backend.config;
 
-import com.example.backend.service.TokenBlacklistService;
+import com.example.backend.auth.TokenBlacklistService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -42,7 +42,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             if (jti != null && blacklistService.isBlacklisted(jti)) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json;charset=UTF-8");
-                response.getWriter().write("{\"error\":\"Token đã bị thu hồi, vui lòng đăng nhập lại\"}");
+                response.getWriter().write("{\"error\":\"Token has been revoked, please log in again\"}");
                 return;
             }
 
