@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { startVerification } from "@/services/report.service";
 
 export function VerifyForm() {
   const router = useRouter();
@@ -13,57 +12,37 @@ export function VerifyForm() {
   const [companyName, setCompanyName] = useState("");
   const [country, setCountry] = useState("");
 
-  const handleSubmit = async (
-    e: React.FormEvent
-  ) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!companyName.trim()) return;
 
-    await startVerification({
-      entityName: companyName,
-      countryIso2: country,
-    });
-
-    router.push("/reports/demo-report");
+    // Route to the verify search page; deep verification runs through the AI chat pipeline
+    const params = new URLSearchParams({ q: companyName, country });
+    router.push(`/verify?${params.toString()}`);
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-6"
-    >
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div>
-        <label className="mb-2 block text-sm font-medium">
-          Company Name
-        </label>
-
+        <label className="mb-2 block text-sm font-medium">Company Name</label>
         <Input
           placeholder="ABC Furniture Import LLC"
           value={companyName}
-          onChange={(e) =>
-            setCompanyName(e.target.value)
-          }
+          onChange={(e) => setCompanyName(e.target.value)}
         />
       </div>
 
       <div>
-        <label className="mb-2 block text-sm font-medium">
-          Country
-        </label>
-
+        <label className="mb-2 block text-sm font-medium">Country</label>
         <Input
-          placeholder="United States"
+          placeholder="VN, US, DE…"
           value={country}
-          onChange={(e) =>
-            setCountry(e.target.value)
-          }
+          onChange={(e) => setCountry(e.target.value)}
         />
       </div>
 
-      <Button
-        type="submit"
-        className="w-full"
-      >
-        Start Verification
+      <Button type="submit" className="w-full">
+        Search Partners
       </Button>
     </form>
   );

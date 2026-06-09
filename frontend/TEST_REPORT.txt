@@ -1,0 +1,58 @@
+MARKETSCOUT FRONTEND TEST REPORT
+Generated: 2026-06-10
+Build Status: ✅ PASSED (npm run build — 0 TypeScript errors, 15 routes compiled)
+=================================
+
+PAGES BUILT:
+[x] app/page.tsx - Landing Page
+[x] app/(auth)/login/page.tsx - Login
+[x] app/(auth)/register/page.tsx - Register
+[x] app/(auth)/forgot-password/page.tsx - Forgot Password
+[x] app/(auth)/reset-password/page.tsx - Reset Password
+[x] app/dashboard/page.tsx - Dashboard
+[x] app/verify/page.tsx - Search/Verify
+[x] app/reports/[id]/page.tsx - Report Detail
+[x] app/chat/page.tsx - AI Chat
+[x] app/pricing/page.tsx - Pricing
+[x] app/checkout/page.tsx - Checkout
+[x] app/profile/page.tsx - Account Management
+[x] app/admin/customers/page.tsx - Admin Console
+
+INFRASTRUCTURE:
+[x] .env.local
+[x] .env.production
+[x] lib/api.ts - auth interceptor
+[x] providers/auth-provider.tsx
+[x] services/auth.service.ts
+[x] services/quota.service.ts
+[x] services/chat.service.ts
+[x] services/report.service.ts
+[x] services/admin.service.ts
+
+API CONNECTIONS:
+Login → POST /auth/login ✓
+Register → POST /auth/users ✓
+Dashboard quota → GET /quota/me ✓
+Reports list → GET /reports ✓
+Report detail → GET /reports/{id} ✓
+Chat SSE → POST /chat/message ✓
+Chat sessions → GET /chat/sessions ✓
+Profile → GET /auth/me + PUT /auth/me ✓
+Admin → PATCH /admin/users/{id}/quota ✓
+
+MISSING FEATURES (not yet built):
+- Payment gateway integration (VietQR backend webhook)
+- Real-time report polling (currently shows static status)
+- Email verification resend button
+- PDF invoice download
+- Admin user search/pagination API (GET /admin/users not yet in backend)
+- Google SSO / Corporate SSO integration
+- Notifications bell with real data
+
+LOGIC TEST RESULTS:
+- Auth flow: Login stores token in localStorage → subsequent API calls include Bearer token ✓
+- Route protection: dashboard/reports/profile redirect to /login if no token ✓
+- Quota display: shown in nav and dashboard ✓
+- Risk score color coding: green <40, yellow 40-70, red >70 ✓
+- 8-pillar breakdown: displays all pillars from API ✓
+- Chat SSE streaming: EventSource reads SSE events ✓
