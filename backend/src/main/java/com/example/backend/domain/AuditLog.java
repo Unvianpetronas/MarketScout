@@ -5,8 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -17,7 +15,7 @@ import java.util.UUID;
 @Table(name = "audit_logs")
 public class AuditLog {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -27,12 +25,10 @@ public class AuditLog {
 
     @Size(max = 100)
     @NotNull
-    @Nationalized
     @Column(name = "\"action\"", nullable = false, length = 100)
     private String action;
 
     @Size(max = 50)
-    @Nationalized
     @Column(name = "target_type", length = 50)
     private String targetType;
 
@@ -43,14 +39,15 @@ public class AuditLog {
     private String payload;
 
     @Size(max = 45)
-    @Nationalized
     @Column(name = "ip_address", length = 45)
     private String ipAddress;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = Instant.now();
+    }
 }

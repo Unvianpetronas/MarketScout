@@ -2,21 +2,81 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Send, Plus, Trash2, FileText, Loader2, Paperclip, RefreshCw, MoreHorizontal } from "lucide-react";
+import {
+  Send, Plus, Trash2, FileText, Loader2, MessageSquare,
+  RefreshCw, Sparkles, Search, Shield, TrendingUp, Globe,
+  ChevronRight, X, Bot, User
+} from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
+import { Sidebar } from "@/components/layout/sidebar";
 import {
-  getSessions,
-  createSession,
-  deleteSession,
-  getSessionHistory,
-  streamPipelineMessage,
+  getSessions, createSession, deleteSession,
+  getSessionHistory, streamPipelineMessage,
 } from "@/services/chat.service";
 import { ChatSession, ChatMessage } from "@/types/chat";
+import { useAuth } from "@/providers/auth-provider";
+
+const SUGGESTED_PROMPTS = [
+  { icon: Search, label: "Tìm đối tác xuất khẩu", prompt: "Tìm cho tôi các nhà xuất khẩu hàng điện tử tại Việt Nam" },
+  { icon: Shield, label: "Kiểm tra rủi ro", prompt: "What are the main red flags when dealing with a new Chinese supplier?" },
+  { icon: TrendingUp, label: "Phân tích thị trường", prompt: "Phân tích xu hướng thị trường xuất khẩu đồ gỗ Việt Nam sang EU năm 2024" },
+  { icon: Globe, label: "Tư vấn thương mại", prompt: "Hướng dẫn quy trình thẩm định đối tác thương mại quốc tế cho công ty vừa và nhỏ" },
+];
+
+function TypingDots() {
+  return (
+      <div className="flex items-center gap-1.5 px-1">
+        {[0, 150, 300].map((delay) => (
+            <div
+                key={delay}
+                className="w-2 h-2 rounded-full bg-[#00D26A]"
+                style={{ animation: `bounce 1.2s ${delay}ms ease-in-out infinite` }}
+            />
+        ))}
+      </div>
+  );
+}
+
+function MessageBubble({ msg, userInitials }: { msg: ChatMessage; userInitials: string }) {
+  const isUser = msg.role === "user";
+  return (
+      <div className={`flex gap-3 animate-fade-in-up ${isUser ? "flex-row-reverse" : ""}`}>
+        {/* Avatar */}
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
+            isUser ? "gradient-brand" : "bg-[#0D2218]"
+        }`}>
+          {isUser
+              ? <span className="text-white text-xs font-bold">{userInitials}</span>
+              : <Bot className="w-4 h-4 text-[#00D26A]" />
+          }
+        </div>
+
+        <div className={`max-w-[75%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1`}>
+          <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider px-1">
+            {isUser ? "Bạn" : "MarketScout AI"}
+          </p>
+          <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
+              isUser
+                  ? "bg-[#0D2218] text-white rounded-tr-sm"
+                  : "bg-white text-gray-800 rounded-tl-sm border border-gray-100"
+          }`}>
+            <p style={{ whiteSpace: "pre-wrap" }}>{msg.content}</p>
+          </div>
+          {!isUser && (
+              <p className="text-[10px] text-gray-400 px-1">
+                {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""}
+              </p>
+          )}
+        </div>
+      </div>
+  );
+}
 
 function ChatContent() {
   const searchParams = useSearchParams();
   const reportId = searchParams.get("reportId") || undefined;
+  const { user } = useAuth();
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
@@ -27,22 +87,22 @@ function ChatContent() {
   const streamingContentRef = useRef("");
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const userInitials = (user?.fullName || "U")
+      .split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
 
   useEffect(() => {
     getSessions()
-      .then((s) => {
-        setSessions(s);
-        if (s.length > 0) setActiveSession(s[0]);
-        setIsLoadingSessions(false);
-      })
-      .catch(() => setIsLoadingSessions(false));
+        .then((s) => { setSessions(s); if (s.length > 0) setActiveSession(s[0]); setIsLoadingSessions(false); })
+        .catch(() => setIsLoadingSessions(false));
   }, []);
 
   useEffect(() => {
     if (activeSession) {
       getSessionHistory(activeSession.id)
-        .then((conv) => setMessages(conv.messages))
-        .catch(() => setMessages([]));
+          .then((conv) => setMessages(conv.messages))
+          .catch(() => setMessages([]));
     }
   }, [activeSession]);
 
@@ -50,12 +110,9 @@ function ChatContent() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent]);
 
-  // Handle preMessage from search params (coming from verify page)
   useEffect(() => {
     const preMessage = searchParams.get("preMessage");
-    if (preMessage) {
-      setInput(decodeURIComponent(preMessage));
-    }
+    if (preMessage) setInput(decodeURIComponent(preMessage));
   }, [searchParams]);
 
   const handleNewSession = async () => {
@@ -64,8 +121,9 @@ function ChatContent() {
       setSessions((prev) => [session, ...prev]);
       setActiveSession(session);
       setMessages([]);
+      inputRef.current?.focus();
     } catch {
-      toast.error("Failed to create session.");
+      toast.error("Không thể tạo session mới.");
     }
   };
 
@@ -79,7 +137,7 @@ function ChatContent() {
         setMessages([]);
       }
     } catch {
-      toast.error("Failed to delete session.");
+      toast.error("Không thể xóa session.");
     }
   };
 
@@ -93,8 +151,7 @@ function ChatContent() {
         setSessions((prev) => [session!, ...prev]);
         setActiveSession(session);
       } catch {
-        toast.error("Failed to create session.");
-        return;
+        toast.error("Không thể tạo session."); return;
       }
     }
 
@@ -112,332 +169,244 @@ function ChatContent() {
     setStreamingContent("");
     streamingContentRef.current = "";
 
+
     streamPipelineMessage(
-      { message: sentInput, sessionId: session.id, reportId },
-      (chunk) => {
-        streamingContentRef.current += chunk;
-        setStreamingContent(streamingContentRef.current);
-      },
-      () => {
-        setIsStreaming(false);
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: streamingContentRef.current,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-        setStreamingContent("");
-        streamingContentRef.current = "";
-      },
-      () => {
-        setIsStreaming(false);
-        setStreamingContent("");
-        toast.error("Streaming failed. Please try again.");
-      }
+        { message: sentInput, sessionId: session.id, reportId },
+        (chunk) => {
+          streamingContentRef.current = streamingContentRef.current
+              ? `${streamingContentRef.current}\n\n${chunk}` : chunk;
+          setStreamingContent(streamingContentRef.current);
+        },
+        () => {
+          // FIX: chụp giá trị ref ra biến local NGAY LẬP TỨC.
+          // setMessages(updater) chạy trễ (lúc React render), trong khi 2 dòng
+          // reset bên dưới chạy ngay — nếu đọc ref bên trong updater thì lúc đó
+          // ref đã bị xóa thành "" → luôn rơi vào fallback.
+          const finalContent = streamingContentRef.current;
+          setIsStreaming(false);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content: finalContent || "Xin lỗi, hệ thống AI đang không thể tạo phản hồi. Vui lòng thử lại.",
+              createdAt: new Date().toISOString(),
+            },
+          ]);
+          setStreamingContent("");
+          streamingContentRef.current = "";
+        },
+        (err) => {
+          setIsStreaming(false);
+          const partialContent = streamingContentRef.current; // FIX: chụp giá trị trước, lý do như onDone
+          if (partialContent) {
+            // Stream đứt NHƯNG đã nhận được nội dung → vẫn hiển thị cho user
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: partialContent,
+                createdAt: new Date().toISOString(),
+              },
+            ]);
+            streamingContentRef.current = "";
+            setStreamingContent("");
+          } else {
+            setStreamingContent("");
+            toast.error("Kết nối AI bị gián đoạn. Vui lòng thử lại.");
+          }
+        }
     );
   };
 
   return (
-    <AuthGuard>
-      <div className="flex flex-col h-screen bg-[#F9F8F4]">
-        {/* TOP BAR */}
-        <header className="bg-white border-b border-gray-100 h-14 flex items-center px-6 gap-4 shrink-0">
-          {/* Left: Logo */}
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded bg-[#00D26A] flex items-center justify-center">
-              <span className="text-black font-bold text-xs">M</span>
-            </div>
-            <div>
-              <span className="font-bold text-gray-900 text-sm">MarketScout</span>
-              <p className="text-gray-400 text-[10px] leading-none">Intelligence Platform</p>
-            </div>
-          </div>
+      <AuthGuard>
+        <div className="flex h-screen bg-[#FAFBFA] overflow-hidden">
+          <Sidebar active="ai-assistant" />
 
-          {/* Center: Dataset badge */}
-          <div className="flex-1 flex justify-center">
-            <div className="bg-white border border-gray-200 rounded-full px-4 py-1.5 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00D26A]" />
-              <span className="text-sm text-gray-600">Active Dataset: VN_Retail_Expansion_Q3_2024.pdf</span>
-            </div>
-          </div>
-
-          {/* Right */}
-          <div className="flex items-center gap-3">
-            <button className="flex items-center gap-1.5 bg-yellow-400 text-black text-xs font-bold px-3 py-1.5 rounded-full hover:bg-yellow-300 transition-colors">
-              👑 UPGRADE TO PRO
-            </button>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">
-              MD
-            </div>
-          </div>
-        </header>
-
-        {/* MAIN LAYOUT */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* LEFT SIDEBAR */}
-          <aside className="w-72 bg-white border-r border-gray-100 p-5 flex flex-col overflow-y-auto shrink-0">
-            {/* Report Source */}
-            <div className="mb-5">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-[#B8860B] font-semibold uppercase tracking-wider">Report Source</p>
-                <span className="text-xs text-gray-400">● Updated 2h ago</span>
+          {/* ── Session Sidebar ── */}
+          <aside className="w-64 bg-white border-r border-gray-100 flex flex-col shrink-0">
+            <div className="px-4 py-4 border-b border-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-sm font-bold text-gray-900">AI Assistant</h2>
+                  <p className="text-[11px] text-gray-400">Trợ lý thương mại quốc tế</p>
+                </div>
+                <div className="pulse-dot" />
               </div>
-              <h3 className="text-base font-bold text-gray-900 mb-1 leading-snug">
-                Báo cáo Nhượng quyền &amp; Chuỗi Bán lẻ Việt Nam 2024
-              </h3>
-              <p className="text-gray-500 text-sm mb-4 leading-relaxed">
-                Phân tích toàn diện về thị trường nhượng quyền thương mại và chuỗi bán lẻ tại Việt Nam Q3 2024.
-              </p>
-
-              {/* Resource cards */}
-              <div className="space-y-2">
-                {[
-                  {
-                    icon: "📋",
-                    title: "CHẾ ĐỊNH PHÁP LÝ MỚI",
-                    desc: "Nghị định 120/2024 về nhượng quyền thương mại",
-                  },
-                  {
-                    icon: "📈",
-                    title: "DỰ BÁO TĂNG TRƯỞNG",
-                    desc: "CAGR 18.5% giai đoạn 2024-2027",
-                  },
-                  {
-                    icon: "📎",
-                    title: "PHỤ LỤC TẬP ĐÍNH KÈM",
-                    desc: "Danh sách 47 thương hiệu nhượng quyền hàng đầu",
-                  },
-                ].map((item) => (
-                  <div key={item.title} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                    <span className="text-base">{item.icon}</span>
-                    <div>
-                      <p className="text-xs font-bold text-gray-700">{item.title}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
-                <span>Metadata Status: Fully Indexed</span>
-                <span>•</span>
-                <button className="text-[#00D26A] hover:underline font-medium">Browse PDF Data</button>
-              </div>
-            </div>
-
-            {/* Sessions */}
-            <div className="border-t border-gray-100 pt-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Sessions</p>
-                <button
+              <button
                   onClick={handleNewSession}
-                  className="w-6 h-6 bg-[#00D26A] rounded flex items-center justify-center hover:bg-[#00b85d]"
-                >
-                  <Plus className="w-3.5 h-3.5 text-white" />
-                </button>
-              </div>
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 gradient-brand text-white text-xs font-semibold rounded-xl hover:opacity-90 transition-opacity"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Cuộc hội thoại mới
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto scrollbar-thin px-2 py-3">
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold px-2 mb-2">Lịch sử</p>
               {isLoadingSessions ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                </div>
+                  <div className="space-y-2 px-2">
+                    {[...Array(4)].map((_, i) => <div key={i} className="h-9 shimmer rounded-xl" />)}
+                  </div>
               ) : sessions.length === 0 ? (
-                <p className="text-xs text-gray-400">No sessions yet.</p>
+                  <div className="text-center py-8">
+                    <MessageSquare className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                    <p className="text-xs text-gray-400">Chưa có hội thoại nào</p>
+                  </div>
               ) : (
-                <div className="space-y-0.5">
-                  {sessions.map((session) => (
-                    <div
-                      key={session.id}
-                      onClick={() => setActiveSession(session)}
-                      className={`flex items-center justify-between rounded-lg px-3 py-2 cursor-pointer group transition-colors ${
-                        activeSession?.id === session.id
-                          ? "bg-green-50 text-green-700"
-                          : "hover:bg-gray-50 text-gray-600"
-                      }`}
-                    >
-                      <span className="text-xs font-medium truncate">{session.title}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteSession(session.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
+                  <div className="space-y-0.5">
+                    {sessions.map((session) => (
+                        <div
+                            key={session.id}
+                            onClick={() => setActiveSession(session)}
+                            className={`flex items-center justify-between rounded-xl px-3 py-2.5 cursor-pointer group transition-all ${
+                                activeSession?.id === session.id
+                                    ? "bg-[#E6F9F0] text-[#00843F]"
+                                    : "text-gray-600 hover:bg-gray-50"
+                            }`}
+                        >
+                          <span className="text-xs font-medium truncate flex-1">{session.title}</span>
+                          <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteSession(session.id); }}
+                              className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all ml-1 shrink-0"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                    ))}
+                  </div>
               )}
             </div>
           </aside>
 
-          {/* MAIN CHAT AREA */}
+          {/* ── Main Chat ── */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Chat header */}
-            <div className="bg-white border-b border-gray-100 p-4 flex items-center gap-3 shrink-0">
-              <div className="w-9 h-9 rounded-full bg-[#1A3A28] flex items-center justify-center">
-                <span className="text-white font-bold text-sm">M</span>
+            {/* Header */}
+            <div className="bg-white border-b border-gray-100 px-6 py-3.5 flex items-center gap-3 shrink-0 shadow-sm">
+              <div className="w-9 h-9 rounded-full bg-[#0D2218] flex items-center justify-center">
+                <Bot className="w-4.5 h-4.5 text-[#00D26A]" />
               </div>
               <div>
-                <p className="font-semibold text-gray-900 text-sm">MarketScout AI</p>
-                <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                  INTELLIGENCE COPILOT
-                </span>
+                <p className="font-bold text-gray-900 text-sm">MarketScout AI</p>
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00D26A]" />
+                  <span className="text-[11px] text-gray-400">Synced · 190+ quốc gia · 8-pillar analysis</span>
+                </div>
               </div>
-              <p className="text-xs text-gray-400 ml-2">■ Synced to 2024 Corporate Regulatory Index</p>
               <div className="ml-auto flex items-center gap-2">
-                <button className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400">
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-                <button className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400">
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
+                {reportId && (
+                    <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-xs px-3 py-1.5 rounded-full border border-emerald-200 font-medium">
+                      <FileText className="w-3 h-3" />
+                      Báo cáo đã đính kèm
+                    </div>
+                )}
+                <span className="text-[11px] text-gray-400 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                <Sparkles className="w-3 h-3 inline-block mr-1 text-[#00D26A]" />
+                Powered by Gemini
+              </span>
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#F9F8F4]">
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 scrollbar-thin">
               {messages.length === 0 && !isStreaming && (
-                <div className="flex flex-col items-center justify-center h-full text-center pb-20">
-                  <div className="w-16 h-16 rounded-full bg-[#1A3A28] flex items-center justify-center mb-4">
-                    <span className="text-[#00D26A] font-bold text-xl">M</span>
+                  <div className="flex flex-col items-center justify-center h-full text-center pb-20 animate-fade-in">
+                    <div className="w-20 h-20 rounded-full bg-[#0D2218] flex items-center justify-center mb-5 shadow-lg">
+                      <Bot className="w-10 h-10 text-[#00D26A]" />
+                    </div>
+                    <h3 className="text-xl font-extrabold text-gray-900 mb-2">Xin chào! Tôi là MarketScout AI</h3>
+                    <p className="text-gray-500 text-sm max-w-md mb-8">
+                      Tôi có thể giúp bạn tìm kiếm đối tác, thẩm định doanh nghiệp, và tư vấn thương mại quốc tế.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 max-w-lg w-full">
+                      {SUGGESTED_PROMPTS.map(({ icon: Icon, label, prompt }) => (
+                          <button
+                              key={label}
+                              onClick={() => { setInput(prompt); inputRef.current?.focus(); }}
+                              className="flex items-start gap-2.5 text-left p-3.5 bg-white border border-gray-200 rounded-xl hover:border-[#00D26A] hover:bg-[#E6F9F0] transition-all group shadow-sm"
+                          >
+                            <div className="w-6 h-6 bg-[#E6F9F0] rounded-lg flex items-center justify-center shrink-0 group-hover:bg-white transition-colors">
+                              <Icon className="w-3.5 h-3.5 text-[#00D26A]" />
+                            </div>
+                            <span className="text-xs font-semibold text-gray-700 group-hover:text-[#00843F]">{label}</span>
+                          </button>
+                      ))}
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">Intelligence Copilot Ready</h3>
-                  <p className="text-gray-500 text-sm max-w-md">
-                    Ask me anything about regulations, trade partners, financial estimates, or export criteria.
-                  </p>
-                  <div className="grid grid-cols-2 gap-3 mt-6 max-w-sm w-full">
-                    {[
-                      "Summarize the risk findings",
-                      "What are the red flags?",
-                      "Compare with similar companies",
-                      "Recommend due diligence steps",
-                    ].map((prompt) => (
-                      <button
-                        key={prompt}
-                        onClick={() => setInput(prompt)}
-                        className="text-xs text-gray-600 border border-gray-200 rounded-lg px-3 py-2 hover:bg-white hover:border-[#00D26A]/50 text-left transition-colors"
-                      >
-                        {prompt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               )}
 
               {messages.map((msg) => (
-                <div key={msg.id} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                  <p className={`text-xs text-gray-400 mb-1.5 font-semibold uppercase tracking-wider ${msg.role === "user" ? "text-right" : ""}`}>
-                    {msg.role === "user" ? "You • Senior Advisor" : "MarketScout AI • Deep Analytics Agent"}
-                  </p>
-                  <div
-                    className={`rounded-2xl p-4 text-sm leading-relaxed shadow-sm ${
-                      msg.role === "user"
-                        ? "bg-white rounded-tr-sm max-w-lg text-gray-800"
-                        : "bg-white rounded-tl-sm max-w-2xl text-gray-800 italic"
-                    }`}
-                  >
-                    <p style={{ whiteSpace: "pre-wrap" }}>{msg.content}</p>
-                  </div>
-                  {msg.role === "assistant" && (
-                    <p className="text-xs text-gray-400 mt-1.5">
-                      Delivered instantly • Confidence Score: 94%
-                    </p>
-                  )}
-                </div>
+                  <MessageBubble key={msg.id} msg={msg} userInitials={userInitials} />
               ))}
 
-              {/* Streaming */}
               {isStreaming && (
-                <div className="flex flex-col items-start">
-                  <p className="text-xs text-gray-400 mb-1.5 font-semibold uppercase tracking-wider">
-                    MarketScout AI • Deep Analytics Agent
-                  </p>
-                  <div className="bg-white rounded-2xl rounded-tl-sm p-4 shadow-sm max-w-2xl">
-                    {streamingContent ? (
-                      <p className="text-sm text-gray-800 italic" style={{ whiteSpace: "pre-wrap" }}>{streamingContent}</p>
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                        <span className="text-xs text-gray-400 italic ml-1">Analyzing data...</span>
+                  <div className="flex gap-3 animate-fade-in">
+                    <div className="w-8 h-8 rounded-full bg-[#0D2218] flex items-center justify-center shrink-0">
+                      <Bot className="w-4 h-4 text-[#00D26A]" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider px-1">MarketScout AI</p>
+                      <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100 max-w-[75%]">
+                        {streamingContent ? (
+                            <p className="text-sm text-gray-800 leading-relaxed" style={{ whiteSpace: "pre-wrap" }}>
+                              {streamingContent}
+                              <span className="inline-block w-0.5 h-4 bg-[#00D26A] ml-0.5 animate-pulse" />
+                            </p>
+                        ) : <TypingDots />}
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
               )}
 
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input bar */}
-            <div className="bg-white border-t border-gray-100 p-4 shrink-0">
-              <div className="flex items-center gap-3">
-                <button className="text-gray-400 hover:text-gray-600 shrink-0">
-                  <Paperclip className="w-5 h-5" />
-                </button>
-                <div className="flex-1 relative">
-                  <input
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend();
-                      }
-                    }}
-                    placeholder="Ask about regulations, finance estimates, or export criteria..."
-                    disabled={isStreaming}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#1A3A28] focus:ring-2 focus:ring-[#1A3A28]/10 disabled:opacity-60 bg-gray-50"
-                  />
-                </div>
-                {reportId && (
-                  <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-xs rounded-full px-2 py-1 border border-emerald-100 shrink-0">
-                    <FileText className="w-3 h-3" />
-                    <span>Attached Report Active</span>
-                  </div>
-                )}
+            {/* Input Bar */}
+            <div className="bg-white border-t border-gray-100 px-6 py-4 shrink-0">
+              <div className={`flex items-end gap-3 bg-gray-50 rounded-2xl border transition-all ${
+                  input ? "border-[#00D26A] ring-2 ring-[#00D26A]/15" : "border-gray-200"
+              } px-4 py-3`}>
+              <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`; }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+                  }}
+                  placeholder="Hỏi về đối tác, thị trường, rủi ro thương mại... (Enter để gửi)"
+                  disabled={isStreaming}
+                  rows={1}
+                  style={{ resize: "none", overflow: "hidden", minHeight: "36px" }}
+                  className="flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-400 focus:outline-none disabled:opacity-60"
+              />
                 <button
-                  onClick={handleSend}
-                  disabled={isStreaming || !input.trim()}
-                  className="px-4 py-2.5 bg-[#1A3A28] text-white rounded-lg hover:bg-[#0D2218] transition-colors disabled:opacity-60 flex items-center gap-1.5 text-sm font-semibold shrink-0"
+                    onClick={handleSend}
+                    disabled={isStreaming || !input.trim()}
+                    className="gradient-brand text-white rounded-xl p-2.5 hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                 >
                   {isStreaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  Analyze
                 </button>
               </div>
-              <p className="text-xs text-gray-400 text-center mt-2">
+              <p className="text-[11px] text-gray-400 text-center mt-2">
                 🔒 Nội dung mang tính tham khảo. MarketScout AI không thay thế tư vấn pháp lý chuyên nghiệp.
               </p>
             </div>
           </div>
         </div>
-
-        {/* Bottom bar */}
-        <div className="bg-white border-t border-gray-100 px-6 py-2 flex items-center justify-between shrink-0">
-          <p className="text-xs text-gray-400">&copy; 2024 MarketScout Inc. | Terms of Platform Services | Privacy Assurance</p>
-          <div className="flex items-center gap-1.5 text-xs text-gray-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#00D26A]" />
-            MarketScout Central Data Node: Fully Connected
-          </div>
-        </div>
-      </div>
-    </AuthGuard>
+      </AuthGuard>
   );
 }
 
 export default function ChatPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#F9F8F4] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#00D26A]/30 border-t-[#00D26A] rounded-full animate-spin" />
-      </div>
-    }>
-      <ChatContent />
-    </Suspense>
+      <Suspense fallback={
+        <div className="min-h-screen bg-[#FAFBFA] flex items-center justify-center">
+          <div className="w-10 h-10 border-2 border-[#00D26A]/30 border-t-[#00D26A] rounded-full animate-spin" />
+        </div>
+      }>
+        <ChatContent />
+      </Suspense>
   );
 }

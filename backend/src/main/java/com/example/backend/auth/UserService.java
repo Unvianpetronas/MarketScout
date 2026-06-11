@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -53,7 +54,7 @@ public class UserService {
                 .businessDesc(request.getBusinessDesc())
                 .targetMarkets(request.getTargetMarkets())
                 .certifications(request.getCertifications())
-                .role("USER")
+                .role("user")
                 .quotaRemaining(2)
                 .quotaUsedThisCycle(0)
                 .cycleResetAt(Instant.now().plus(30, ChronoUnit.DAYS))
@@ -112,7 +113,7 @@ public class UserService {
         usersRepository.save(user);
 
         String token = jwtService.generateToken(
-                user.getId(), user.getEmail(), user.getRole(), user.getFullName());
+                user.getId(), user.getEmail(), user.getRole().toUpperCase(Locale.ROOT), user.getFullName());
         String refreshToken = refreshTokenService.create(user.getId());
 
         return AuthDTO.LoginResponse.builder()
@@ -122,7 +123,7 @@ public class UserService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .companyName(user.getCompanyName())
-                .role(user.getRole())
+                .role(user.getRole().toUpperCase(Locale.ROOT))
                 .quotaRemaining(user.getQuotaRemaining())
                 .phone(user.getPhone())
                 .taxId(user.getTaxId())
@@ -146,7 +147,7 @@ public class UserService {
         Users user = usersRepository.findById(result.userId())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         String newAccessToken = jwtService.generateToken(
-                user.getId(), user.getEmail(), user.getRole(), user.getFullName());
+                user.getId(), user.getEmail(), user.getRole().toUpperCase(Locale.ROOT), user.getFullName());
         return AuthDTO.RefreshResponse.builder()
                 .token(newAccessToken)
                 .refreshToken(result.newToken())
@@ -164,7 +165,7 @@ public class UserService {
                 .email(user.getEmail())
                 .fullName(user.getFullName())
                 .companyName(user.getCompanyName())
-                .role(user.getRole())
+                .role(user.getRole().toUpperCase(Locale.ROOT))
                 .quotaRemaining(user.getQuotaRemaining())
                 .emailVerified(user.getEmailVerified())
                 .phone(user.getPhone())

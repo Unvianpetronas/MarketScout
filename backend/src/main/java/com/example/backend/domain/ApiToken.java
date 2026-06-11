@@ -5,8 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -17,7 +15,7 @@ import java.util.UUID;
 @Table(name = "api_tokens")
 public class ApiToken {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -28,12 +26,10 @@ public class ApiToken {
 
     @Size(max = 255)
     @NotNull
-    @Nationalized
     @Column(name = "token_hash", nullable = false)
     private String tokenHash;
 
     @Size(max = 100)
-    @Nationalized
     @Column(name = "label", length = 100)
     private String label;
 
@@ -44,9 +40,11 @@ public class ApiToken {
     private Instant expiresAt;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = Instant.now();
+    }
 }

@@ -44,7 +44,7 @@ public class PasswordResetService {
     @Value("${mailtrap.from-name:MarketScout}")
     private String fromName;
 
-    @Value("${app.frontend-url:http://localhost:5173}")
+    @Value("${app.frontend-url:http://localhost:3000}")
     private String frontendUrl;
 
     public void sendResetToken(UUID userId, String toEmail, String language) {

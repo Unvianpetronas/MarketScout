@@ -5,8 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -17,7 +15,7 @@ import java.util.UUID;
 @Table(name = "long_term_memory")
 public class LongTermMemory {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -28,7 +26,6 @@ public class LongTermMemory {
 
     @Size(max = 100)
     @NotNull
-    @Nationalized
     @Column(name = "memory_key", nullable = false, length = 100)
     private String memoryKey;
 
@@ -37,9 +34,16 @@ public class LongTermMemory {
     private String content;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @PrePersist
+    protected void onCreate() {
+        if (updatedAt == null) updatedAt = Instant.now();
+    }
 
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = Instant.now();
+    }
 }

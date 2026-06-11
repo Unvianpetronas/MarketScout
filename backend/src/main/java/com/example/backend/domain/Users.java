@@ -9,7 +9,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -22,7 +21,7 @@ import java.util.UUID;
 public class Users {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id", columnDefinition = "UNIQUEIDENTIFIER")
+    @Column(name = "id", nullable = false)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -31,18 +30,15 @@ public class Users {
 
     @Size(max = 255)
     @NotNull
-    @Nationalized
     @Column(name = "email", nullable = false)
     private String email;
 
     @Size(max = 255)
     @NotNull
-    @Nationalized
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
     @Size(max = 200)
-    @Nationalized
     @Column(name = "full_name", length = 200)
     private String fullName;
 
@@ -60,7 +56,7 @@ public class Users {
     private Instant cycleResetAt;
 
     @NotNull
-    @ColumnDefault("1")
+    @ColumnDefault("true")
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
@@ -68,8 +64,7 @@ public class Users {
     private Instant lastLoginAt;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @Column(name = "updated_at")
@@ -80,38 +75,31 @@ public class Users {
 
     @Size(max = 20)
     @NotNull
-    @Nationalized
     @ColumnDefault("'user'")
     @Column(name = "role", nullable = false, length = 20)
     private String role;
 
     @Size(max = 50)
-    @Nationalized
     @Column(name = "tax_id", length = 50)
     private String taxId;
 
     @Size(max = 30)
-    @Nationalized
     @Column(name = "phone", length = 30)
     private String phone;
 
     @Size(max = 300)
-    @Nationalized
     @Column(name = "company_website", length = 300)
     private String companyWebsite;
 
     @Size(max = 500)
-    @Nationalized
     @Column(name = "headquarters_addr", length = 500)
     private String headquartersAddr;
 
     @Size(max = 100)
-    @Nationalized
     @Column(name = "industry", length = 100)
     private String industry;
 
     @Size(max = 50)
-    @Nationalized
     @Column(name = "annual_revenue", length = 50)
     private String annualRevenue;
 
@@ -126,32 +114,38 @@ public class Users {
 
     @Size(max = 10)
     @NotNull
-    @Nationalized
     @ColumnDefault("'system'")
     @Column(name = "theme", nullable = false, length = 10)
     private String theme;
 
     @Size(max = 2)
     @NotNull
-    @Nationalized
     @ColumnDefault("'vi'")
-    @Column(name = "\"language\"", nullable = false, length = 2)
+    @Column(name = "language", nullable = false, length = 2)
     private String language;
     
     @NotNull
-    @ColumnDefault("1")
+    @ColumnDefault("true")
     @Column(name = "ai_optimization", nullable = false)
     private Boolean aiOptimization;
 
     @Size(max = 300)
-    @Nationalized
     @Column(name = "company_name", length = 300)
     private String companyName;
 
     @NotNull
-    @ColumnDefault("0")
+    @ColumnDefault("false")
     @Column(name = "email_verified", nullable = false)
     private Boolean emailVerified;
 
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = Instant.now();
+        updatedAt = Instant.now();
+    }
 
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = Instant.now();
+    }
 }

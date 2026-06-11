@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -18,7 +17,7 @@ import java.util.UUID;
 @Table(name = "refunds")
 public class Refund {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -38,29 +37,28 @@ public class Refund {
 
     @Size(max = 500)
     @NotNull
-    @Nationalized
     @Column(name = "reason", nullable = false, length = 500)
     private String reason;
 
     @Size(max = 20)
     @NotNull
-    @Nationalized
     @ColumnDefault("'pending'")
     @Column(name = "status", nullable = false, length = 20)
     private String status;
 
     @Size(max = 255)
-    @Nationalized
     @Column(name = "provider_ref")
     private String providerRef;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @Column(name = "completed_at")
     private Instant completedAt;
 
-
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = Instant.now();
+    }
 }

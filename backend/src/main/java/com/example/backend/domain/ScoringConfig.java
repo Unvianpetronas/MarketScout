@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -17,7 +16,7 @@ import java.util.UUID;
 @Table(name = "scoring_configs")
 public class ScoringConfig {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -28,7 +27,6 @@ public class ScoringConfig {
 
     @Size(max = 20)
     @NotNull
-    @Nationalized
     @ColumnDefault("'v1.0'")
     @Column(name = "config_version", nullable = false, length = 20)
     private String configVersion;
@@ -42,14 +40,16 @@ public class ScoringConfig {
     private String thresholds;
 
     @NotNull
-    @ColumnDefault("1")
+    @ColumnDefault("true")
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = Instant.now();
+    }
 }

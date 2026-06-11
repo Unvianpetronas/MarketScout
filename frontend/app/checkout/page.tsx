@@ -258,6 +258,20 @@ function CheckoutContent() {
                 <Shield className="w-4 h-4 text-blue-400" />
                 <span className="text-white text-xs font-semibold">ENTERPRISE GRADE SECURITY</span>
               </div>
+              <div className="flex items-center gap-2 bg-[#1A2035] border border-white/10 rounded-lg px-4 py-2.5">
+                <Lock className="w-4 h-4 text-gray-300" />
+                <span className="text-white text-xs font-semibold">ISO 27001 &amp; PCI-DSS COMPLIANT</span>
+              </div>
+            </div>
+
+            {/* Trust copy */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-gray-500 leading-relaxed">
+              <p>
+                Full refund within the first 24 hours if no verify quota has been consumed. Risk-free purchase.
+              </p>
+              <p>
+                Payment processes securely through certified payment gateways. System checks transaction logs every 3 seconds.
+              </p>
             </div>
           </div>
 
@@ -309,6 +323,9 @@ function CheckoutContent() {
 
               <p className="text-xs text-gray-500 text-center mt-3">
                 Encrypted via TLS 1.3 · Powered by NAPAS
+              </p>
+              <p className="text-xs text-gray-600 text-center mt-1">
+                By continuing, you agree to MarketScout&apos;s B2B Terms of Service.
               </p>
             </div>
           </div>

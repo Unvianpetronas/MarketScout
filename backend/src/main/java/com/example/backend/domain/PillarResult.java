@@ -5,7 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.UUID;
 
@@ -15,7 +16,7 @@ import java.util.UUID;
 @Table(name = "pillar_results")
 public class PillarResult {
     @Id
-    @ColumnDefault("gen_random_uuid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -41,6 +42,7 @@ public class PillarResult {
     private Integer latencyMs;
 
     // v3: array of { type: PASS|WARN|FAIL, text, source } as JSONB
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "evidences", columnDefinition = "jsonb")
     private String evidences;
 

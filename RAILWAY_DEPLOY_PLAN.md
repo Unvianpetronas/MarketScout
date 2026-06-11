@@ -120,10 +120,12 @@ Set it as a Railway environment variable so you don't hardcode the URL.
 After creating the Postgres service on Railway, run:
 ```bash
 # Use Railway CLI or the Railway dashboard → Postgres → Query tab
-psql $DATABASE_URL -f migrate_v3.sql
+psql $DATABASE_URL -v ON_ERROR_STOP=1 -f database_production_v4.sql
 ```
 
-(The `migrate_v3.sql` file is already in the repo root.)
+(The `database_production_v4.sql` file is already in the repo root — it
+supersedes `migrate_v3.sql`/`create_database_postgres.sql` and creates the
+full 33-table schema, seed data, and 5 admin accounts in one shot.)
 
 ### 3B — Set `spring.jpa.hibernate.ddl-auto`
 
@@ -192,7 +194,7 @@ railway up
 ### 4E — Run database migration
 ```bash
 # Via Railway CLI
-railway run --service postgres psql -f migrate_v3.sql
+railway run --service postgres psql -v ON_ERROR_STOP=1 -f database_production_v4.sql
 
 # Or: open Railway dashboard → Postgres → Query tab → paste SQL
 ```
@@ -310,7 +312,7 @@ Before deploying:
 - [ ] `server.port=${PORT:8080}` in `application.properties`
 - [ ] `spring-boot-starter-actuator` added to `pom.xml`
 - [ ] CORS env-based configuration verified
-- [ ] `migrate_v3.sql` ready to run on production Postgres
+- [ ] `database_production_v4.sql` ready to run on production Postgres
 - [ ] All backend env vars set in Railway dashboard
 - [ ] `NEXT_PUBLIC_API_URL` set in Railway frontend service
 

@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -19,6 +21,7 @@ public interface ChatSessionRepository extends JpaRepository<ChatSession, UUID> 
 
     Optional<ChatSession> findByIdAndUser_Id(UUID id, UUID userId);
 
+    @Transactional
     @Modifying
     @Query("UPDATE ChatSession s SET s.updatedAt = :now WHERE s.id = :id")
     void touchUpdatedAt(@Param("id") UUID id, @Param("now") Instant now);

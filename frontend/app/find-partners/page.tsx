@@ -3,115 +3,123 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  Search, MessageSquare, CheckCircle2, Users, Settings,
-  Building2, Plus, Download, X, ChevronDown
+  Search, Download, X, ChevronDown, Globe, Building2, TrendingUp,
+  Star, Filter, LayoutGrid, List, MapPin, BarChart3, Zap,
+  CheckCircle2, AlertTriangle, XCircle, MessageSquare, ArrowUpRight
 } from "lucide-react";
+import { Sidebar } from "@/components/layout/sidebar";
 
 interface Partner {
   id: number;
   score: number;
   name: string;
-  status: "An toàn" | "Cần lưu ý" | "Rủi ro cao";
+  status: "Đáng tin cậy" | "Cần lưu ý" | "Rủi ro cao";
   description: string;
   location: string;
+  country: string;
+  countryFlag: string;
   volume: string;
+  industry: string;
+  founded: string;
   tags: string[];
+  verified: boolean;
 }
 
 const MOCK_PARTNERS: Partner[] = [
   {
-    id: 1,
-    score: 78,
-    name: "ABC Furniture Import LLC",
-    status: "An toàn",
-    description: "Nhà nhập khẩu nội thất gỗ từ Đông Nam Á, chuyên phân phối cho thị trường bán lẻ Mỹ.",
-    location: "Delaware, USA",
-    volume: "~120 container/năm",
-    tags: ["Nội thất & Gỗ", "Nhập khẩu", "B2B", "Verified"],
+    id: 1, score: 87, name: "ABC Furniture Import LLC",
+    status: "Đáng tin cậy",
+    description: "Nhà nhập khẩu nội thất gỗ từ Đông Nam Á, chuyên phân phối cho thị trường bán lẻ Mỹ và Canada.",
+    location: "Delaware, USA", country: "US", countryFlag: "🇺🇸",
+    volume: "~120 container/năm", industry: "Nội thất & Gỗ", founded: "2008",
+    tags: ["Nội thất", "Nhập khẩu", "B2B"], verified: true,
   },
   {
-    id: 2,
-    score: 74,
-    name: "HomeStyle Distribution Inc.",
-    status: "An toàn",
-    description: "Nhà phân phối đồ nội thất và trang trí gia đình tại thị trường Bắc Mỹ.",
-    location: "California, USA",
-    volume: "~85 container/năm",
-    tags: ["Nội thất", "Phân phối", "B2B"],
+    id: 2, score: 79, name: "HomeStyle Distribution Inc.",
+    status: "Đáng tin cậy",
+    description: "Nhà phân phối đồ nội thất và trang trí gia đình tại thị trường Bắc Mỹ với mạng lưới 200+ cửa hàng.",
+    location: "California, USA", country: "US", countryFlag: "🇺🇸",
+    volume: "~85 container/năm", industry: "Phân phối bán lẻ", founded: "2014",
+    tags: ["Nội thất", "Phân phối", "Retail"], verified: true,
   },
   {
-    id: 3,
-    score: 70,
-    name: "Pacific Rim Furnishing Co.",
-    status: "An toàn",
-    description: "Công ty thương mại chuyên nhập khẩu nội thất từ châu Á - Thái Bình Dương.",
-    location: "Oregon, USA",
-    volume: "~60 container/năm",
-    tags: ["Nội thất", "Nhập khẩu", "Verified"],
+    id: 3, score: 73, name: "Pacific Rim Furnishing Co.",
+    status: "Đáng tin cậy",
+    description: "Công ty thương mại chuyên nhập khẩu nội thất từ châu Á - Thái Bình Dương, nhiều kinh nghiệm.",
+    location: "Oregon, USA", country: "US", countryFlag: "🇺🇸",
+    volume: "~60 container/năm", industry: "Nội thất", founded: "2011",
+    tags: ["Nội thất", "Nhập khẩu"], verified: true,
   },
   {
-    id: 4,
-    score: 48,
-    name: "Global Home Trading Co.",
+    id: 4, score: 48, name: "Global Home Trading Co.",
     status: "Cần lưu ý",
-    description: "Công ty thương mại mới thành lập, hoạt động trong lĩnh vực nhập khẩu đồ gia dụng.",
-    location: "Texas, USA",
-    volume: "~20 container/năm",
-    tags: ["Mới thành lập", "8 tháng giao dịch"],
+    description: "Công ty thương mại mới thành lập (8 tháng), hoạt động trong lĩnh vực nhập khẩu đồ gia dụng.",
+    location: "Texas, USA", country: "US", countryFlag: "🇺🇸",
+    volume: "~20 container/năm", industry: "Đồ gia dụng", founded: "2024",
+    tags: ["Mới thành lập", "8 tháng"], verified: false,
   },
   {
-    id: 5,
-    score: 32,
-    name: "XYZ International Group",
+    id: 5, score: 31, name: "XYZ International Group",
     status: "Rủi ro cao",
-    description: "Tập đoàn thương mại quốc tế với lịch sử tranh chấp pháp lý phức tạp.",
-    location: "New York, USA",
-    volume: "N/A",
-    tags: ["⚠ Hard Stop", "Tranh chấp pháp lý"],
+    description: "Tập đoàn thương mại quốc tế với lịch sử tranh chấp pháp lý phức tạp, đang điều tra.",
+    location: "New York, USA", country: "US", countryFlag: "🇺🇸",
+    volume: "N/A", industry: "Thương mại tổng hợp", founded: "2019",
+    tags: ["Hard Stop", "Tranh chấp pháp lý"], verified: false,
   },
-];
-
-const NAV_ITEMS = [
-  { label: "AI Assistant", icon: MessageSquare, active: false },
-  { label: "Tìm đối tác", icon: Search, active: true },
-  { label: "Xác minh nhanh", icon: CheckCircle2, active: false },
-  { label: "Deal Safety", icon: CheckCircle2, active: false },
-  { label: "Quản lý Thành viên", icon: Users, active: false },
-  { label: "Hồ sơ Doanh nghiệp", icon: Building2, active: false },
+  {
+    id: 6, score: 91, name: "EuroFlex Trading GmbH",
+    status: "Đáng tin cậy",
+    description: "Tập đoàn thương mại châu Âu uy tín với 20+ năm kinh nghiệm, đối tác chiến lược của 50+ nhà xuất khẩu Việt Nam.",
+    location: "Hamburg, Germany", country: "DE", countryFlag: "🇩🇪",
+    volume: "~200 container/năm", industry: "Thương mại đa ngành", founded: "2003",
+    tags: ["EU", "Top Partner", "Certified"], verified: true,
+  },
 ];
 
 const FILTER_CHIPS = [
-  { label: "Tất cả", active: false, removable: false },
-  { label: "🇺🇸 Mỹ", active: true, removable: true },
-  { label: "Châu Âu", active: true, removable: true },
-  { label: "Nhật Bản", active: true, removable: true },
-  { label: "Hàn Quốc A", active: true, removable: true },
-  { label: "Điểm ≥ 70", active: true, removable: true },
-  { label: "Hoạt động 5+ năm", active: false, removable: false },
-  { label: "100+ container/năm", active: false, removable: false },
+  { label: "🇺🇸 Mỹ", active: true },
+  { label: "🇩🇪 Châu Âu", active: true },
+  { label: "Điểm ≥ 70", active: true },
+  { label: "Đã xác minh", active: true },
+  { label: "5+ năm", active: false },
+  { label: "100+ container", active: false },
 ];
 
-function ScoreCircle({ score }: { score: number }) {
+function ScoreRing({ score }: { score: number }) {
   const color = score >= 70 ? "#00D26A" : score >= 40 ? "#F59E0B" : "#EF4444";
+  const bg = score >= 70 ? "#E6F9F0" : score >= 40 ? "#FFF8E7" : "#FFF1F0";
+  const r = 18; const circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ;
   return (
-    <div
-      className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white text-sm shrink-0"
-      style={{ backgroundColor: color }}
-    >
-      {score}
+    <div className="relative w-12 h-12 shrink-0">
+      <svg width="48" height="48" viewBox="0 0 48 48" className="-rotate-90">
+        <circle cx="24" cy="24" r={r} fill={bg} stroke="transparent" strokeWidth="0" />
+        <circle cx="24" cy="24" r={r} fill="none" stroke="#F0F0F0" strokeWidth="4" />
+        <circle cx="24" cy="24" r={r} fill="none" stroke={color} strokeWidth="4"
+          strokeDasharray={circ} strokeDashoffset={offset}
+          strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.8s ease" }} />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-xs font-extrabold" style={{ color }}>
+        {score}
+      </span>
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: Partner["status"] }) {
-  const styles = {
-    "An toàn": "bg-green-100 text-green-700",
-    "Cần lưu ý": "bg-yellow-100 text-yellow-700",
-    "Rủi ro cao": "bg-red-100 text-red-700",
-  };
+  if (status === "Đáng tin cậy") return (
+    <span className="flex items-center gap-1 risk-low text-xs font-semibold px-2.5 py-0.5 rounded-full">
+      <CheckCircle2 className="w-3 h-3" /> {status}
+    </span>
+  );
+  if (status === "Cần lưu ý") return (
+    <span className="flex items-center gap-1 risk-medium text-xs font-semibold px-2.5 py-0.5 rounded-full">
+      <AlertTriangle className="w-3 h-3" /> {status}
+    </span>
+  );
   return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${styles[status]}`}>
-      {status}
+    <span className="flex items-center gap-1 risk-high text-xs font-semibold px-2.5 py-0.5 rounded-full">
+      <XCircle className="w-3 h-3" /> {status}
     </span>
   );
 }
@@ -119,231 +127,286 @@ function StatusBadge({ status }: { status: Partner["status"] }) {
 export default function FindPartnersPage() {
   const [searchQuery, setSearchQuery] = useState("Nhà nhập khẩu nội thất gỗ tại Mỹ");
   const [chips, setChips] = useState(FILTER_CHIPS);
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [sortBy, setSortBy] = useState("score");
+  const [searchFocused, setSearchFocused] = useState(false);
 
-  const removeChip = (index: number) => {
-    setChips((prev) => prev.map((c, i) => i === index ? { ...c, active: false } : c));
-  };
+  const toggleChip = (i: number) => setChips((prev) => prev.map((c, idx) => idx === i ? { ...c, active: !c.active } : c));
+
+  const sorted = [...MOCK_PARTNERS].sort((a, b) =>
+    sortBy === "score" ? b.score - a.score : a.name.localeCompare(b.name)
+  );
 
   return (
-    <div className="flex h-screen bg-white overflow-hidden">
-      {/* LEFT SIDEBAR */}
-      <aside className="w-56 shrink-0 bg-white border-r border-gray-100 flex flex-col">
-        {/* Logo */}
-        <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#00D26A] rounded-lg flex items-center justify-center">
-              <Search className="w-4 h-4 text-white" />
+    <div className="flex h-screen bg-[#FAFBFA] overflow-hidden">
+      <Sidebar active="find-partners" />
+
+      <div className="flex-1 overflow-y-auto scrollbar-thin">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+
+          {/* ── Header ── */}
+          <div className="flex items-start justify-between mb-6 animate-fade-in-up">
+            <div>
+              <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Tìm đối tác thương mại</h1>
+              <p className="text-sm text-gray-400">Khám phá và xác minh đối tác B2B toàn cầu với AI thẩm định</p>
             </div>
-            <span className="font-bold text-gray-900 text-sm">MarketScout</span>
-          </div>
-          <button className="w-6 h-6 border border-gray-200 rounded flex items-center justify-center hover:bg-gray-50">
-            <Plus className="w-3.5 h-3.5 text-gray-500" />
-          </button>
-        </div>
-
-        {/* Nav label */}
-        <div className="px-4 pt-5 pb-1">
-          <p className="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">Menu Chính</p>
-        </div>
-
-        {/* Nav items */}
-        <nav className="px-2 flex-1 space-y-0.5">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.label}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
-                item.active
-                  ? "bg-green-50 text-[#00D26A] font-semibold"
-                  : "text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              <item.icon className="w-4 h-4 shrink-0" />
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        {/* Bottom */}
-        <div className="border-t border-gray-100 p-3 space-y-2">
-          <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-            <Settings className="w-4 h-4" />
-            Cài đặt
-          </button>
-          <div className="flex items-center gap-2 px-3">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">N</div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-800 truncate">Nguyễn Văn An</p>
-              <p className="text-[10px] text-gray-400 truncate">Growth Plan</p>
+            <div className="flex items-center gap-3">
+              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
+                <Download className="w-4 h-4" />
+                Xuất danh sách
+              </button>
+              <button className="flex items-center gap-2 px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90 shadow-sm">
+                <Filter className="w-4 h-4" />
+                Bộ lọc nâng cao
+              </button>
             </div>
           </div>
-        </div>
-      </aside>
 
-      {/* MAIN AREA */}
-      <main className="flex-1 overflow-y-auto p-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Tìm đối tác thương mại</h1>
-          <div className="flex items-center gap-3">
-            <button className="text-sm text-gray-500 hover:text-gray-700">Lưu workspace</button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-[#00D26A] text-white text-sm font-semibold rounded-lg hover:bg-[#00b85d] transition-colors">
-              <Download className="w-4 h-4" />
-              Xuất danh sách
-            </button>
-          </div>
-        </div>
+          {/* ── Search ── */}
+          <div className={`bg-white rounded-2xl border shadow-sm mb-5 transition-all ${
+            searchFocused ? "border-[#00D26A] ring-2 ring-[#00D26A]/15" : "border-gray-100"
+          }`}>
+            <div className="flex gap-3 p-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                  placeholder="Ví dụ: Nhà nhập khẩu nội thất gỗ tại Mỹ..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#00D26A] focus:bg-white transition-all"
+                />
+              </div>
+              <select className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-700 focus:outline-none focus:border-[#00D26A]">
+                <option value="">Tất cả ngành</option>
+                <option>Nội thất & Gỗ</option>
+                <option>Dệt may</option>
+                <option>Điện tử</option>
+                <option>Thực phẩm & FMCG</option>
+              </select>
+              <select className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-700 focus:outline-none focus:border-[#00D26A]">
+                <option value="">Tất cả quốc gia</option>
+                <option value="US">🇺🇸 Mỹ</option>
+                <option value="DE">🇩🇪 Đức</option>
+                <option value="JP">🇯🇵 Nhật</option>
+                <option value="CN">🇨🇳 Trung Quốc</option>
+              </select>
+              <button className="px-6 py-2.5 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 transition-opacity text-sm">
+                Tìm kiếm
+              </button>
+            </div>
 
-        {/* Search subsection */}
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Tìm đối tác toàn cầu</h2>
-
-        {/* Search bar */}
-        <div className="flex gap-3 mb-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Nhà nhập khẩu nội thất gỗ tại Mỹ"
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00D26A] focus:ring-2 focus:ring-[#00D26A]/20"
-            />
-          </div>
-          <button className="px-5 py-2.5 bg-[#00D26A] text-white font-semibold text-sm rounded-lg hover:bg-[#00b85d] transition-colors">
-            Tìm kiếm
-          </button>
-        </div>
-
-        {/* Filter chips */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          {chips.map((chip, i) => (
-            <span
-              key={i}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                chip.active
-                  ? "bg-green-50 text-green-700 border-green-200"
-                  : "bg-gray-100 text-gray-600 border-gray-200"
-              }`}
-            >
-              {chip.label}
-              {chip.removable && chip.active && (
-                <button onClick={() => removeChip(i)} className="hover:text-red-500">
-                  <X className="w-3 h-3" />
+            {/* Chips */}
+            <div className="flex flex-wrap gap-2 px-4 pb-4">
+              {chips.map((chip, i) => (
+                <button
+                  key={i}
+                  onClick={() => toggleChip(i)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border transition-all ${
+                    chip.active
+                      ? "bg-[#E6F9F0] text-[#00843F] border-[#00D26A]/30"
+                      : "bg-gray-50 text-gray-500 border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  {chip.label}
+                  {chip.active && <X className="w-2.5 h-2.5" />}
                 </button>
-              )}
-            </span>
-          ))}
-        </div>
+              ))}
+            </div>
+          </div>
 
-        {/* Results count */}
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-gray-500">
-            Tìm thấy: <span className="font-semibold text-gray-800">47 kết quả</span>
-          </p>
-          <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
-            Sắp xếp theo: Trust Score
-            <ChevronDown className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Partner cards */}
-        <div className="space-y-3">
-          {MOCK_PARTNERS.map((partner) => (
-            <div
-              key={partner.id}
-              className="bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start gap-4">
-                <ScoreCircle score={partner.score} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-gray-900">{partner.name}</h3>
-                    <StatusBadge status={partner.status} />
-                  </div>
-                  <p className="text-sm text-gray-500 mb-2">{partner.description}</p>
-                  <p className="text-xs text-gray-400 mb-2">
-                    {partner.location} &bull; {partner.volume}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {partner.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className={`text-xs px-2 py-0.5 rounded-full border ${
-                          tag.startsWith("⚠")
-                            ? "bg-red-50 text-red-600 border-red-200"
-                            : "bg-gray-50 text-gray-500 border-gray-200"
-                        }`}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  <button className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
-                    Xem hồ sơ
-                  </button>
-                  <Link
-                    href={`/verify?q=${encodeURIComponent(partner.name)}`}
-                    className="px-3 py-1.5 text-xs font-semibold bg-[#00D26A] text-white rounded-lg hover:bg-[#00b85d] transition-colors"
-                  >
-                    Xác minh
-                  </Link>
-                </div>
+          {/* ── Controls row ── */}
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-gray-500">
+              Tìm thấy <span className="font-bold text-gray-900">{MOCK_PARTNERS.length} đối tác</span> phù hợp
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSortBy(sortBy === "score" ? "name" : "score")}
+                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-xl px-3 py-2"
+              >
+                Sắp xếp: {sortBy === "score" ? "Điểm tin cậy" : "Tên"}
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+              <div className="flex bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <button onClick={() => setViewMode("list")} className={`p-2 transition-colors ${viewMode === "list" ? "bg-[#E6F9F0] text-[#00D26A]" : "text-gray-400 hover:text-gray-600"}`}>
+                  <List className="w-4 h-4" />
+                </button>
+                <button onClick={() => setViewMode("grid")} className={`p-2 transition-colors ${viewMode === "grid" ? "bg-[#E6F9F0] text-[#00D26A]" : "text-gray-400 hover:text-gray-600"}`}>
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
               </div>
             </div>
-          ))}
-        </div>
-      </main>
+          </div>
 
-      {/* RIGHT SIDEBAR */}
-      <aside className="w-72 shrink-0 bg-gray-50 border-l border-gray-100 p-5 overflow-y-auto">
-        {/* Overview */}
-        <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
-          <h3 className="text-sm font-semibold text-gray-800 mb-3">🌐 Tổng quan tìm kiếm</h3>
-          <div className="space-y-2">
-            {[
-              { label: "Tổng kết quả", value: "67 công ty", color: "text-gray-600" },
-              { label: "An toàn (≥70)", value: "28 công ty", color: "text-green-600" },
-              { label: "Cần lưu ý", value: "12 công ty", color: "text-yellow-600" },
-              { label: "Rủi ro cao", value: "7 công ty", color: "text-red-600" },
-            ].map((row) => (
-              <div key={row.label} className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">{row.label}</span>
-                <span className={`font-semibold ${row.color}`}>{row.value}</span>
+          {/* ── Main Layout ── */}
+          <div className="flex gap-5">
+            {/* Partner List/Grid */}
+            <div className="flex-1">
+              {viewMode === "list" ? (
+                <div className="space-y-3">
+                  {sorted.map((partner) => (
+                    <div key={partner.id} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm card-hover group">
+                      <div className="flex items-start gap-4">
+                        <ScoreRing score={partner.score} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                            <h3 className="font-bold text-gray-900 text-base">{partner.name}</h3>
+                            {partner.verified && (
+                              <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <CheckCircle2 className="w-2.5 h-2.5" /> Đã xác minh
+                              </span>
+                            )}
+                            <StatusBadge status={partner.status} />
+                          </div>
+                          <p className="text-sm text-gray-500 mb-3 leading-relaxed">{partner.description}</p>
+                          <div className="flex items-center gap-4 text-xs text-gray-400 mb-3">
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" /> {partner.location}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Building2 className="w-3 h-3" /> {partner.industry}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <BarChart3 className="w-3 h-3" /> {partner.volume}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <TrendingUp className="w-3 h-3" /> {partner.founded}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {partner.tags.map((tag) => (
+                              <span key={tag} className={`text-xs px-2 py-0.5 rounded-full border ${
+                                tag === "Hard Stop"
+                                  ? "risk-high"
+                                  : tag === "Top Partner"
+                                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                                  : "bg-gray-50 text-gray-500 border-gray-200"
+                              }`}>
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Link
+                            href={`/verify?q=${encodeURIComponent(partner.name)}&country=${partner.country}`}
+                            className="flex items-center gap-1.5 px-3 py-2 gradient-brand text-white text-xs font-bold rounded-xl hover:opacity-90"
+                          >
+                            <Zap className="w-3 h-3" /> Thẩm định
+                          </Link>
+                          <Link
+                            href={`/chat?preMessage=${encodeURIComponent(`Cho tôi biết thêm về ${partner.name}`)}`}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 border border-gray-200 text-gray-600 text-xs font-semibold rounded-xl hover:bg-gray-100"
+                          >
+                            <MessageSquare className="w-3 h-3" /> Hỏi AI
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  {sorted.map((partner) => (
+                    <div key={partner.id} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm card-hover">
+                      <div className="flex items-start justify-between mb-3">
+                        <ScoreRing score={partner.score} />
+                        <StatusBadge status={partner.status} />
+                      </div>
+                      <h3 className="font-bold text-gray-900 mb-1 text-sm">{partner.name}</h3>
+                      <p className="text-xs text-gray-400 mb-3 line-clamp-2">{partner.description}</p>
+                      <div className="flex items-center gap-2 text-[11px] text-gray-400 mb-3">
+                        <span>{partner.countryFlag} {partner.country}</span>
+                        <span>·</span>
+                        <span>{partner.industry}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Link
+                          href={`/verify?q=${encodeURIComponent(partner.name)}`}
+                          className="flex-1 text-center text-xs py-1.5 gradient-brand text-white font-semibold rounded-lg"
+                        >
+                          Thẩm định
+                        </Link>
+                        <button className="flex-1 text-xs py-1.5 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50">
+                          Xem hồ sơ
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right Panel */}
+            <aside className="w-72 shrink-0 space-y-4">
+              {/* Overview */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-[#00D26A]" />
+                  Tổng quan kết quả
+                </h3>
+                <div className="space-y-2">
+                  {[
+                    { label: "Đáng tin cậy (≥70)", value: `${MOCK_PARTNERS.filter(p => p.score >= 70).length}`, color: "text-emerald-600" },
+                    { label: "Cần lưu ý (40-70)", value: `${MOCK_PARTNERS.filter(p => p.score >= 40 && p.score < 70).length}`, color: "text-amber-600" },
+                    { label: "Rủi ro cao (<40)", value: `${MOCK_PARTNERS.filter(p => p.score < 40).length}`, color: "text-red-500" },
+                    { label: "Đã xác minh", value: `${MOCK_PARTNERS.filter(p => p.verified).length}`, color: "text-blue-600" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">{label}</span>
+                      <span className={`font-bold ${color}`}>{value} đối tác</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
+
+              {/* Country breakdown */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                <h3 className="text-sm font-bold text-gray-900 mb-3">🌍 Phân bổ quốc gia</h3>
+                <div className="space-y-2">
+                  {[
+                    { flag: "🇺🇸", country: "Mỹ", count: 5 },
+                    { flag: "🇩🇪", country: "Đức", count: 1 },
+                  ].map(({ flag, country, count }) => (
+                    <div key={country} className="flex items-center justify-between">
+                      <span className="text-sm text-gray-700">{flag} {country}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-20 bg-gray-100 rounded-full h-1.5">
+                          <div className="bg-[#00D26A] h-1.5 rounded-full" style={{ width: `${(count / 6) * 100}%` }} />
+                        </div>
+                        <span className="text-xs text-gray-500">{count}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* AI Insight */}
+              <div className="bg-gradient-to-br from-[#0A1A12] to-[#0D2218] rounded-2xl p-4">
+                <h3 className="text-xs font-bold text-[#5FD48A] uppercase tracking-widest mb-2">💡 AI Insights</h3>
+                <p className="text-xs text-[#7BAA8C] leading-relaxed mb-3">
+                  Thị trường nội thất nhập khẩu Mỹ tăng trưởng mạnh. Đối tác tin cậy tập trung ở Delaware & California. Ưu tiên đối tác 5+ năm hoạt động.
+                </p>
+                <Link href="/chat?preMessage=Ph%C3%A2n%20t%C3%ADch%20th%E1%BB%8B%20tr%C6%B0%E1%BB%9Dng%20n%E1%BB%99i%20th%E1%BA%A5t%20nh%E1%BA%ADp%20kh%E1%BA%A9u%20M%E1%BB%B9" className="flex items-center gap-1.5 text-xs text-[#00D26A] hover:underline font-semibold">
+                  Hỏi AI chi tiết hơn <ArrowUpRight className="w-3 h-3" />
+                </Link>
+              </div>
+
+              {/* Top pick */}
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Star className="w-4 h-4 text-amber-500" />
+                  <h3 className="text-sm font-bold text-amber-800">Đề xuất hàng đầu</h3>
+                </div>
+                <p className="text-xs text-amber-700 font-semibold mb-0.5">EuroFlex Trading GmbH</p>
+                <p className="text-xs text-amber-600">Điểm 91 · Đức · 20+ năm kinh nghiệm</p>
+              </div>
+            </aside>
           </div>
         </div>
-
-        {/* Country distribution */}
-        <div className="bg-white rounded-xl border border-gray-100 p-4 mb-4">
-          <h3 className="text-sm font-semibold text-gray-800 mb-3">Phân bổ theo quốc gia</h3>
-          <div className="space-y-2">
-            {[
-              { flag: "🇺🇸", country: "Mỹ", count: 31 },
-              { flag: "🇨🇦", country: "Canada", count: 8 },
-              { flag: "🇬🇧", country: "UK", count: 5 },
-              { flag: "🇦🇺", country: "Australia", count: 3 },
-            ].map((row) => (
-              <div key={row.country} className="flex items-center justify-between text-sm">
-                <span className="text-gray-700">
-                  {row.flag} {row.country}
-                </span>
-                <span className="text-gray-500">{row.count} công ty</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* AI Insights */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-amber-800 mb-2">💡 AI Insights</h3>
-          <p className="text-xs text-amber-700 leading-relaxed">
-            Thị trường nội thất nhập khẩu Mỹ đang tăng trưởng mạnh. Các đối tác có điểm tin cậy ≥70
-            tập trung chủ yếu ở bang Delaware và California. Cân nhắc ưu tiên các đối tác có trên 5 năm hoạt động
-            và lịch sử giao dịch rõ ràng.
-          </p>
-        </div>
-      </aside>
+      </div>
     </div>
   );
 }

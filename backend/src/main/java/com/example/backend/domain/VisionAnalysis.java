@@ -4,8 +4,6 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.util.UUID;
 
@@ -15,7 +13,7 @@ import java.util.UUID;
 @Table(name = "vision_analyses")
 public class VisionAnalysis {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -26,6 +24,4 @@ public class VisionAnalysis {
 
     @Column(name = "ai_analysis", columnDefinition = "text")
     private String aiAnalysis;
-
-
 }

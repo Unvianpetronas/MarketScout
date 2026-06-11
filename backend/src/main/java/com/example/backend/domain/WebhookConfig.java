@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -17,7 +16,7 @@ import java.util.UUID;
 @Table(name = "webhook_configs")
 public class WebhookConfig {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -28,13 +27,11 @@ public class WebhookConfig {
 
     @Size(max = 500)
     @NotNull
-    @Nationalized
     @Column(name = "url", nullable = false, length = 500)
     private String url;
 
     @Size(max = 255)
     @NotNull
-    @Nationalized
     @Column(name = "secret_hash", nullable = false)
     private String secretHash;
 
@@ -43,14 +40,16 @@ public class WebhookConfig {
     private String eventTypes;
 
     @NotNull
-    @ColumnDefault("1")
+    @ColumnDefault("true")
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = Instant.now();
+    }
 }

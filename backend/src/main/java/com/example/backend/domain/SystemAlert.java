@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -17,7 +16,7 @@ import java.util.UUID;
 @Table(name = "system_alerts")
 public class SystemAlert {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -27,13 +26,11 @@ public class SystemAlert {
 
     @Size(max = 100)
     @NotNull
-    @Nationalized
     @Column(name = "alert_type", nullable = false, length = 100)
     private String alertType;
 
     @Size(max = 10)
     @NotNull
-    @Nationalized
     @Column(name = "severity", nullable = false, length = 10)
     private String severity;
 
@@ -42,17 +39,19 @@ public class SystemAlert {
     private String message;
 
     @NotNull
-    @ColumnDefault("0")
+    @ColumnDefault("false")
     @Column(name = "is_resolved", nullable = false)
     private Boolean isResolved;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
-
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = Instant.now();
+    }
 }

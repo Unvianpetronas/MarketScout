@@ -6,6 +6,39 @@ export interface QuotaResponse {
   message: string;
 }
 
+export interface AdminUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  planName: string;
+  quotaRemaining: number;
+  quotaUsed: number;
+  monthlyQuota: number;
+  isActive: boolean;
+  emailVerified: boolean;
+  createdAt: string;
+}
+
+export interface AdminUsersResponse {
+  users: AdminUser[];
+  total: number;
+  page: number;
+  size: number;
+}
+
+// GET /api/v1/admin/users — list all users (paginated, searchable)
+export const getAdminUsers = async (
+  page = 0,
+  size = 20,
+  search = ""
+): Promise<AdminUsersResponse> => {
+  const response = await api.get<AdminUsersResponse>("/admin/users", {
+    params: { page, size, search },
+  });
+  return response.data;
+};
+
 // PATCH /api/v1/admin/users/{id}/quota — set exact quota value
 export const setUserQuota = async (userId: string, quota: number): Promise<QuotaResponse> => {
   const response = await api.patch<QuotaResponse>(`/admin/users/${userId}/quota`, { quota });
@@ -17,6 +50,3 @@ export const refundUserQuota = async (userId: string): Promise<QuotaResponse> =>
   const response = await api.post<QuotaResponse>(`/admin/users/${userId}/quota/refund`);
   return response.data;
 };
-
-// NOTE: GET /admin/users does not exist in the backend yet.
-// The admin customers page uses mock data until the backend adds this endpoint.

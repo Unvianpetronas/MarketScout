@@ -25,6 +25,13 @@ public class ChatDTO {
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class UpdateSessionRequest {
+        @NotBlank(message = "Title cannot be blank")
+        @Size(max = 300)
+        private String title;
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class SendMessageRequest {
         @NotBlank(message = "Message content cannot be blank")
         private String content;
