@@ -13,6 +13,15 @@ export interface ChatMessage {
   content: string;
   modelUsed?: string;
   createdAt: string;
+  // Populated client-side from the final SSE "done" event of a VERIFY_PARTNER
+  // run — not persisted on the backend, so history reloads won't have these.
+  reportId?: string;
+  reportMeta?: {
+    overallScore?: number;
+    riskLevel?: string;
+    hardStop?: boolean;
+    taxId?: string;
+  };
 }
 
 // Matches backend ConversationResponse

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   Send, Plus, Trash2, FileText, Loader2, MessageSquare,
   RefreshCw, Sparkles, Search, Shield, TrendingUp, Globe,
@@ -63,6 +64,14 @@ function MessageBubble({ msg, userInitials }: { msg: ChatMessage; userInitials: 
           }`}>
             <p style={{ whiteSpace: "pre-wrap" }}>{msg.content}</p>
           </div>
+          {!isUser && msg.reportId && (
+              <Link
+                  href={`/reports/${msg.reportId}`}
+                  className="flex items-center gap-1 text-[11px] font-semibold text-[#00843F] hover:underline px-1"
+              >
+                Xem báo cáo chi tiết <ChevronRight className="w-3 h-3" />
+              </Link>
+          )}
           {!isUser && (
               <p className="text-[10px] text-gray-400 px-1">
                 {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""}
@@ -85,6 +94,13 @@ function ChatContent() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const streamingContentRef = useRef("");
+  const reportMetaRef = useRef<{
+    reportId?: string;
+    overallScore?: number;
+    riskLevel?: string;
+    hardStop?: boolean;
+    taxId?: string;
+  } | null>(null);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -168,6 +184,7 @@ function ChatContent() {
     setIsStreaming(true);
     setStreamingContent("");
     streamingContentRef.current = "";
+    reportMetaRef.current = null;
 
 
     streamPipelineMessage(
@@ -183,6 +200,7 @@ function ChatContent() {
           // reset bên dưới chạy ngay — nếu đọc ref bên trong updater thì lúc đó
           // ref đã bị xóa thành "" → luôn rơi vào fallback.
           const finalContent = streamingContentRef.current;
+          const meta = reportMetaRef.current;
           setIsStreaming(false);
           setMessages((prev) => [
             ...prev,
@@ -191,14 +209,25 @@ function ChatContent() {
               role: "assistant",
               content: finalContent || "Xin lỗi, hệ thống AI đang không thể tạo phản hồi. Vui lòng thử lại.",
               createdAt: new Date().toISOString(),
+              reportId: meta?.reportId,
+              reportMeta: meta
+                  ? {
+                    overallScore: meta.overallScore,
+                    riskLevel: meta.riskLevel,
+                    hardStop: meta.hardStop,
+                    taxId: meta.taxId,
+                  }
+                  : undefined,
             },
           ]);
           setStreamingContent("");
           streamingContentRef.current = "";
+          reportMetaRef.current = null;
         },
         (err) => {
           setIsStreaming(false);
           const partialContent = streamingContentRef.current; // FIX: chụp giá trị trước, lý do như onDone
+          const meta = reportMetaRef.current;
           if (partialContent) {
             // Stream đứt NHƯNG đã nhận được nội dung → vẫn hiển thị cho user
             setMessages((prev) => [
@@ -208,6 +237,15 @@ function ChatContent() {
                 role: "assistant",
                 content: partialContent,
                 createdAt: new Date().toISOString(),
+                reportId: meta?.reportId,
+                reportMeta: meta
+                    ? {
+                      overallScore: meta.overallScore,
+                      riskLevel: meta.riskLevel,
+                      hardStop: meta.hardStop,
+                      taxId: meta.taxId,
+                    }
+                    : undefined,
               },
             ]);
             streamingContentRef.current = "";
@@ -216,6 +254,16 @@ function ChatContent() {
             setStreamingContent("");
             toast.error("Kết nối AI bị gián đoạn. Vui lòng thử lại.");
           }
+          reportMetaRef.current = null;
+        },
+        (meta) => {
+          reportMetaRef.current = {
+            reportId: meta.reportId as string | undefined,
+            overallScore: meta.overallScore as number | undefined,
+            riskLevel: meta.riskLevel as string | undefined,
+            hardStop: meta.hardStop as boolean | undefined,
+            taxId: meta.taxId as string | undefined,
+          };
         }
     );
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { Eye, EyeOff, Mail, Lock, Navigation } from "lucide-react";
@@ -32,6 +32,13 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("verified") === "true") {
+      toast.success("Email verified successfully! You can now log in.");
+    }
+  }, []);
 
   return (
     <div className="min-h-screen flex">

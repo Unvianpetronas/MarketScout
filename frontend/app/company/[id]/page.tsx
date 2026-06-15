@@ -22,13 +22,13 @@ interface Props {
 }
 
 const PILLAR_ICONS: Record<number, string> = {
-  1: "🏛", 2: "💰", 3: "⚖️", 4: "⭐",
-  5: "🏭", 6: "👥", 7: "🌐", 8: "🚢",
+  1: "🛡", 2: "🌐", 3: "📈", 4: "🏢",
+  5: "💰", 6: "🏦", 7: "📜", 8: "✅",
 };
 const PILLAR_NAMES_VI: Record<number, string> = {
-  1: "Pháp lý & Đăng ký", 2: "Tài chính & Minh bạch", 3: "Tuân thủ & AML",
-  4: "Uy tín thị trường", 5: "Năng lực vận hành", 6: "Nhân sự & Ban lãnh đạo",
-  7: "Dấu vết kỹ thuật số", 8: "Thương mại quốc tế",
+  1: "Xác thực Pháp nhân", 2: "Dấu vết Kỹ thuật số", 3: "Hoạt động Thương mại",
+  4: "Tính nhất quán Danh tính", 5: "Tín hiệu Tài chính & Thuế", 6: "Thanh toán & Ngân hàng",
+  7: "Rủi ro Cấu trúc Giao dịch", 8: "Minh chứng Vận hành",
 };
 
 function getRiskInfo(score: number) {

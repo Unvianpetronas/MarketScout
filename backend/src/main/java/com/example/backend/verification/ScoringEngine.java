@@ -61,8 +61,8 @@ public class ScoringEngine {
     private final ObjectMapper objectMapper;
 
     @Async("scoringExecutor")
-    public void runAsync(UUID reportId, CompanyInput input, UUID userId,
-                          Consumer<String> sseCallback) {
+    public CompletableFuture<ScoringResult> runAsync(UUID reportId, CompanyInput input, UUID userId,
+                                                       Consumer<String> sseCallback) {
         Report report = reportRepository.findById(reportId)
             .orElseThrow(() -> new RuntimeException("Report not found: " + reportId));
         try {
@@ -77,6 +77,13 @@ public class ScoringEngine {
             report.setHardStop(result.isHardStop());
             report.setStatus(result.getStatus());
             report.setRiskLevel(result.getRiskLevel());
+            if (result.getRegistrationId() != null && !result.getRegistrationId().isBlank()) {
+                if ("MST_VN".equals(result.getRegistrationType())) {
+                    report.setTaxId(result.getRegistrationId());
+                } else if ("LEI_INTL".equals(result.getRegistrationType())) {
+                    report.setLei(result.getRegistrationId());
+                }
+            }
             report.setUpdatedAt(Instant.now());
             reportRepository.save(report);
 
@@ -89,6 +96,8 @@ public class ScoringEngine {
                 sseCallback.accept(toJson(result));
             }
             log.info("ScoringEngine done for report {} — score={}", reportId, result.getOverallScore());
+
+            return CompletableFuture.completedFuture(result);
 
         } catch (Exception e) {
             log.error("ScoringEngine failed for report {}: {}", reportId, e.getMessage(), e);
@@ -105,6 +114,12 @@ public class ScoringEngine {
             if (sseCallback != null) {
                 sseCallback.accept("{\"error\":\"Scoring pipeline failed: " + e.getMessage() + "\"}");
             }
+            ScoringResult failed = ScoringResult.builder()
+                .reportId(reportId)
+                .companyName(input.getName())
+                .status("FAILED")
+                .build();
+            return CompletableFuture.completedFuture(failed);
         }
     }
 
@@ -145,6 +160,8 @@ public class ScoringEngine {
                 .riskLevel("Nghiêm trọng").status("HARD_STOP")
                 .pillars(List.of(rubricLoader.getRubric().scoreP6(
                     FactJson.P6Facts.builder().isSanctionHit(true).build())))
+                .registrationId(p1.getRegistrationId())
+                .registrationType(p1.getRegistrationType())
                 .build();
         }
 
@@ -174,6 +191,8 @@ public class ScoringEngine {
             .reportId(reportId).companyName(input.getName())
             .overallScore(overallScore).hardStop(false).riskLevel(riskLevel)
             .status("DONE").pillars(pillars)
+            .registrationId(p1.getRegistrationId())
+            .registrationType(p1.getRegistrationType())
             .build();
     }
 

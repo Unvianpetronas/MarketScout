@@ -64,10 +64,10 @@ public class ScoringRubric {
         }
         if (f.getDomainAgeMonths() != null && f.getDomainAgeMonths() > 12) {
             score += 25;
-            ev.add(Evidence.builder().type("PASS").text("Domain đã " + f.getDomainAgeMonths() + " tháng tuổi").source("WHOIS").build());
+            ev.add(Evidence.builder().type("PASS").text("Domain đã " + f.getDomainAgeMonths() + " tháng tuổi").source("RDAP").build());
         } else if (f.getDomainAgeMonths() != null && f.getDomainAgeMonths() > 0) {
             score += 10;
-            ev.add(Evidence.builder().type("WARN").text("Domain mới (< 12 tháng)").source("WHOIS").build());
+            ev.add(Evidence.builder().type("WARN").text("Domain mới (< 12 tháng)").source("RDAP").build());
         }
         if (Boolean.TRUE.equals(f.getHasSsl())) {
             score += 15;
@@ -87,7 +87,7 @@ public class ScoringRubric {
             score += 8;
             ev.add(Evidence.builder().type("WARN").text("Hiện diện mạng xã hội trung bình").source("Tavily").build());
         }
-        return build(2, "Digital Footprint", Math.min(100, Math.max(0, score)), ev, "WHOIS / Tavily");
+        return build(2, "Digital Footprint", Math.min(100, Math.max(0, score)), ev, "RDAP / Tavily");
     }
 
     // P3 — Trade Activity

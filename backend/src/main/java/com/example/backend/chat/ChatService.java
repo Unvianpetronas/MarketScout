@@ -6,9 +6,12 @@ import com.example.backend.exception.AppException;
 import com.example.backend.domain.*;
 import com.example.backend.shared.model.agent.AgentEvent;
 import com.example.backend.shared.model.agent.IntentResult;
+import com.example.backend.shared.model.crawler.P1Data;
+import com.example.backend.shared.model.crawler.P6Data;
 import com.example.backend.shared.model.input.CompanyInput;
 import com.example.backend.shared.model.scoring.ScoringResult;
 import com.example.backend.partners.FindPartnersService;
+import com.example.backend.partners.QuickScanService;
 import com.example.backend.chat.IntentDetector;
 import com.example.backend.verification.DealSafetyAgent;
 import com.example.backend.verification.ScoringEngine;
@@ -25,6 +28,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -41,6 +45,7 @@ public class ChatService {
     private final QuotaService          quotaService;
     private final IntentDetector        intentDetector;
     private final FindPartnersService   findPartnersService;
+    private final QuickScanService      quickScanService;
     private final ScoringEngine         scoringEngine;
     private final DealSafetyAgent       dealSafetyAgent;
     private final ObjectMapper          objectMapper;
@@ -64,7 +69,9 @@ public class ChatService {
      * which Firefox reports as "TypeError: Error in input stream".
      */
     public SseEmitter processMessage(UUID userId, ReportDTO.ChatMessageRequest req) {
-        SseEmitter emitter = new SseEmitter(60_000L); // 60s timeout
+        // 180s — covers the full 8-pillar scoring pipeline (~17s observed) plus
+        // safety margin for slow external crawlers (masothue.vn, GLEIF, etc.)
+        SseEmitter emitter = new SseEmitter(180_000L);
 
         sseExecutor.submit(() -> {
             try {
@@ -153,6 +160,7 @@ public class ChatService {
 
         return switch (intentType) {
             case "FIND_BUYER", "FIND_SELLER" -> handleFindPartners(userId, intent, req, emitter);
+            case "LOOKUP_COMPANY" -> handleLookup(userId, intent, req, emitter);
             case "VERIFY_PARTNER" -> handleVerify(userId, intent, req, emitter, 1);
             case "COMPARE_PARTNERS" -> handleCompare(userId, intent, req, emitter);
             case "EXPLAIN_REPORT" -> handleExplainReport(userId, req, emitter);
@@ -175,6 +183,74 @@ public class ChatService {
         return message;
     }
 
+    /**
+     * Lightweight P1(+P6)-only lookup for "tra mã số thuế / công ty có thật không"
+     * style questions. No quota cost — does not run the full 8-pillar pipeline.
+     */
+    private String handleLookup(UUID userId, IntentResult intent, ReportDTO.ChatMessageRequest req,
+                               SseEmitter emitter) throws Exception {
+        // Default to Vietnam when the intent didn't extract a country — same rationale as handleVerify.
+        String country = (intent.getCountry() == null || intent.getCountry().isBlank())
+            ? "VN" : intent.getCountry();
+        CompanyInput input = CompanyInput.builder()
+            .companyName(intent.getCompanyName() != null ? intent.getCompanyName() : req.getMessage())
+            .country(country)
+            .taxId(intent.getTaxId())
+            .build();
+
+        sendEvent(emitter, AgentEvent.thinking("manager", "Đang tra cứu " + input.getCompanyName() + "..."));
+
+        QuickScanService.QuickLookupResult lookup = quickScanService.quickScanByInput(userId, input);
+        Report report = lookup.report();
+        P1Data p1 = lookup.p1();
+        P6Data p6 = lookup.p6();
+        UUID reportId = report.getId();
+
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        StringBuilder sb = new StringBuilder();
+        boolean hasUsefulResult = p1.isFound() || p6.isSanctioned();
+
+        if (p1.isFound()) {
+            sb.append(p1.getCompanyName() != null ? p1.getCompanyName() : input.getCompanyName());
+            if (p1.getRegistrationId() != null && !p1.getRegistrationId().isBlank()) {
+                boolean isLei = "LEI_INTL".equals(p1.getRegistrationType());
+                sb.append(" | ").append(isLei ? "LEI" : "MST").append(": ").append(p1.getRegistrationId());
+                data.put(isLei ? "lei" : "taxId", p1.getRegistrationId());
+            }
+            if (p1.getStatus() != null) {
+                String statusVi = switch (p1.getStatus()) {
+                    case "ACTIVE" -> "Đang hoạt động";
+                    case "INACTIVE" -> "Đã ngừng hoạt động";
+                    default -> "Không rõ trạng thái";
+                };
+                sb.append(" | Trạng thái: ").append(statusVi);
+            }
+            if (p1.getAddress() != null && !p1.getAddress().isBlank()) {
+                sb.append(" | Địa chỉ: ").append(p1.getAddress());
+            }
+        } else {
+            sb.append("Không tìm thấy thông tin đăng ký cho \"").append(input.getCompanyName())
+              .append("\" trên dữ liệu công khai. Có thể tên công ty chưa chính xác hoặc công ty chưa đăng ký công khai.");
+        }
+
+        if (p6.isSanctioned()) {
+            sb.append(" | ⚠️ CẢNH BÁO: nằm trong danh sách trừng phạt");
+            if (p6.getSanctionSource() != null && !p6.getSanctionSource().isBlank()) {
+                sb.append(" (").append(p6.getSanctionSource()).append(")");
+            }
+            data.put("hardStop", true);
+        }
+
+        if (hasUsefulResult) {
+            sb.append(" | Xem chi tiết: /reports/").append(reportId);
+            data.put("reportId", reportId);
+        }
+
+        String message = sb.toString();
+        sendEvent(emitter, AgentEvent.done("manager", message, data));
+        return message;
+    }
+
     private String handleVerify(UUID userId, IntentResult intent, ReportDTO.ChatMessageRequest req,
                                SseEmitter emitter, int quotaCost) throws Exception {
         // Deduct quota BEFORE running
@@ -182,15 +258,19 @@ public class ChatService {
         if (quotaCost == 2) quotaService.checkAndDeduct(userId);
 
         Users user = requireUser(userId);
+        // Default to Vietnam when the intent didn't extract a country — this product
+        // is VN-focused (masothue.vn/VietQR MST lookup) and a null country routes
+        // the P1 crawler to GLEIF (international), which never finds a VN MST.
+        String country = (intent.getCountry() == null || intent.getCountry().isBlank())
+            ? "VN" : intent.getCountry();
         CompanyInput input = CompanyInput.builder()
             .companyName(intent.getCompanyName() != null ? intent.getCompanyName() : req.getMessage())
-            .country(intent.getCountry())
+            .country(country)
             .taxId(intent.getTaxId())
             .build();
 
         // Create report record
         Report report = new Report();
-        report.setId(UUID.randomUUID());
         report.setUser(user);
         report.setEntityName(input.getCompanyName());
         report.setCountryIso2(input.getCountry());
@@ -206,8 +286,7 @@ public class ChatService {
 
         sendEvent(emitter, AgentEvent.thinking("manager", "Bắt đầu thẩm định " + input.getCompanyName() + " | Report ID: " + reportId));
 
-        final Report savedReport = report;
-        scoringEngine.runAsync(reportId, input, userId, json -> {
+        CompletableFuture<ScoringResult> future = scoringEngine.runAsync(reportId, input, userId, json -> {
             try {
                 emitter.send(SseEmitter.event().data(json));
             } catch (Exception ex) {
@@ -215,8 +294,50 @@ public class ChatService {
             }
         });
 
-        String message = "Đang chạy thẩm định 8 trụ cột. Theo dõi tại /api/v1/reports/" + reportId + "/status";
-        sendEvent(emitter, AgentEvent.done("manager", message, java.util.Map.of("reportId", reportId)));
+        // Block until the scoring pipeline finishes. Safe here: handleVerify already
+        // runs on sseExecutor (a background pool), never a servlet request thread.
+        ScoringResult result = future.join();
+
+        String message;
+        java.util.Map<String, Object> data;
+
+        if (result == null || "FAILED".equals(result.getStatus())) {
+            message = "Đã xảy ra lỗi khi thẩm định " + input.getCompanyName()
+                + ". Vui lòng kiểm tra lại tại /reports/" + reportId + " hoặc thử lại sau.";
+            data = java.util.Map.of("reportId", reportId, "status", "FAILED");
+        } else if (result.isHardStop()) {
+            java.util.Map<String, Object> hardStopData = new java.util.HashMap<>();
+            hardStopData.put("reportId", reportId);
+            hardStopData.put("hardStop", true);
+            hardStopData.put("hardStopReason", result.getHardStopReason());
+            if (result.getRegistrationId() != null) hardStopData.put("taxId", result.getRegistrationId());
+            data = hardStopData;
+
+            message = "⚠️ HARD STOP — " + result.getCompanyName()
+                + " nằm trong danh sách trừng phạt: " + result.getHardStopReason()
+                + " | Xem chi tiết: /reports/" + reportId;
+        } else {
+            StringBuilder sb = new StringBuilder();
+            sb.append(result.getCompanyName())
+              .append(" | Điểm tổng: ").append(Math.round(result.getOverallScore())).append("/100")
+              .append(" | Mức rủi ro: ").append(result.getRiskLevel());
+            if (result.getRegistrationId() != null && !result.getRegistrationId().isBlank()) {
+                String label = "LEI_INTL".equals(result.getRegistrationType()) ? "LEI" : "MST";
+                sb.append(" | ").append(label).append(": ").append(result.getRegistrationId());
+            }
+            sb.append(" | Xem chi tiết: /reports/").append(reportId);
+            message = sb.toString();
+
+            java.util.Map<String, Object> doneData = new java.util.HashMap<>();
+            doneData.put("reportId", reportId);
+            doneData.put("overallScore", result.getOverallScore());
+            doneData.put("riskLevel", result.getRiskLevel());
+            doneData.put("hardStop", false);
+            if (result.getRegistrationId() != null) doneData.put("taxId", result.getRegistrationId());
+            data = doneData;
+        }
+
+        sendEvent(emitter, AgentEvent.done("manager", message, data));
         return message;
     }
 

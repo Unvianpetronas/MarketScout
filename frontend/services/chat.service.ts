@@ -61,7 +61,8 @@ export const streamPipelineMessage = (
     data: SseMessageRequest,
     onChunk: (chunk: string) => void,
     onDone: () => void,
-    onError: (err: Error) => void
+    onError: (err: Error) => void,
+    onMeta?: (meta: Record<string, unknown>) => void
 ): AbortController => {
   const controller = new AbortController();
   const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
@@ -120,8 +121,17 @@ export const streamPipelineMessage = (
               console.log("[SSE] → onChunk (string):", parsed.slice(0, 80)); //  DEBUG
               onChunk(parsed);
             } else {
-              const event = parsed as { message?: string };
+              const event = parsed as { message?: string; data?: unknown };
               console.log("[SSE] parsed event:", parsed); //  DEBUG
+              if (
+                  onMeta &&
+                  event.data &&
+                  typeof event.data === "object" &&
+                  !Array.isArray(event.data) &&
+                  "reportId" in (event.data as Record<string, unknown>)
+              ) {
+                onMeta(event.data as Record<string, unknown>);
+              }
               if (event.message) {
                 console.log("[SSE] → onChunk (message):", event.message.slice(0, 80)); //  DEBUG
                 onChunk(event.message);

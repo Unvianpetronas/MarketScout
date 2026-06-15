@@ -289,14 +289,14 @@ function VerifyContent() {
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                  { no: 1, name: "Pháp lý & Đăng ký", icon: "🏛" },
-                  { no: 2, name: "Tài chính & Minh bạch", icon: "💰" },
-                  { no: 3, name: "Tuân thủ & AML", icon: "⚖️" },
-                  { no: 4, name: "Uy tín thị trường", icon: "⭐" },
-                  { no: 5, name: "Năng lực vận hành", icon: "🏭" },
-                  { no: 6, name: "Nhân sự & Ban lãnh đạo", icon: "👥" },
-                  { no: 7, name: "Dấu vết kỹ thuật số", icon: "🌐" },
-                  { no: 8, name: "Thương mại quốc tế", icon: "🚢" },
+                  { no: 1, name: "Xác thực Pháp nhân", icon: "🛡" },
+                  { no: 2, name: "Dấu vết Kỹ thuật số", icon: "🌐" },
+                  { no: 3, name: "Hoạt động Thương mại", icon: "📈" },
+                  { no: 4, name: "Tính nhất quán Danh tính", icon: "🏢" },
+                  { no: 5, name: "Tín hiệu Tài chính & Thuế", icon: "💰" },
+                  { no: 6, name: "Thanh toán & Ngân hàng", icon: "🏦" },
+                  { no: 7, name: "Rủi ro Cấu trúc Giao dịch", icon: "📜" },
+                  { no: 8, name: "Minh chứng Vận hành", icon: "✅" },
                 ].map((p) => (
                   <div key={p.no} className="flex items-center gap-2.5 p-3 bg-gray-50 rounded-xl">
                     <span className="text-lg">{p.icon}</span>
