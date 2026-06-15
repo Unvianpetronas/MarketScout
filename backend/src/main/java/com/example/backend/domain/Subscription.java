@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -19,7 +18,7 @@ import java.util.UUID;
 public class Subscription {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id", nullable = false, columnDefinition = "UNIQUEIDENTIFIER")
+    @Column(name = "id", nullable = false)
     private UUID id;
 
     @NotNull
@@ -34,20 +33,17 @@ public class Subscription {
 
     @Size(max = 20)
     @NotNull
-    @Nationalized
     @ColumnDefault("'trialing'")
     @Column(name = "status", nullable = false, length = 20)
     private String status;
 
     @Size(max = 20)
     @NotNull
-    @Nationalized
     @ColumnDefault("'monthly'")
     @Column(name = "billing_cycle", nullable = false, length = 20)
     private String billingCycle;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
     @Column(name = "current_period_start", nullable = false)
     private Instant currentPeriodStart;
 
@@ -62,12 +58,22 @@ public class Subscription {
     private Instant cancelAt;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    @PrePersist
+    protected void onCreate() {
+        Instant now = Instant.now();
+        if (createdAt == null) createdAt = now;
+        if (currentPeriodStart == null) currentPeriodStart = now;
+        updatedAt = now;
+    }
 
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = Instant.now();
+    }
 }

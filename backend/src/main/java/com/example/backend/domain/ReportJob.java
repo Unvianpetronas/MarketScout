@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -17,13 +16,12 @@ import java.util.UUID;
 @Table(name = "report_jobs")
 public class ReportJob {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
     @Size(max = 20)
     @NotNull
-    @Nationalized
     @ColumnDefault("'queued'")
     @Column(name = "status", nullable = false, length = 20)
     private String status;
@@ -46,9 +44,16 @@ public class ReportJob {
     private Instant completedAt;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @PrePersist
+    protected void onCreate() {
+        if (updatedAt == null) updatedAt = Instant.now();
+    }
 
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = Instant.now();
+    }
 }

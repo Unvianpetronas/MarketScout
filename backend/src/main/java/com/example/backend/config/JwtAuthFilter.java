@@ -23,6 +23,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final TokenBlacklistService blacklistService;
 
+    // SSE endpoints (e.g. /api/v1/chat/message) complete via an ASYNC dispatch.
+    // OncePerRequestFilter skips ASYNC dispatches by default, which would leave
+    // SecurityContextHolder empty when that dispatch is authorized, causing
+    // AuthorizationDeniedException after the response is already committed.
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,

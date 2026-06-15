@@ -18,5 +18,5 @@ public class P2Data extends PillarData {
     private Boolean hasSsl;
     private String socialMediaScore; // LOW | MEDIUM | HIGH
     private String domain;
-    private String whoisRegistrar;
+    private String registrar;
 }

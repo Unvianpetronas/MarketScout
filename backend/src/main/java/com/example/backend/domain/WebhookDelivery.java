@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -17,7 +16,7 @@ import java.util.UUID;
 @Table(name = "webhook_deliveries")
 public class WebhookDelivery {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -28,7 +27,6 @@ public class WebhookDelivery {
 
     @Size(max = 100)
     @NotNull
-    @Nationalized
     @Column(name = "event_type", nullable = false, length = 100)
     private String eventType;
 
@@ -45,6 +43,4 @@ public class WebhookDelivery {
 
     @Column(name = "delivered_at")
     private Instant deliveredAt;
-
-
 }

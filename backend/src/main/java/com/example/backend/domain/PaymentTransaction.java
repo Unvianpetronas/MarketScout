@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -18,7 +17,7 @@ import java.util.UUID;
 @Table(name = "payment_transactions")
 public class PaymentTransaction {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -33,18 +32,15 @@ public class PaymentTransaction {
 
     @Size(max = 20)
     @NotNull
-    @Nationalized
     @Column(name = "provider", nullable = false, length = 20)
     private String provider;
 
     @Size(max = 255)
-    @Nationalized
     @Column(name = "provider_ref")
     private String providerRef;
 
     @Size(max = 20)
     @NotNull
-    @Nationalized
     @ColumnDefault("'pending'")
     @Column(name = "status", nullable = false, length = 20)
     private String status;
@@ -57,7 +53,6 @@ public class PaymentTransaction {
     private String providerResponse;
 
     @Size(max = 255)
-    @Nationalized
     @Column(name = "failure_reason")
     private String failureReason;
 
@@ -67,12 +62,14 @@ public class PaymentTransaction {
     private Integer retryCount;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
-    @Column(name = "initiated_at", nullable = false)
+    @Column(name = "initiated_at", nullable = false, updatable = false)
     private Instant initiatedAt;
 
     @Column(name = "completed_at")
     private Instant completedAt;
 
-
+    @PrePersist
+    protected void onCreate() {
+        if (initiatedAt == null) initiatedAt = Instant.now();
+    }
 }

@@ -20,7 +20,9 @@ public class IntentDetector {
         Các intent có thể:
         - FIND_BUYER: tìm buyer, tìm khách hàng, người mua, nhà nhập khẩu
         - FIND_SELLER: tìm nhà cung cấp, tìm người bán, supplier, nhà xuất khẩu
-        - VERIFY_PARTNER: thẩm định, xác minh, kiểm tra công ty
+        - LOOKUP_COMPANY: tra mã số thuế/MST/LEI, kiểm tra một công ty có tồn tại/có thật không,
+          tìm thông tin đăng ký cơ bản của một công ty (KHÔNG yêu cầu đánh giá rủi ro hay thẩm định toàn diện)
+        - VERIFY_PARTNER: thẩm định toàn diện, đánh giá rủi ro đối tác, kiểm tra đầy đủ 8 trụ cột
         - COMPARE_PARTNERS: so sánh, A vs B, cái nào tốt hơn
         - EXPLAIN_REPORT: tại sao điểm thấp, giải thích điểm, kết quả báo cáo
         - GENERAL_QA: LC là gì, FOB là gì, Incoterms, tư vấn thương mại
@@ -77,6 +79,11 @@ public class IntentDetector {
             r.setIntent("FIND_BUYER");
         } else if (lower.contains("tim") && (lower.contains("seller") || lower.contains("nha cung cap") || lower.contains("nguoi ban") || lower.contains("supplier"))) {
             r.setIntent("FIND_SELLER");
+        } else if (lower.contains("ma so thue") || lower.contains("mã số thuế") || lower.contains("mst")
+                || lower.contains("co thuc su") || lower.contains("có thật") || lower.contains("co that")
+                || lower.contains("ton tai") || lower.contains("tồn tại")
+                || lower.contains("tra cuu") || lower.contains("tra cứu")) {
+            r.setIntent("LOOKUP_COMPANY");
         } else if (lower.contains("tham dinh") || lower.contains("xac minh") || lower.contains("kiem tra cong ty") || lower.contains("thẩm định") || lower.contains("xác minh")) {
             r.setIntent("VERIFY_PARTNER");
         } else if (lower.contains("so sanh") || lower.contains("vs ") || lower.contains("so sánh")) {

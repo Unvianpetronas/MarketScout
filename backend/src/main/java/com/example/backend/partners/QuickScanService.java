@@ -67,7 +67,6 @@ public class QuickScanService {
 
         // Create report with QUICK_SCANNING status
         Report report = new Report();
-        report.setId(UUID.randomUUID());
         report.setUser(user);
         report.setEntityName(lead.getCompanyName());
         report.setCountryIso2(lead.getCountry());
@@ -117,4 +116,70 @@ public class QuickScanService {
         log.info("QuickScan done for report {} — hardStop={}", reportId, hardStop);
         return report;
     }
+
+    /**
+     * P1(+P6)-only lookup driven directly by a CompanyInput (used by the chat
+     * LOOKUP_COMPANY intent). Unlike {@link #quickScan}, this does not read
+     * leads from Redis and copies LEI (international) as well as MST (VN)
+     * registration ids onto the report.
+     */
+    @Transactional
+    public QuickLookupResult quickScanByInput(UUID userId, CompanyInput input) {
+        Users user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Report report = new Report();
+        report.setUser(user);
+        report.setEntityName(input.getCompanyName());
+        report.setCountryIso2(input.getCountry());
+        report.setTier("standard");
+        report.setHardStop(false);
+        report.setStatus("QUICK_SCANNING");
+        report.setWebsite(input.getWebsite());
+        report.setSource("MANUAL");
+        report.setQuickScanDone(false);
+        report.setCreatedAt(Instant.now());
+        report.setUpdatedAt(Instant.now());
+        report = reportRepository.save(report);
+        UUID reportId = report.getId();
+
+        // Run P1 + P6 quick lookup (no quota deduction)
+        P1Data p1 = crawlerP1.fetch(input);
+        P6Data p6 = crawlerP6.fetch(input);
+
+        // Save P1 pillar result
+        PillarResult p1Result = new PillarResult();
+        p1Result.setReport(report);
+        p1Result.setPillarNo((short) 1);
+        p1Result.setPillarName("Entity Validation");
+        p1Result.setStatus(p1.isFound() ? "PASS" : "SKIP");
+        p1Result.setConfidence(p1.isFound() ? "HIGH" : "LOW");
+        p1Result.setFindings(p1.getRawText());
+        p1Result.setSourcesUsed(p1.getDataSource());
+        pillarResultRepository.save(p1Result);
+
+        boolean hardStop = p6.isSanctioned();
+        report.setQuickScanDone(true);
+        report.setHardStop(hardStop);
+        if (p1.getRegistrationId() != null && !p1.getRegistrationId().isBlank()) {
+            if ("MST_VN".equals(p1.getRegistrationType())) {
+                report.setTaxId(p1.getRegistrationId());
+            } else if ("LEI_INTL".equals(p1.getRegistrationType())) {
+                report.setLei(p1.getRegistrationId());
+            }
+        }
+        if (hardStop) {
+            report.setStatus("HARD_STOP");
+            report.setOverallScore((short) 0);
+        } else {
+            report.setStatus("QUICK_SCANNING");
+        }
+        report.setUpdatedAt(Instant.now());
+        report = reportRepository.save(report);
+
+        log.info("QuickScan (chat lookup) done for report {} — found={}, hardStop={}", reportId, p1.isFound(), hardStop);
+        return new QuickLookupResult(report, p1, p6);
+    }
+
+    public record QuickLookupResult(Report report, P1Data p1, P6Data p6) {}
 }

@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.util.UUID;
 
@@ -15,7 +14,7 @@ import java.util.UUID;
 @Table(name = "tineye_results")
 public class TineyeResult {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -31,6 +30,4 @@ public class TineyeResult {
 
     @Column(name = "matches", columnDefinition = "text")
     private String matches;
-
-
 }

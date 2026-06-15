@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.util.UUID;
 
@@ -16,7 +15,7 @@ import java.util.UUID;
 @Table(name = "recommendations")
 public class Recommendation {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -27,7 +26,6 @@ public class Recommendation {
 
     @Size(max = 20)
     @NotNull
-    @Nationalized
     @Column(name = "rec_type", nullable = false, length = 20)
     private String recType;
 
@@ -39,6 +37,4 @@ public class Recommendation {
     @ColumnDefault("1")
     @Column(name = "priority", nullable = false)
     private Short priority;
-
-
 }

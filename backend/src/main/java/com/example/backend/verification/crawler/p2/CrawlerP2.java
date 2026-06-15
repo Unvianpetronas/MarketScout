@@ -8,10 +8,12 @@ import com.example.backend.partners.TavilyClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.RequestEntity;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,11 +25,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class CrawlerP2 {
 
-    @Value("${app.whois.api-key:}")
-    private String whoisApiKey;
-
-    @Value("${app.whois.base-url:https://www.whoisxmlapi.com/whoisserver/WhoisService}")
-    private String whoisBaseUrl;
+    @Value("${app.rdap.base-url:https://rdap.org/domain}")
+    private String rdapBaseUrl;
 
     @Value("${app.cache.p2-ttl-days:7}")
     private int ttlDays;
@@ -49,7 +48,7 @@ public class CrawlerP2 {
         try {
             P2Data result = doFetch(input, domain);
             if (result.isFound()) {
-                cacheService.set(key, result, Duration.ofDays(ttlDays), (short) 2, "whoisxmlapi", input.getCountry());
+                cacheService.set(key, result, Duration.ofDays(ttlDays), (short) 2, "rdap", input.getCountry());
             }
             return result;
         } catch (Exception e) {
@@ -65,21 +64,21 @@ public class CrawlerP2 {
         Boolean hasSsl = null;
         String registrar = null;
 
-        if (hasWebsite && !whoisApiKey.isBlank()) {
+        if (hasWebsite) {
             try {
-                String url = whoisBaseUrl + "?domainName=" + domain + "&apiKey=" + whoisApiKey + "&outputFormat=JSON";
-                ResponseEntity<Map> resp = restTemplate.getForEntity(url, Map.class);
-                if (resp.getBody() != null) {
-                    Map<String, Object> whois = (Map<String, Object>) resp.getBody().get("WhoisRecord");
-                    if (whois != null) {
-                        String createdDate = (String) whois.get("createdDate");
-                        domainAgeMonths = calcAgeMonths(createdDate);
-                        registrar = (String) ((Map<String, Object>) whois.getOrDefault("registrarName", Map.of())).getOrDefault("name", null);
-                        hasSsl = domain.startsWith("https") || hasWebsite;
-                    }
+                String url = rdapBaseUrl + "/" + domain;
+                RequestEntity<Void> req = RequestEntity.get(URI.create(url))
+                    .header("Accept", "application/rdap+json, application/json")
+                    .build();
+                ResponseEntity<Map> resp = restTemplate.exchange(req, Map.class);
+                Map<String, Object> rdap = resp.getBody();
+                if (rdap != null) {
+                    domainAgeMonths = extractRegistrationAgeMonths(rdap);
+                    registrar = extractRegistrarName(rdap);
+                    hasSsl = hasWebsite;
                 }
             } catch (Exception e) {
-                log.debug("WHOIS lookup failed for {}: {}", domain, e.getMessage());
+                log.debug("RDAP lookup failed for {}: {}", domain, e.getMessage());
             }
         }
 
@@ -104,11 +103,46 @@ public class CrawlerP2 {
             .hasSsl(hasSsl != null ? hasSsl : hasWebsite)
             .socialMediaScore(socialMediaScore)
             .domain(domain)
-            .whoisRegistrar(registrar)
+            .registrar(registrar)
             .rawText(rawText)
-            .dataSource("whoisxmlapi + tavily")
+            .dataSource("rdap + tavily")
             .fetchedAt(LocalDateTime.now())
             .build();
+    }
+
+    /** Finds the "registration" event in an RDAP response and returns its age in months. */
+    private Integer extractRegistrationAgeMonths(Map<String, Object> rdap) {
+        Object eventsObj = rdap.get("events");
+        if (!(eventsObj instanceof List<?> events)) return null;
+        for (Object o : events) {
+            if (o instanceof Map<?, ?> event
+                    && "registration".equalsIgnoreCase(String.valueOf(event.get("eventAction")))) {
+                return calcAgeMonths(String.valueOf(event.get("eventDate")));
+            }
+        }
+        return null;
+    }
+
+    /** Finds the "registrar" entity in an RDAP response and returns its name (vCard "fn"). */
+    private String extractRegistrarName(Map<String, Object> rdap) {
+        Object entitiesObj = rdap.get("entities");
+        if (!(entitiesObj instanceof List<?> entities)) return null;
+        for (Object o : entities) {
+            if (!(o instanceof Map<?, ?> entity)) continue;
+            Object rolesObj = entity.get("roles");
+            if (!(rolesObj instanceof List<?> roles) || !roles.contains("registrar")) continue;
+
+            Object vcardObj = entity.get("vcardArray");
+            if (!(vcardObj instanceof List<?> vcard) || vcard.size() < 2) continue;
+            Object propsObj = vcard.get(1);
+            if (!(propsObj instanceof List<?> props)) continue;
+            for (Object propObj : props) {
+                if (propObj instanceof List<?> prop && prop.size() >= 4 && "fn".equals(prop.get(0))) {
+                    return String.valueOf(prop.get(3));
+                }
+            }
+        }
+        return null;
     }
 
     private String evaluateSocialMedia(List<String> results) {

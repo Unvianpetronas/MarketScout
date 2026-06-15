@@ -1,0 +1,167 @@
+MarketScout Frontend — Page Rebuild Report V2
+==============================================
+Build Status: PASSED (0 TypeScript errors, 0 compilation warnings)
+Build Command: npm run build (Next.js 16.2.7 Turbopack)
+Date: 2026-06-10
+
+PAGES REBUILT
+=============
+
+TASK 1 — Login Page (app/(auth)/login/page.tsx)
+  Status: REBUILT
+  Changes:
+    - Two-column split layout (42%/58%)
+    - Left: dark green gradient bg-[#0A1A12 -> #0D2218 -> #0A1A12]
+    - Left: Navigation compass icon in rounded square bg-[#1A3A28]
+    - Left: "INTELLIGENCE SUITE" badge with border-[#2A5A3A] text-[#5FD48A]
+    - Left: Hero text-5xl font-extrabold with wavy underline on "market shifts."
+    - Left: 3 feature bullets with bg-[#00D26A] checkmark circles
+    - Left: "FIDELITY PROTOTYPE NAVIGATOR" bottom box with bg-white/5 border
+    - Right: bg-[#E8EDE9] outer, white card rounded-2xl shadow-xl
+    - Right: "Sign In" h1 text-4xl font-bold
+    - Right: Mail/Lock/Eye icons on inputs
+    - Right: CTA bg-[#00D26A] py-3.5 full-width rounded-lg
+    - Right: OR CONNECT VIA divider, Corporate SSO + Google Work buttons
+    - Right: Footer "Protected by enterprise grade cryptography..." text-xs
+
+TASK 2 — Checkout Page (app/checkout/page.tsx)
+  Status: REBUILT
+  Changes:
+    - Full dark theme bg-[#0A0E1A]
+    - Navbar with "M" yellow square avatar + B2B INTELLIGENCE green text + Client ID badge
+    - Orange info bar bg-[#1A1A0A] with TOGGLE STATE SIMULATION link
+    - 3 payment method cards (VietQR with INSTANT badge, Visa/CC, MoMo)
+    - VietQR panel: SVG QR placeholder + NAPAS AUTOPAY label + bank transfer details
+    - Message content MSCOUT928374X in mono bg-[#1A2035] with copy button
+    - Order Summary: gradient card bg-[#1A2035->0F1629] + B2B PLAN tag + feature rows
+    - "Due Today 2.000.000 VND" bold + pay button bg-[#00D26A] text-black
+    - 100% REFUND POLICY + ENTERPRISE GRADE SECURITY badges
+    - Dark footer with Terms/Privacy/Enterprise SLA links
+
+TASK 3 — NEW Find Partners Page (app/find-partners/page.tsx)
+  Status: CREATED (new page)
+  Features:
+    - h-screen flex layout with left sidebar w-56, main area, right sidebar w-72
+    - Vietnamese sidebar nav with active "Tìm đối tác" in green
+    - Search bar with "Tìm kiếm" green button
+    - Filter chips with green active/removable chips
+    - 5 mock partner cards with colored score circles (green ≥70, yellow 40-69, red <40)
+    - Status badges: An toàn / Cần lưu ý / Rủi ro cao
+    - Right sidebar: Tổng quan + country distribution + AI Insights card
+
+TASK 4 — Verify Page (app/verify/page.tsx)
+  Status: REBUILT
+  Changes:
+    - New top nav with shield logo + "B2B VERIFICATION" + quota badge + avatar
+    - White card with "Verify Global Entity Records" h1 + search row
+    - Left filters sidebar with status checkboxes (counts), region search, industry
+    - Alternative Search Match yellow banner with close button
+    - Results cards with colored avatar initials + status badges
+    - "Quick Scan FREE" outline + "Deep Verify 1 Quota" dark green buttons
+    - NOT FINDING WHAT YOU NEED section with question mark circle
+    - Pagination footer
+    - Bottom bar with API docs / ToS / Privacy Policy links
+
+TASK 5 — Profile Page (app/profile/page.tsx)
+  Status: REBUILT
+  Changes:
+    - Full h-screen flex layout with fixed top nav (14px)
+    - Left sidebar w-52 with Profile Info / Subscription / History / Security tabs
+    - "Need Assistance?" dark bg-[#0A0E1A] box at sidebar bottom
+    - Section 1: Personal Profile with "Verified Identity" green badge
+    - "PRIMARY & VERIFIED" badge on email input
+    - Change Password / Reset Form / Save Changes buttons
+    - Section 2: Current Package with "ENTERPRISE ENGINE" dark tag
+    - Quota monitor text-4xl + gradient progress bar + "Quota never expires" text
+    - Section 3: Notifications (2 toggles) + Revoke Active Sessions button
+    - Section 4: Billing table with BILLING DATE / PLAN DETAILS (ref in green) / AMOUNT / PDF Invoice
+    - Footer with Privacy Policy / Terms / API License Agreement
+
+TASK 6 — Admin Customers Page (app/admin/customers/page.tsx)
+  Status: REBUILT
+  Changes:
+    - Sidebar bg-[#0D1117] with CORE PLATFORM + AUDIT & LOGS section labels
+    - Sidebar icons: BarChart2 / Users / Database / CreditCard / History / Key / Terminal
+    - Bottom user: "EA" teal avatar + Evelyn Albright + green online dot
+    - Breadcrumb "GLOBAL OPERATIONS > CUSTOMER CENTRAL" uppercase tracking
+    - 4 metric cards: Total Revenue ($) / Active Paid (1,482) / Suspended / Quota %
+    - 5 customer rows with colored initials avatars (teal/dark/blue/gray/red)
+    - Plan badges: Enterprise pink / Pro Tier purple / Starter blue / Free gray
+    - Quota progress bars: red ≥90% / yellow ≥70% / orange ≥50% / green else
+    - Status dots: ● Active (green) / ● Past Due (orange) / ● Suspended (red)
+    - "Showing 1–5 of 1,482" footer + pagination
+
+TASK 7 — Pricing Page (app/pricing/page.tsx)
+  Status: REBUILT
+  Changes:
+    - bg-[#0A0E1A] full dark theme
+    - Nav with "M" golden square + center nav links (Pricing underlined green) + Sign In outline
+    - "FLEXIBLE PLANS FOR MODERN INTEL" green badge
+    - "Predictable pricing," white + "unrivaled intelligence." gradient green text-5xl
+    - Monthly/Yearly toggle with "Save 20%" badge
+    - 4 plan cards: Free bg-[#111827] / Starter / Pro bg-[#0D1F14] border-[#00D26A] with "★ RECOMMENDED" / Enterprise
+    - Compare table with boolean cells (Check/X icons), Pro column highlighted green
+    - Quota Management bg-[#0D1F14] border-[#00D26A]/20 with 2 sub-cards
+    - FAQ accordion with 3 items
+    - Footer with encrypted checkout badge + payment icons
+
+TASK 8 — Chat Page (app/chat/page.tsx)
+  Status: REBUILT
+  Changes:
+    - bg-[#F9F8F4] cream theme
+    - Top bar: "M" green square logo + "Active Dataset" centered pill badge + "UPGRADE TO PRO" yellow badge
+    - Left sidebar w-72: report source header + 3 resource cards + sessions list
+    - Chat header: bg-[#1A3A28] avatar + "INTELLIGENCE COPILOT" green-100 badge
+    - "■ Synced to 2024 Corporate Regulatory Index" subtitle
+    - User messages: right-aligned white card + "YOU • SENIOR ADVISOR" label
+    - AI messages: left-aligned italic white card + "MARKETSCOUT AI • DEEP ANALYTICS AGENT"
+    - "Delivered instantly • Confidence Score: 94%" delivery text
+    - Streaming: animated dots + "Analyzing data..." italic
+    - Input: Paperclip icon + input + "Attached Report Active" emerald badge + "Analyze ↗" bg-[#1A3A28] button
+    - Vietnamese disclaimer text footer
+    - Bottom bar: copyright + "MarketScout Central Data Node: Fully Connected"
+
+TASK 9 — NEW Company Detail Page (app/company/[id]/page.tsx)
+  Status: CREATED (new page, dynamic route)
+  Features:
+    - Dark bg-[#0D0D0D] near-black theme
+    - Nav: "M" yellow square + MARKETSCOUT uppercase + FREE DEMO PLAN credits badge
+    - Header card bg-[#1A1A1A]: status badges + company name uppercase + tax/date/HQ grid
+    - SVG risk gauge circle (yellow stroke at 82/100) with LOW-MEDIUM RISK label
+    - 3-col grid: Compliance Audit / Trade Activity / Digital Footprint
+    - HARD STOP alert box bg-red-950 border-red-800 with ⚠ warning text
+    - Deep Verify CTA: gradient bg from-[#1A1A0A] to-[#1A1500] border-yellow-900/30
+    - Golden "Run Deep Verify | Requires 1 Quota" button
+
+TASK 10 — NEW Intelligence Detail Page (app/intelligence/[id]/page.tsx)
+  Status: CREATED (new page, dynamic route)
+  Features:
+    - Dark green bg-[#080F0A] theme
+    - Nav: compass icon bg-[#1A3A28] + MARKETSCOUT in [#00D26A] + nav links + quota badge
+    - Breadcrumb: Database > Chemicals & Biotech > Vespera Synthetics Ltd.
+    - 3-column grid (col-span-2 + col-span-1)
+    - VSP avatar bg-[#1A3A28] text-[#00D26A] + "VERIFIED PROFILE" badge
+    - Data Health Score 9.4/10 with green bar visualization
+    - Corporate Identity section with grid of 5 fields
+    - Digital Footprint: 3 metric cards + presence summary + verified channels
+    - Regulatory Approvals: 3 licenses (2 Active green, 1 Awaiting Renewal yellow)
+    - Premium Intelligence CTA card: "TRIGGER DEEP VERIFICATION" bg-[#00D26A] button
+    - Intelligence Radar: Legal Disputes / PEP / Subsidiaries / Credit Risk
+    - Audit History: 3 timestamped events with checkmark circles
+
+BUILD SUMMARY
+=============
+Total pages: 10 rebuilt/created
+TypeScript errors: 0
+Compilation warnings: 0
+Static pages: 14
+Dynamic pages: 3 (company/[id], intelligence/[id], reports/[id])
+Build time: ~5 seconds
+
+KNOWN LIMITATIONS
+=================
+- Company/[id] and Intelligence/[id] pages use static mock data (no backend API)
+- Find Partners page uses mock data (47 results)
+- QR code in checkout uses an SVG placeholder (real QR would need a QR library)
+- Admin page uses MOCK_USERS (backend GET /admin/users not yet implemented)
+- Billing history in profile uses mock data

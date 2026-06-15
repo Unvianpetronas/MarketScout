@@ -16,10 +16,19 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class GeminiService {
 
-    private static final String GEMINI_URL =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+    private static final String GEMINI_URL_TEMPLATE =
+        "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
 
-    public static final String MODEL_NAME = "gemini-2.0-flash";
+    @Value("${gemini.model:gemini-2.5-flash}")
+    private String modelName;
+
+    public String getModelName() {
+        return modelName;
+    }
+
+    private String geminiUrl() {
+        return GEMINI_URL_TEMPLATE.formatted(modelName);
+    }
 
     // System prompt defining MarketScout AI persona
     static final String SYSTEM_PROMPT = """
@@ -83,7 +92,7 @@ public class GeminiService {
         );
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        String url = GEMINI_URL + "?key=" + apiKey;
+        String url = geminiUrl() + "?key=" + apiKey;
         try {
             ResponseEntity<Map> response = restTemplate.exchange(
                 url, HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
@@ -102,7 +111,7 @@ public class GeminiService {
     }
 
     /**
-     * Sends the full conversation history to Gemini 2.0 Flash and returns the AI reply.
+     * Sends the full conversation history to Gemini and returns the AI reply.
      * @param history list of messages in chronological order (role: 'user' or 'assistant')
      */
     @SuppressWarnings("unchecked")
@@ -129,7 +138,7 @@ public class GeminiService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
-        String url = GEMINI_URL + "?key=" + apiKey;
+        String url = geminiUrl() + "?key=" + apiKey;
 
         try {
             ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, request, Map.class);

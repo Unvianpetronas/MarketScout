@@ -22,4 +22,6 @@ public class ScoringResult {
     private String status;         // DONE | HARD_STOP | FAILED
     private List<PillarScore> pillars;
     private String dealSafetyAnalysis;
+    private String registrationId;    // MST (VN) or LEI (international), from P1Data
+    private String registrationType;  // MST_VN | LEI_INTL
 }

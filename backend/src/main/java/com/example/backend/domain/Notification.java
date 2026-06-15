@@ -6,7 +6,6 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.Nationalized;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -17,7 +16,7 @@ import java.util.UUID;
 @Table(name = "notifications")
 public class Notification {
     @Id
-    @ColumnDefault("newid()")
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", nullable = false)
     private UUID id;
 
@@ -28,13 +27,11 @@ public class Notification {
 
     @Size(max = 50)
     @NotNull
-    @Nationalized
     @Column(name = "type", nullable = false, length = 50)
     private String type;
 
     @Size(max = 200)
     @NotNull
-    @Nationalized
     @Column(name = "title", nullable = false, length = 200)
     private String title;
 
@@ -45,14 +42,16 @@ public class Notification {
     private String payload;
 
     @NotNull
-    @ColumnDefault("0")
+    @ColumnDefault("false")
     @Column(name = "is_read", nullable = false)
     private Boolean isRead;
 
     @NotNull
-    @ColumnDefault("getutcdate()")
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = Instant.now();
+    }
 }
