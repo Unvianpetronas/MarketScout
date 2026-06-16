@@ -17,7 +17,8 @@ public class AppException extends RuntimeException {
         SESSION_NOT_FOUND("Chat session not found or you do not have access.", HttpStatus.NOT_FOUND),
         REPORT_NOT_FOUND("Report not found or you do not have access.", HttpStatus.NOT_FOUND),
         UNAUTHORIZED("You do not have permission to perform this action.", HttpStatus.FORBIDDEN),
-        BAD_REQUEST("Invalid request.", HttpStatus.BAD_REQUEST);
+        BAD_REQUEST("Invalid request.", HttpStatus.BAD_REQUEST),
+        RESOURCE_NOT_FOUND("Resource not found.", HttpStatus.NOT_FOUND);
 
         private final String defaultMessage;
         private final HttpStatus httpStatus;

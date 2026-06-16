@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -51,4 +52,23 @@ public interface UsersRepository extends JpaRepository<Users, UUID> {
     @Transactional
     @Query("UPDATE Users u SET u.quotaRemaining = :quota WHERE u.id = :userId")
     void setQuotaRemaining(@Param("userId") UUID userId, @Param("quota") int quota);
+
+    // ── Analytics queries ─────────────────────────────────────────────
+    long countByIsActiveTrue();
+    long countByCreatedAtBetween(Instant start, Instant end);
+
+    @Query("SELECT u.plan.name, COUNT(u) FROM Users u WHERE u.plan IS NOT NULL GROUP BY u.plan.name")
+    List<Object[]> countGroupByPlanName();
+
+    // Admin: toggle active status
+    @Modifying
+    @Transactional
+    @Query("UPDATE Users u SET u.isActive = :active WHERE u.id = :userId")
+    void setActiveStatus(@Param("userId") UUID userId, @Param("active") boolean active);
+
+    // Admin: change role
+    @Modifying
+    @Transactional
+    @Query("UPDATE Users u SET u.role = :role WHERE u.id = :userId")
+    void setRole(@Param("userId") UUID userId, @Param("role") String role);
 }
