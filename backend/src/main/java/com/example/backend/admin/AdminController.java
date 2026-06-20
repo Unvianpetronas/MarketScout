@@ -95,25 +95,19 @@ public class AdminController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "") String search) {
 
-        List<Users> allUsers = usersRepository.findAll();
-        List<Users> filtered = allUsers.stream()
-                .filter(u -> search.isEmpty()
-                        || u.getEmail().toLowerCase().contains(search.toLowerCase())
-                        || (u.getFullName() != null && u.getFullName().toLowerCase().contains(search.toLowerCase())))
-                .toList();
+        Page<Users> result = usersRepository.searchUsers(
+                search,
+                PageRequest.of(page, size, Sort.by("createdAt").descending()));
 
-        int start = Math.min(page * size, filtered.size());
-        int end   = Math.min(start + size, filtered.size());
-        List<AdminDTO.AdminUser> items = filtered.subList(start, end).stream()
-                .map(this::toAdminUser).toList();
+        List<AdminDTO.AdminUser> items = result.getContent().stream().map(this::toAdminUser).toList();
 
         return ResponseEntity.ok(Map.of(
-                "users", items, "total", filtered.size(), "page", page, "size", size));
+                "users", items, "total", result.getTotalElements(), "page", page, "size", size));
     }
 
     @GetMapping("/users/{id}")
     public ResponseEntity<AdminDTO.AdminUser> getUserDetail(@PathVariable UUID id) {
-        Users u = usersRepository.findById(id)
+        Users u = usersRepository.findByIdWithPlan(id)
                 .orElseThrow(() -> new AppException(AppException.ErrorCode.USER_NOT_FOUND));
         return ResponseEntity.ok(toAdminUser(u));
     }
@@ -341,6 +335,7 @@ public class AdminController {
         if (req.priceVnd() != null)     plan.setPriceVnd(req.priceVnd());
         if (req.priceUsd() != null)     plan.setPriceUsd(req.priceUsd());
         if (req.features() != null)     plan.setFeatures(req.features());
+        if (req.isActive() != null)     plan.setIsActive(req.isActive());
         planRepository.save(plan);
         writeAuditLog(actor, "PLAN_UPDATE", "plan", null, "{\"planId\":" + id + "}");
         return ResponseEntity.ok(toPlanDTO(plan));

@@ -12,6 +12,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const {
     register,
@@ -22,7 +23,7 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginRequest) => {
     setIsLoading(true);
     try {
-      await login(data);
+      await login(data, rememberMe);
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -200,6 +201,8 @@ export default function LoginPage() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 rounded border-gray-300 accent-[#00D26A]"
                 />
                 <span className="text-sm text-gray-600">Remember Me</span>

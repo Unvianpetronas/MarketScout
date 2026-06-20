@@ -210,5 +210,5 @@ export const resolveAlert = (id: string) =>
 export const getPlans = () =>
   api.get<PlanDTO[]>("/admin/plans").then(r => r.data);
 
-export const updatePlan = (id: number, data: Partial<Pick<PlanDTO, "monthlyQuota" | "priceVnd" | "priceUsd" | "features">>) =>
+export const updatePlan = (id: number, data: Partial<Pick<PlanDTO, "monthlyQuota" | "priceVnd" | "priceUsd" | "features" | "isActive">>) =>
   api.patch<PlanDTO>(`/admin/plans/${id}`, data).then(r => r.data);

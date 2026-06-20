@@ -35,7 +35,7 @@ public class CrawlerP1VN {
         try {
             String url = vietqrUrl + "/business/" + taxId;
             ResponseEntity<Map> resp = restTemplate.getForEntity(url, Map.class);
-            if (resp.getBody() == null || !"200".equals(String.valueOf(resp.getBody().get("code")))) {
+            if (resp.getBody() == null || !"00".equals(String.valueOf(resp.getBody().get("code")))) {
                 return skipP1(taxId, "VietQR không tìm thấy MST " + taxId, false);
             }
             Map<String, Object> data = (Map<String, Object>) resp.getBody().get("data");
@@ -83,20 +83,41 @@ public class CrawlerP1VN {
                 .get();
             Element firstResult = doc.selectFirst("table.table-taxinfo td a");
             if (firstResult == null) {
-                return skipP1(companyName, "Không tìm thấy MST cho " + companyName, false);
+                // Site phản hồi OK nhưng không có kết quả → đây là NOT_FOUND thật
+                log.info("P1 masothue.vn: NOT_FOUND for '{}' (site OK, no results)", companyName);
+                return skipP1(companyName, "Không tìm thấy MST cho \"" + companyName + "\" trên masothue.vn", false);
             }
             String href = firstResult.attr("href");
             Pattern p = Pattern.compile("/(\\d{10,13})-");
             Matcher m = p.matcher(href);
             if (!m.find()) {
-                return skipP1(companyName, "Không parse được MST từ URL", false);
+                log.warn("P1 masothue.vn: could not parse MST from URL '{}' for '{}'", href, companyName);
+                return skipP1(companyName, "Không parse được MST từ URL masothue.vn", false);
             }
             String mst = m.group(1);
-            log.info("Found MST {} for company {}", mst, companyName);
+            log.info("P1 masothue.vn: found MST {} for '{}'", mst, companyName);
             return fetchByMST(mst);
+
+        } catch (org.jsoup.HttpStatusException e) {
+            // HTTP 403 = bị block, 429 = rate-limit — đây là lỗi kỹ thuật, KHÔNG phải NOT_FOUND
+            log.warn("P1 masothue.vn TECHNICAL_FAILURE (HTTP {}) for '{}': site chặn hoặc rate-limit",
+                e.getStatusCode(), companyName);
+            return skipP1(companyName,
+                "masothue.vn HTTP " + e.getStatusCode() + " — site tạm không truy cập được (lỗi kỹ thuật, không phải không tồn tại)", true);
+
+        } catch (java.net.SocketTimeoutException e) {
+            log.warn("P1 masothue.vn TECHNICAL_FAILURE (TIMEOUT) for '{}': site không phản hồi trong 8s", companyName);
+            return skipP1(companyName, "masothue.vn timeout sau 8s — thử lại sau (lỗi kỹ thuật)", true);
+
+        } catch (java.io.IOException e) {
+            log.warn("P1 masothue.vn TECHNICAL_FAILURE (IO: {}) for '{}': {}",
+                e.getClass().getSimpleName(), companyName, e.getMessage());
+            return skipP1(companyName, "masothue.vn lỗi kết nối: " + e.getMessage() + " (lỗi kỹ thuật)", true);
+
         } catch (Exception e) {
-            log.warn("masothue.vn search failed for {}: {}", companyName, e.getMessage());
-            return skipP1(companyName, "masothue.vn error: " + e.getMessage(), true);
+            log.warn("P1 masothue.vn TECHNICAL_FAILURE (unexpected: {}) for '{}': {}",
+                e.getClass().getSimpleName(), companyName, e.getMessage());
+            return skipP1(companyName, "masothue.vn lỗi không xác định: " + e.getMessage(), true);
         }
     }
 

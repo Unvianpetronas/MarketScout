@@ -160,15 +160,22 @@ public class CrawlerP6 {
                 if (score != null && score > 0.7) {
                     List<String> datasets = (List<String>) r.getOrDefault("datasets", List.of());
                     String source = datasets.isEmpty() ? "unknown" : datasets.get(0);
+                    String matchedEntityId = (String) r.getOrDefault("id", null);
+                    String matchedEntityName = extractMatchedEntityName(r);
 
-                    log.warn("SANCTIONS HIT: {} — score={} source={}", companyName, score, source);
+                    log.warn("SANCTIONS HIT: '{}' — score={} source={} matchedEntity='{}' entityId={}",
+                            companyName, score, source, matchedEntityName, matchedEntityId);
 
                     return P6Data.builder()
                             .state(PillarData.DataState.FOUND)
                             .companyName(companyName)
                             .sanctioned(true)
                             .sanctionSource(source)
-                            .rawText("Sanction match score: " + score + " | source: " + source)
+                            .matchedEntityName(matchedEntityName)
+                            .matchedEntityId(matchedEntityId)
+                            .matchScore(score)
+                            .rawText(String.format("Sanction match score=%.3f | source=%s | matched='%s' | id=%s",
+                                    score, source, matchedEntityName, matchedEntityId))
                             .dataSource("opensanctions_api")
                             .fetchedAt(LocalDateTime.now())
                             .build();
@@ -206,6 +213,27 @@ public class CrawlerP6 {
                 .dataSource("opensanctions_api")
                 .fetchedAt(LocalDateTime.now())
                 .build();
+    }
+
+    /**
+     * Trích xuất tên entity từ OpenSanctions result để lưu audit trail.
+     * OpenSanctions trả về properties.name[] hoặc caption ở top level.
+     */
+    @SuppressWarnings("unchecked")
+    private String extractMatchedEntityName(Map<String, Object> result) {
+        try {
+            // Thử lấy từ properties.name[]
+            Map<String, Object> properties = (Map<String, Object>) result.get("properties");
+            if (properties != null) {
+                List<String> names = (List<String>) properties.get("name");
+                if (names != null && !names.isEmpty()) return names.get(0);
+            }
+            // Fallback sang caption (display name trong OpenSanctions)
+            Object caption = result.get("caption");
+            return caption instanceof String ? (String) caption : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private String buildKey(String name, String country) {

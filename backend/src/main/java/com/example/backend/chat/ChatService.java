@@ -27,6 +27,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -37,18 +38,19 @@ import java.util.concurrent.Executors;
 @RequiredArgsConstructor
 public class ChatService {
 
-    private final ChatSessionRepository sessionRepo;
-    private final ChatMessageRepository messageRepo;
-    private final UsersRepository       usersRepo;
-    private final ReportRepository      reportRepo;
-    private final GeminiService         geminiService;
-    private final QuotaService          quotaService;
-    private final IntentDetector        intentDetector;
-    private final FindPartnersService   findPartnersService;
-    private final QuickScanService      quickScanService;
-    private final ScoringEngine         scoringEngine;
-    private final DealSafetyAgent       dealSafetyAgent;
-    private final ObjectMapper          objectMapper;
+    private final ChatSessionRepository  sessionRepo;
+    private final ChatMessageRepository  messageRepo;
+    private final UsersRepository        usersRepo;
+    private final ReportRepository       reportRepo;
+    private final GeminiService          geminiService;
+    private final QuotaService           quotaService;
+    private final IntentDetector         intentDetector;
+    private final FindPartnersService    findPartnersService;
+    private final QuickScanService       quickScanService;
+    private final ScoringEngine          scoringEngine;
+    private final DealSafetyAgent        dealSafetyAgent;
+    private final CompanyResolverService companyResolverService;
+    private final ObjectMapper           objectMapper;
 
     private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
 
@@ -184,16 +186,45 @@ public class ChatService {
     }
 
     /**
-     * Lightweight P1(+P6)-only lookup for "tra mã số thuế / công ty có thật không"
-     * style questions. No quota cost — does not run the full 8-pillar pipeline.
+     * Lightweight P1(+P6)-only lookup. No quota cost.
+     * Chạy CompanyResolverService trước để xử lý tên mơ hồ và detect VN vs quốc tế.
      */
     private String handleLookup(UUID userId, IntentResult intent, ReportDTO.ChatMessageRequest req,
                                SseEmitter emitter) throws Exception {
-        // Default to Vietnam when the intent didn't extract a country — same rationale as handleVerify.
-        String country = (intent.getCountry() == null || intent.getCountry().isBlank())
-            ? "VN" : intent.getCountry();
+        String sessionKey = req.getSessionId() != null && !req.getSessionId().isBlank()
+            ? req.getSessionId() : userId.toString();
+
+        // Kiểm tra pending clarification từ lượt trước
+        Optional<CompanyResolutionResult> pending = companyResolverService.getPendingClarification(sessionKey);
+        String rawName = intent.getCompanyName() != null && !intent.getCompanyName().isBlank()
+            ? intent.getCompanyName() : req.getMessage();
+
+        CompanyResolutionResult resolved = companyResolverService.resolve(
+            rawName,
+            pending.map(companyResolverService::buildContextFromPending).orElse(null));
+
+        if (pending.isPresent()) companyResolverService.clearPendingClarification(sessionKey);
+
+        // Tên mơ hồ → hỏi lại, không chạy crawler
+        if (resolved.isAmbiguous()) {
+            companyResolverService.savePendingClarification(sessionKey, resolved);
+            String clarifyMsg = buildClarifyMessage(resolved);
+            sendEvent(emitter, AgentEvent.done("clarify", clarifyMsg,
+                java.util.Map.of("alternatives", resolved.getAlternatives(), "pending", true)));
+            return clarifyMsg;
+        }
+
+        // Xác định tên và quốc gia từ kết quả resolver
+        String effectiveName = resolved.isVietnam() && resolved.getNormalizedName() != null
+            ? resolved.getNormalizedName() : resolved.getSuggestedFullName();
+        if (effectiveName == null || effectiveName.isBlank()) effectiveName = rawName;
+
+        String country = resolved.getCountryIso2() != null
+            ? resolved.getCountryIso2()
+            : (intent.getCountry() != null && !intent.getCountry().isBlank() ? intent.getCountry() : null);
+
         CompanyInput input = CompanyInput.builder()
-            .companyName(intent.getCompanyName() != null ? intent.getCompanyName() : req.getMessage())
+            .companyName(effectiveName)
             .country(country)
             .taxId(intent.getTaxId())
             .build();
@@ -253,18 +284,43 @@ public class ChatService {
 
     private String handleVerify(UUID userId, IntentResult intent, ReportDTO.ChatMessageRequest req,
                                SseEmitter emitter, int quotaCost) throws Exception {
-        // Deduct quota BEFORE running
+        // 1. Resolve company name TRƯỚC khi deduct quota — tránh trừ quota khi cần hỏi lại
+        String sessionKey = req.getSessionId() != null && !req.getSessionId().isBlank()
+            ? req.getSessionId() : userId.toString();
+
+        Optional<CompanyResolutionResult> pending = companyResolverService.getPendingClarification(sessionKey);
+        String rawName = intent.getCompanyName() != null && !intent.getCompanyName().isBlank()
+            ? intent.getCompanyName() : req.getMessage();
+
+        CompanyResolutionResult resolved = companyResolverService.resolve(
+            rawName,
+            pending.map(companyResolverService::buildContextFromPending).orElse(null));
+
+        if (pending.isPresent()) companyResolverService.clearPendingClarification(sessionKey);
+
+        if (resolved.isAmbiguous()) {
+            companyResolverService.savePendingClarification(sessionKey, resolved);
+            String clarifyMsg = buildClarifyMessage(resolved);
+            sendEvent(emitter, AgentEvent.done("clarify", clarifyMsg,
+                java.util.Map.of("alternatives", resolved.getAlternatives(), "pending", true)));
+            return clarifyMsg;
+        }
+
+        // 2. Chỉ deduct quota sau khi đã xác nhận tên công ty rõ ràng
         quotaService.checkAndDeduct(userId);
         if (quotaCost == 2) quotaService.checkAndDeduct(userId);
 
         Users user = requireUser(userId);
-        // Default to Vietnam when the intent didn't extract a country — this product
-        // is VN-focused (masothue.vn/VietQR MST lookup) and a null country routes
-        // the P1 crawler to GLEIF (international), which never finds a VN MST.
-        String country = (intent.getCountry() == null || intent.getCountry().isBlank())
-            ? "VN" : intent.getCountry();
+        String effectiveName = resolved.isVietnam() && resolved.getNormalizedName() != null
+            ? resolved.getNormalizedName() : resolved.getSuggestedFullName();
+        if (effectiveName == null || effectiveName.isBlank()) effectiveName = rawName;
+
+        String country = resolved.getCountryIso2() != null
+            ? resolved.getCountryIso2()
+            : (intent.getCountry() != null && !intent.getCountry().isBlank() ? intent.getCountry() : null);
+
         CompanyInput input = CompanyInput.builder()
-            .companyName(intent.getCompanyName() != null ? intent.getCompanyName() : req.getMessage())
+            .companyName(effectiveName)
             .country(country)
             .taxId(intent.getTaxId())
             .build();
@@ -394,6 +450,18 @@ public class ChatService {
         log.info("handleGeneralQA reply string length: {}", reply != null ? reply.length() : "null");
         sendEvent(emitter, AgentEvent.done("result", reply, null));
         return reply;
+    }
+
+    private String buildClarifyMessage(CompanyResolutionResult resolved) {
+        StringBuilder sb = new StringBuilder("Bạn muốn tra cứu công ty nào? \"")
+            .append(resolved.getNormalizedName())
+            .append("\" có thể là nhiều công ty khác nhau.");
+        if (resolved.getAlternatives() != null && !resolved.getAlternatives().isEmpty()) {
+            sb.append(" Ý bạn có phải: ").append(String.join(", ", resolved.getAlternatives())).append("?");
+        } else {
+            sb.append(" Vui lòng cung cấp thêm thông tin (tên đầy đủ, quốc gia, MST...).");
+        }
+        return sb.toString();
     }
 
     private void sendEvent(SseEmitter emitter, AgentEvent event) throws Exception {

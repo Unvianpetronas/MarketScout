@@ -2,6 +2,8 @@ package com.example.backend.domain;
 
 import com.example.backend.domain.Users;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -18,6 +20,21 @@ public interface UsersRepository extends JpaRepository<Users, UUID> {
 
     Optional<Users> findByEmail(String email);
     boolean existsByEmail(String email);
+
+    // Admin: single-user lookup with plan eagerly fetched (avoids LazyInitializationException
+    // once the request-scoped session closes after the repository call returns)
+    @Query("SELECT u FROM Users u LEFT JOIN FETCH u.plan WHERE u.id = :id")
+    Optional<Users> findByIdWithPlan(@Param("id") UUID id);
+
+    // Admin: paginated/filterable user list with plan eagerly fetched.
+    // `search` must never be null — an empty string matches everything via the
+    // '%%' LIKE pattern. Binding a literal null here makes Postgres unable to
+    // infer the parameter type inside LOWER(CONCAT(...)) (it falls back to
+    // bytea and "lower(bytea) does not exist" blows up the query).
+    @Query("SELECT u FROM Users u LEFT JOIN FETCH u.plan WHERE " +
+           "LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%'))")
+    Page<Users> searchUsers(@Param("search") String search, Pageable pageable);
 
     // ── Quota mutations ───────────────────────────────────────────────
 
