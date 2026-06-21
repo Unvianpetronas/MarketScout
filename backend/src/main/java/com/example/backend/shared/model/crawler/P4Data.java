@@ -15,6 +15,5 @@ public class P4Data extends PillarData {
     private String identityMatchLevel; // COMPLETELY_MATCHED | MINOR_MISMATCH | MAJOR_MISMATCH
     private Boolean addressVerified;
     private Boolean ceoVerified;
-    private String googlePlaceId;
     private String verifiedAddress;
 }
