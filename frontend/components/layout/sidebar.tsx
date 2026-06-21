@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   MessageSquare, Search, Shield, Zap, Users, Building2,
   Settings, Plus, ChevronLeft, ChevronRight, Bell, LogOut,
-  BarChart3, CreditCard, Home, FileText, Globe, Star
+  BarChart3, CreditCard, Home, FileText, Globe, Star, LayoutDashboard
 } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import { useState } from "react";
@@ -139,6 +139,25 @@ export function Sidebar({ active }: { active?: string }) {
           );
         })}
       </nav>
+
+      {/* ── Admin Panel shortcut (admin only) ── */}
+      {user?.role?.toUpperCase() === "ADMIN" && (
+        <div className="px-2 pb-1">
+          <Link
+            href="/admin"
+            title={collapsed ? "Admin Panel" : undefined}
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 bg-gradient-to-r from-purple-50 to-indigo-50 text-purple-700 hover:from-purple-100 hover:to-indigo-100 border border-purple-100 ${collapsed ? "justify-center" : ""}`}
+          >
+            <LayoutDashboard className="w-[18px] h-[18px] shrink-0 text-purple-500" />
+            {!collapsed && <span className="truncate">Admin Panel</span>}
+            {!collapsed && (
+              <span className="ml-auto text-[10px] bg-purple-600 text-white font-bold px-1.5 py-0.5 rounded-full">
+                ADMIN
+              </span>
+            )}
+          </Link>
+        </div>
+      )}
 
       {/* ── Bottom Section ── */}
       <div className="border-t border-gray-100 px-2 py-3 space-y-0.5">

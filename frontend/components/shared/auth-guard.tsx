@@ -4,15 +4,23 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
 
-export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+export function AuthGuard({
+  children,
+  requiredRole,
+}: {
+  children: React.ReactNode;
+  requiredRole?: string;
+}) {
+  const { isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
+  const hasRole = !requiredRole || user?.role?.toUpperCase() === requiredRole.toUpperCase();
+
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace("/login");
-    }
-  }, [isAuthenticated, isLoading, router]);
+    if (isLoading) return;
+    if (!isAuthenticated) { router.replace("/login"); return; }
+    if (requiredRole && !hasRole) { router.replace("/dashboard"); }
+  }, [isAuthenticated, isLoading, hasRole, requiredRole, router]);
 
   if (isLoading) {
     return (
@@ -28,6 +36,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) return null;
+  if (requiredRole && !hasRole) return null;
 
   return <>{children}</>;
 }

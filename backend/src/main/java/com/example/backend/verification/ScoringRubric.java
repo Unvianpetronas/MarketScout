@@ -269,15 +269,25 @@ public class ScoringRubric {
         return build(8, "Operational Proof", Math.min(100, Math.max(0, score)), ev, "TinEye / Tavily");
     }
 
-    // Overall score calculation
+    // Overall score calculation.
+    // A null score means SKIP — no data available (external source down/unreachable,
+    // not yet applicable, etc.), which is NOT the same as a real low/failing score.
+    // Counting it as 0 against the pillar's full weight makes one offline data
+    // source (e.g. a government site outage) look like business risk. Instead we
+    // drop skipped pillars from both the numerator and the denominator and
+    // re-normalize across whatever pillars actually returned data.
     public double calcOverallScore(List<PillarScore> pillars) {
         double[] weights = {w1, w2, w3, w4, w5, w6, w7, w8};
-        double total = 0;
+        double weightedSum = 0;
+        double weightTotal = 0;
         for (int i = 0; i < pillars.size() && i < 8; i++) {
             Integer s = pillars.get(i).getScore();
-            total += (s != null ? s : 0) * weights[i];
+            if (s == null) continue;
+            weightedSum += s * weights[i];
+            weightTotal += weights[i];
         }
-        return Math.round(total * 10.0) / 10.0;
+        if (weightTotal == 0) return 0;
+        return Math.round((weightedSum / weightTotal) * 10.0) / 10.0;
     }
 
     public String getRiskLevel(double overall) {

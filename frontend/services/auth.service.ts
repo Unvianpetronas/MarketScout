@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { getRefreshToken } from "@/lib/token-storage";
 import {
   LoginRequest,
   LoginResponse,
@@ -24,7 +25,7 @@ export const register = async (data: RegisterRequest): Promise<RegisterResponse>
 };
 
 export const logout = async (): Promise<void> => {
-  const refreshToken = typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
+  const refreshToken = typeof window !== "undefined" ? getRefreshToken() : null;
   await api.post("/auth/logout", refreshToken ? { refreshToken } : undefined);
 };
 

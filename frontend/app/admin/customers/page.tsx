@@ -1,30 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import {
-  BarChart2, Users, DollarSign, Ban, Database,
-  Search, Download, UserPlus, History, Key, Terminal, CreditCard,
-  ArrowUpRight, Shield, AlertTriangle, CheckCircle2, RefreshCw,
-  TrendingUp, Activity
+  Users, Ban,
+  Search, Download, UserPlus,
+  ArrowUpRight, AlertTriangle, CheckCircle2, RefreshCw,
+  Activity
 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
+import { AdminShell } from "@/components/admin/admin-shell";
 import { getAdminUsers, setUserQuota, refundUserQuota, AdminUser } from "@/services/admin.service";
-
-const NAV_ITEMS = [
-  { label: "Core Platform", items: [
-    { label: "Tổng quan", href: "/admin", icon: BarChart2 },
-    { label: "Khách hàng", href: "/admin/customers", icon: Users, active: true },
-    { label: "Quota Matrix", href: "/admin/quota", icon: Database },
-    { label: "Billing", href: "/admin/billing", icon: CreditCard },
-  ]},
-  { label: "Audit & Logs", items: [
-    { label: "Lịch sử", href: "/admin/history", icon: History },
-    { label: "Access Tokens", href: "/admin/tokens", icon: Key },
-    { label: "System Logs", href: "/admin/logs", icon: Terminal },
-  ]},
-];
 
 function getQuotaBarColor(pct: number) {
   if (pct >= 90) return "#EF4444";
@@ -109,59 +95,8 @@ export default function AdminCustomersPage() {
   ];
 
   return (
-    <AuthGuard>
-      <div className="min-h-screen flex bg-[#0A0F1A]">
-        {/* ── Admin Sidebar ── */}
-        <aside className="w-60 shrink-0 flex flex-col bg-[#0D1117] border-r border-white/5">
-          <div className="p-5 border-b border-white/5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl gradient-brand flex items-center justify-center">
-                <Shield className="w-4 h-4 text-white" />
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white">MarketScout</p>
-                <p className="text-[10px] text-[#00D26A] font-bold uppercase tracking-widest">Super Admin</p>
-              </div>
-            </div>
-          </div>
-
-          <nav className="flex-1 p-3 pt-5 space-y-5">
-            {NAV_ITEMS.map((section) => (
-              <div key={section.label}>
-                <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-2 px-3">
-                  {section.label}
-                </p>
-                <div className="space-y-0.5">
-                  {section.items.map((item) => (
-                    <Link key={item.href} href={item.href}
-                      className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all ${
-                        item.active ? "bg-white/10 text-white font-semibold" : "text-gray-500 hover:text-white hover:bg-white/5"
-                      }`}>
-                      <item.icon className="w-4 h-4 shrink-0" />
-                      {item.label}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </nav>
-
-          <div className="p-4 border-t border-white/5">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-xs font-bold shrink-0">SA</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">Super Admin</p>
-                <p className="text-xs text-gray-500 truncate">admin@marketscout.vn</p>
-              </div>
-              <div className="w-2 h-2 rounded-full bg-[#00D26A]" />
-            </div>
-          </div>
-        </aside>
-
-        {/* ── Main ── */}
-        <div className="flex-1 bg-[#F8FAFB] overflow-y-auto">
-          <div className="p-6">
-
+    <AuthGuard requiredRole="ADMIN">
+      <AdminShell active="customers">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -335,8 +270,6 @@ export default function AdminCustomersPage() {
                 </>
               )}
             </div>
-          </div>
-        </div>
 
         {/* Quota Modal */}
         {quotaModal && (
@@ -357,7 +290,7 @@ export default function AdminCustomersPage() {
             </div>
           </div>
         )}
-      </div>
+      </AdminShell>
     </AuthGuard>
   );
 }

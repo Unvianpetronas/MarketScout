@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import { User } from "@/types/user";
 import { LoginRequest } from "@/types/auth";
 import { login as loginApi, logout as logoutApi, getMe } from "@/services/auth.service";
+import { setTokens, getAccessToken, clearTokens } from "@/lib/token-storage";
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (data: LoginRequest) => Promise<void>;
+  login: (data: LoginRequest, rememberMe?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -32,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
+    const token = getAccessToken();
     if (token) {
       refreshUser().finally(() => setIsLoading(false));
     } else {
@@ -40,10 +41,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [refreshUser]);
 
-  const login = async (data: LoginRequest) => {
+  const login = async (data: LoginRequest, rememberMe = false) => {
     const response = await loginApi(data);
-    localStorage.setItem("access_token", response.token);
-    localStorage.setItem("refresh_token", response.refreshToken);
+    setTokens(response.token, response.refreshToken, rememberMe);
     setUser({
       id: response.id,
       email: response.email,
@@ -62,8 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore errors
     } finally {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      clearTokens();
       setUser(null);
       router.push("/login");
     }

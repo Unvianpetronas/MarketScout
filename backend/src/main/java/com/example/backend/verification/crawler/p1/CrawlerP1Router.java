@@ -49,12 +49,29 @@ public class CrawlerP1Router {
                 return crawlerP1VN.fetchByMST(input.getTaxId());
             } else {
                 log.info("P1 CASE 2: VN + name only → masothue.vn search for {}", input.getName());
-                return crawlerP1VN.findMSTByName(input.getName());
+                P1Data result = crawlerP1VN.findMSTByName(input.getName());
+                // CASE 2b: masothue.vn không tìm thấy và tên không có dấu tiếng Việt
+                // → có thể là công ty nước ngoài bị route nhầm, thử GLEIF
+                if (!result.isFound() && looksLikeForeignName(input.getName())) {
+                    log.info("P1 CASE 2b: masothue.vn not found + no VN diacritics → trying GLEIF for '{}'", input.getName());
+                    return crawlerP1Intl.fetchByName(input.getName(), input.getCountry());
+                }
+                return result;
             }
         } else {
             log.info("P1 CASE 3: International → GLEIF for {}", input.getName());
             return crawlerP1Intl.fetchByName(input.getName(), input.getCountry());
         }
+    }
+
+    /**
+     * Trả về true nếu tên không chứa ký tự tiếng Việt có dấu.
+     * Dùng để phát hiện tên nước ngoài bị route nhầm vào pipeline VN.
+     */
+    private boolean looksLikeForeignName(String name) {
+        if (name == null || name.isBlank()) return false;
+        return !name.matches(".*[àáâãèéêìíòóôõùúýăđơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ"
+            + "ÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚÝĂĐƠƯẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼẾỀỂỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪỬỮỰỲỴỶỸ].*");
     }
 
     private String buildKey(CompanyInput input) {

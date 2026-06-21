@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { getAccessToken } from "@/lib/token-storage";
 import {
   ChatSession,
   ConversationResponse,
@@ -65,7 +66,7 @@ export const streamPipelineMessage = (
     onMeta?: (meta: Record<string, unknown>) => void
 ): AbortController => {
   const controller = new AbortController();
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
+  const token = typeof window !== "undefined" ? getAccessToken() : null;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
   console.log("[SSE] PARSER VERSION 2026-06-11 — starting request", data); // DEBUG
