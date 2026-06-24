@@ -2,17 +2,25 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { Eye, EyeOff, Mail, Lock, Navigation } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Navigation, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/providers/auth-provider";
 import { LoginRequest } from "@/types/auth";
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated) {
+      router.replace("/dashboard");
+    }
+  }, [isAuthLoading, isAuthenticated, router]);
 
   const {
     register,
@@ -40,6 +48,8 @@ export default function LoginPage() {
       toast.success("Email verified successfully! You can now log in.");
     }
   }, []);
+
+  if (isAuthLoading || isAuthenticated) return null;
 
   return (
     <div className="min-h-screen flex">
@@ -139,6 +149,14 @@ export default function LoginPage() {
       {/* RIGHT PANEL — 58% */}
       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#E8EDE9]">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-10">
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 mb-6 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Về trang chủ
+          </Link>
+
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-2 mb-8">
             <div className="w-10 h-10 rounded-xl bg-[#1A3A28] flex items-center justify-center">
