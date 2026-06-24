@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Check, X, Zap, Shield, Star, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
+import { useAuth } from "@/providers/auth-provider";
 
 const PLANS = [
   {
@@ -173,6 +174,8 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 }
 
 export default function PricingPage() {
+  const { isAuthenticated, isLoading } = useAuth();
+
   return (
     <div className="min-h-screen bg-[#FAFBFA]">
       {/* ── Navbar ── */}
@@ -187,13 +190,20 @@ export default function PricingPage() {
           </div>
         </Link>
         <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="text-sm text-gray-500 hover:text-gray-800 font-medium">Bảng điều khiển</Link>
-          <Link href="/login" className="px-4 py-2 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50">
-            Đăng nhập
-          </Link>
-          <Link href="/register" className="px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90">
-            Dùng thử miễn phí
-          </Link>
+          {isLoading ? null : isAuthenticated ? (
+            <Link href="/dashboard" className="px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90">
+              Bảng điều khiển
+            </Link>
+          ) : (
+            <>
+              <Link href="/login" className="px-4 py-2 border border-gray-200 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50">
+                Đăng nhập
+              </Link>
+              <Link href="/register" className="px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90">
+                Dùng thử miễn phí
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 

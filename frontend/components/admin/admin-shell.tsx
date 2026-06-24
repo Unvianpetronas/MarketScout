@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart2, Users, Database, CreditCard, History, Terminal, Shield } from "lucide-react";
+import { BarChart2, Users, Database, CreditCard, History, Terminal, Shield, ArrowLeft } from "lucide-react";
 
 export type AdminNavId = "overview" | "customers" | "quota" | "billing" | "history" | "logs";
 
@@ -40,7 +40,17 @@ export function AdminShell({ active, children }: { active: AdminNavId; children:
           </div>
         </div>
 
-        <nav className="flex-1 p-3 pt-5 space-y-5">
+        <div className="p-3 pt-4">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" />
+            Về Dashboard
+          </Link>
+        </div>
+
+        <nav className="flex-1 p-3 pt-2 space-y-5">
           {NAV_SECTIONS.map((section) => (
             <div key={section.label}>
               <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-2 px-3">
