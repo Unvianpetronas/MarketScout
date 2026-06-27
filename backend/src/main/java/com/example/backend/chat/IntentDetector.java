@@ -12,20 +12,25 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class IntentDetector {
 
-    private static final String SYSTEM_PROMPT = """
-        Bạn là Manager Agent của MarketScout AI.
-        Nhiệm vụ: Phân tích message từ user và trả về JSON phân loại intent.
+    private static final String SYSTEM_PROMPT = MarketScoutPrompts.PERSONA + """
+
+        Vai trò ở bước này: Manager Agent phân loại ý định (intent) của người dùng.
         CHỈ trả về JSON thuần túy, KHÔNG markdown, KHÔNG giải thích.
 
         Các intent có thể:
         - FIND_BUYER: tìm buyer, tìm khách hàng, người mua, nhà nhập khẩu
         - FIND_SELLER: tìm nhà cung cấp, tìm người bán, supplier, nhà xuất khẩu
-        - LOOKUP_COMPANY: tra mã số thuế/MST/LEI, kiểm tra một công ty có tồn tại/có thật không,
-          tìm thông tin đăng ký cơ bản của một công ty (KHÔNG yêu cầu đánh giá rủi ro hay thẩm định toàn diện)
-        - VERIFY_PARTNER: thẩm định toàn diện, đánh giá rủi ro đối tác, kiểm tra đầy đủ 8 trụ cột
+        - LOOKUP_COMPANY: tra cứu NHANH một công ty — mã số thuế/MST/LEI, kiểm tra có tồn tại/có thật không,
+          lấy thông tin đăng ký cơ bản. KHÔNG đánh giá rủi ro, KHÔNG thẩm định toàn diện.
+        - VERIFY_PARTNER: thẩm định TOÀN DIỆN, đánh giá rủi ro đối tác, chấm điểm đầy đủ 8 trụ cột.
         - COMPARE_PARTNERS: so sánh, A vs B, cái nào tốt hơn
         - EXPLAIN_REPORT: tại sao điểm thấp, giải thích điểm, kết quả báo cáo
         - GENERAL_QA: LC là gì, FOB là gì, Incoterms, tư vấn thương mại
+
+        Phân biệt LOOKUP_COMPANY vs VERIFY_PARTNER:
+        - "tra/kiểm tra/có thật/MST/thông tin của X" → LOOKUP_COMPANY (rẻ hơn, không tốn quota).
+        - "thẩm định/đánh giá rủi ro/chấm điểm/verify X" → VERIFY_PARTNER (tốn quota).
+        - KHÔNG chắc giữa hai cái → chọn LOOKUP_COMPANY (rẻ hơn, an toàn hơn cho người dùng).
 
         Output format (JSON thuần túy):
         {
@@ -41,7 +46,7 @@ public class IntentDetector {
           "reply": null
         }
 
-        Với GENERAL_QA, điền "reply" với câu trả lời ngắn gọn.
+        Với GENERAL_QA, điền "reply" với câu trả lời ngắn gọn theo đúng giọng MarketScout ở trên.
         """;
 
     private final GeminiService geminiService;

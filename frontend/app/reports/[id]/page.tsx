@@ -4,8 +4,8 @@ import { useEffect, useState, use } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, AlertTriangle, Shield, RefreshCw, Globe, ExternalLink,
-  CheckCircle2, XCircle, Clock, ChevronRight, Download, MessageSquare,
-  Building2, FileText, TrendingDown, TrendingUp, Info, Star
+  CheckCircle2, XCircle, Clock, Download, MessageSquare,
+  Building2, FileText, TrendingUp, Info, Star
 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
@@ -22,14 +22,42 @@ const PILLAR_ICONS: Record<number, React.ElementType> = {
   5: Star, 6: AlertTriangle, 7: FileText, 8: CheckCircle2,
 };
 
-function getRiskInfo(score: number) {
-  if (score < 40) return { color: "#00D26A", bg: "#E6F9F0", textClass: "text-emerald-700", label: "Rủi ro Thấp", badgeCls: "risk-low" };
-  if (score < 70) return { color: "#F59E0B", bg: "#FFF8E7", textClass: "text-amber-700", label: "Rủi ro Trung bình", badgeCls: "risk-medium" };
-  return { color: "#EF4444", bg: "#FFF1F0", textClass: "text-red-700", label: "Rủi ro Cao", badgeCls: "risk-high" };
+// Trust-based color for the OVERALL score: higher = more trustworthy = green.
+function trustStyle(score: number) {
+  if (score >= 75) return { color: "#00D26A", bg: "#E6F9F0", textClass: "text-emerald-700", label: "Tin cậy cao" };
+  if (score >= 40) return { color: "#F59E0B", bg: "#FFF8E7", textClass: "text-amber-700", label: "Cần thận trọng" };
+  return { color: "#EF4444", bg: "#FFF1F0", textClass: "text-red-700", label: "Rủi ro cao" };
+}
+
+// Color/badge for a pillar driven by its STATUS (PASS/WARN/FAIL/SKIP),
+// not by the raw number — so a high-trust pillar is green and an
+// unverified one is a neutral grey "N/A" instead of a red "FAIL".
+function pillarStatusStyle(status: string | undefined) {
+  switch ((status || "").toUpperCase()) {
+    case "PASS": return { color: "#00D26A", bg: "#E6F9F0", badge: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "PASS", na: false };
+    case "WARN": return { color: "#F59E0B", bg: "#FFF8E7", badge: "bg-amber-50 text-amber-700 border-amber-200", label: "WARN", na: false };
+    case "FAIL": return { color: "#EF4444", bg: "#FFF1F0", badge: "bg-red-50 text-red-700 border-red-200", label: "FAIL", na: false };
+    default:     return { color: "#9CA3AF", bg: "#F3F4F6", badge: "bg-gray-100 text-gray-500 border-gray-200", label: "N/A", na: true };
+  }
+}
+
+function EvidenceRow({ ev }: { ev: { type?: string; text?: string; source?: string } }) {
+  const t = (ev.type || "").toUpperCase();
+  const Icon = t === "PASS" ? CheckCircle2 : t === "FAIL" ? XCircle : AlertTriangle;
+  const cls = t === "PASS" ? "text-emerald-500" : t === "FAIL" ? "text-red-400" : "text-amber-500";
+  return (
+    <li className="text-xs text-gray-600 flex items-start gap-1.5">
+      <Icon className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${cls}`} />
+      <span>
+        {ev.text}
+        {ev.source && <span className="text-gray-300"> · {ev.source}</span>}
+      </span>
+    </li>
+  );
 }
 
 function ScoreGaugeLight({ score }: { score: number }) {
-  const { color, label, textClass } = getRiskInfo(score);
+  const { color, label, textClass } = trustStyle(score);
   const circumference = 2 * Math.PI * 52;
   const dashOffset = circumference - (circumference * score) / 100;
 
@@ -66,17 +94,19 @@ function parseFindings(raw: string | undefined): string[] {
 }
 
 function PillarCard({ pillar }: { pillar: PillarResult }) {
+  const st = pillarStatusStyle(pillar.status);
+  const isNa = st.na || pillar.score == null;
   const score = pillar.score ?? 0;
-  const { color, bg, textClass } = getRiskInfo(score);
-  const findings = parseFindings(pillar.findings);
   const Icon = PILLAR_ICONS[pillar.pillarNo] || Shield;
+  const evidences = pillar.evidences ?? [];
+  const findings = parseFindings(pillar.findings);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm card-hover">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: bg }}>
-            <Icon className="w-4.5 h-4.5" style={{ color }} />
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: st.bg }}>
+            <Icon className="w-4.5 h-4.5" style={{ color: st.color }} />
           </div>
           <div>
             <p className="text-[10px] text-gray-400 font-mono uppercase">Trụ cột {pillar.pillarNo}</p>
@@ -84,36 +114,42 @@ function PillarCard({ pillar }: { pillar: PillarResult }) {
           </div>
         </div>
         <div className="text-right shrink-0">
-          <div className="text-2xl font-extrabold" style={{ color }}>{score}</div>
-          <div className="text-[10px] text-gray-400">điểm</div>
+          {isNa ? (
+            <div className="text-2xl font-extrabold text-gray-300">N/A</div>
+          ) : (
+            <>
+              <div className="text-2xl font-extrabold" style={{ color: st.color }}>{score}</div>
+              <div className="text-[10px] text-gray-400">điểm</div>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="w-full bg-gray-100 rounded-full h-1.5 mb-3">
-        <div className="h-1.5 rounded-full transition-all duration-700" style={{ width: `${score}%`, backgroundColor: color }} />
-      </div>
+      {!isNa && (
+        <div className="w-full bg-gray-100 rounded-full h-1.5 mb-3">
+          <div className="h-1.5 rounded-full transition-all duration-700" style={{ width: `${score}%`, backgroundColor: st.color }} />
+        </div>
+      )}
 
       <div className="flex items-center justify-between">
-        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-          score < 40 ? "risk-low" : score < 70 ? "risk-medium" : "risk-high"
-        }`}>
-          {pillar.status || (score >= 70 ? "Passed" : score >= 40 ? "Review" : "Alert")}
+        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${st.badge}`}>
+          {isNa ? "N/A — Chưa đủ dữ liệu" : st.label}
         </span>
-        {pillar.confidence && (
+        {pillar.confidence && !isNa && (
           <span className="text-[11px] text-gray-400">Độ tin cậy: {pillar.confidence}</span>
         )}
       </div>
 
-      {findings.length > 0 && (
-        <ul className="mt-3 space-y-1 border-t border-gray-50 pt-3">
-          {findings.slice(0, 2).map((finding, i) => (
-            <li key={i} className="text-xs text-gray-500 flex items-start gap-1.5">
-              <ChevronRight className="w-3 h-3 shrink-0 mt-0.5 text-gray-300" />
-              {finding}
-            </li>
-          ))}
+      {/* What was actually checked — evidence list */}
+      {evidences.length > 0 ? (
+        <ul className="mt-3 space-y-1.5 border-t border-gray-50 pt-3">
+          {evidences.map((ev, i) => <EvidenceRow key={i} ev={ev} />)}
         </ul>
-      )}
+      ) : isNa ? (
+        <p className="mt-3 border-t border-gray-50 pt-3 text-xs text-gray-400">
+          {findings[0] || "Không tìm thấy dữ liệu từ nguồn để kiểm chứng trụ cột này."}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -146,9 +182,9 @@ export default function ReportDetailPage({ params }: Props) {
     catch { dealSafety = { recommendation: report.dealSafetyAnalysis }; }
   }
 
-  const avgScore = pillars.length > 0 
-    ? Math.round(pillars.reduce((s, p) => s + (p.score ?? 0), 0) / pillars.length)
-    : report?.overallScore ?? 0;
+  // Use the backend's weighted overall score — it already excludes N/A pillars,
+  // so unverified sources don't drag a legitimate company's score down to 0.
+  const avgScore = report?.overallScore ?? 0;
 
   return (
     <AuthGuard>
@@ -270,7 +306,7 @@ export default function ReportDetailPage({ params }: Props) {
                 {/* ── Score + Deal Safety ── */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex flex-col items-center">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Tổng điểm rủi ro</p>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Điểm tin cậy tổng</p>
                     <ScoreGaugeLight score={avgScore} />
                     <div className="mt-4 w-full space-y-1.5">
                       {[

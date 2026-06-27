@@ -10,6 +10,7 @@ export interface LoginResponse {
   email: string;
   fullName: string;
   role: string;
+  planName?: string;
   quotaRemaining: number;
   phone?: string;
   taxId?: string;

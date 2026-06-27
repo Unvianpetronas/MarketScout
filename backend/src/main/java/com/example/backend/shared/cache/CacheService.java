@@ -94,4 +94,46 @@ public class CacheService {
             log.warn("Redis delete failed for key {}: {}", key, e.getMessage());
         }
     }
+
+    // ── Atomic counters (rate / daily-budget guards) ───────────────────
+    // All fail-open: on any Redis error they behave as if the counter is 0
+    // so a Redis outage never blocks a legitimate API call.
+
+    /**
+     * Atomically increments {@code key} by {@code delta}, returning the new value.
+     * The TTL is applied only on the first increment (when the value equals delta),
+     * so the window starts when the first request of the period lands.
+     */
+    public long incrementCounter(String key, Duration ttl, long delta) {
+        try {
+            Long v = redisTemplate.opsForValue().increment(key, delta);
+            if (v != null && v == delta) {
+                redisTemplate.expire(key, ttl);
+            }
+            return v != null ? v : 0L;
+        } catch (Exception e) {
+            log.warn("incrementCounter failed for key {}: {}", key, e.getMessage());
+            return 0L;
+        }
+    }
+
+    /** Reads a counter; returns 0 on miss or any error (fail-open). */
+    public long getCounter(String key) {
+        try {
+            String v = redisTemplate.opsForValue().get(key);
+            return v != null ? Long.parseLong(v) : 0L;
+        } catch (Exception e) {
+            log.warn("getCounter failed for key {}: {}", key, e.getMessage());
+            return 0L;
+        }
+    }
+
+    /** Sets a counter to an exact value with a TTL. */
+    public void setCounter(String key, long value, Duration ttl) {
+        try {
+            redisTemplate.opsForValue().set(key, String.valueOf(value), ttl);
+        } catch (Exception e) {
+            log.warn("setCounter failed for key {}: {}", key, e.getMessage());
+        }
+    }
 }

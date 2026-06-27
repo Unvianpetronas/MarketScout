@@ -48,7 +48,7 @@ public class FactExtractor {
             String prompt = String.format(USER_PROMPT_TEMPLATE, rawContext);
             String raw = geminiService.callWithSystemPromptLowTemp(SYSTEM_PROMPT, prompt);
             String json = extractJson(raw);
-            return parseFactJson(json, p6);
+            return parseFactJson(json, p1, p2, p3, p4, p5, p6, p7, p8);
         } catch (Exception e) {
             log.warn("FactExtractor Gemini call failed, using structural fallback: {}", e.getMessage());
             return buildFallbackFacts(p1, p2, p3, p4, p5, p6, p7, p8);
@@ -72,87 +72,109 @@ public class FactExtractor {
         return sb.toString();
     }
 
-    private FactJson parseFactJson(String json, P6Data p6) {
+    private FactJson parseFactJson(String json, P1Data p1, P2Data p2, P3Data p3, P4Data p4,
+                                   P5Data p5, P6Data p6, P7Data p7, P8Data p8) {
         try {
             var node = objectMapper.readTree(json);
             FactJson f = new FactJson();
 
+            // Only build facts for pillars whose crawler actually returned data
+            // (state FOUND). When a source was SKIP/NOT_FOUND we leave the facts
+            // null so the rubric marks the pillar N/A (SKIP) instead of scoring it
+            // 0/FAIL — "couldn't verify" must not look like "failed verification".
+
             // P1
-            var p1n = node.path("p1");
-            f.setP1(FactJson.P1Facts.builder()
-                .status(text(p1n, "status"))
-                .ageYears(doubleVal(p1n, "age_years"))
-                .hasLegalRepresentative(boolVal(p1n, "has_legal_representative"))
-                .industryMatch(text(p1n, "industry_match"))
-                .build());
+            if (p1 != null && p1.isFound()) {
+                var p1n = node.path("p1");
+                f.setP1(FactJson.P1Facts.builder()
+                    .status(text(p1n, "status"))
+                    .ageYears(doubleVal(p1n, "age_years"))
+                    .hasLegalRepresentative(boolVal(p1n, "has_legal_representative"))
+                    .industryMatch(text(p1n, "industry_match"))
+                    .build());
+            }
 
             // P2
-            var p2n = node.path("p2");
-            f.setP2(FactJson.P2Facts.builder()
-                .hasOfficialWebsite(boolVal(p2n, "has_official_website"))
-                .domainAgeMonths(intVal(p2n, "domain_age_months"))
-                .usesFreeEmail(boolVal(p2n, "uses_free_email"))
-                .hasSsl(boolVal(p2n, "has_ssl"))
-                .socialMediaScore(text(p2n, "social_media_score"))
-                .build());
+            if (p2 != null && p2.isFound()) {
+                var p2n = node.path("p2");
+                f.setP2(FactJson.P2Facts.builder()
+                    .hasOfficialWebsite(boolVal(p2n, "has_official_website"))
+                    .domainAgeMonths(intVal(p2n, "domain_age_months"))
+                    .usesFreeEmail(boolVal(p2n, "uses_free_email"))
+                    .hasSsl(boolVal(p2n, "has_ssl"))
+                    .socialMediaScore(text(p2n, "social_media_score"))
+                    .build());
+            }
 
             // P3
-            var p3n = node.path("p3");
-            f.setP3(FactJson.P3Facts.builder()
-                .hasTradeHistory(boolVal(p3n, "has_trade_history"))
-                .shipmentCountYear(intVal(p3n, "shipment_count_year"))
-                .isIndustryMatched(boolVal(p3n, "is_industry_matched"))
-                .tradeTrend(text(p3n, "trade_trend"))
-                .build());
+            if (p3 != null && p3.isFound()) {
+                var p3n = node.path("p3");
+                f.setP3(FactJson.P3Facts.builder()
+                    .hasTradeHistory(boolVal(p3n, "has_trade_history"))
+                    .shipmentCountYear(intVal(p3n, "shipment_count_year"))
+                    .isIndustryMatched(boolVal(p3n, "is_industry_matched"))
+                    .tradeTrend(text(p3n, "trade_trend"))
+                    .build());
+            }
 
             // P4
-            var p4n = node.path("p4");
-            f.setP4(FactJson.P4Facts.builder()
-                .identityMatchLevel(text(p4n, "identity_match_level"))
-                .addressVerified(boolVal(p4n, "address_verified"))
-                .ceoVerified(boolVal(p4n, "ceo_verified"))
-                .build());
+            if (p4 != null && p4.isFound()) {
+                var p4n = node.path("p4");
+                f.setP4(FactJson.P4Facts.builder()
+                    .identityMatchLevel(text(p4n, "identity_match_level"))
+                    .addressVerified(boolVal(p4n, "address_verified"))
+                    .ceoVerified(boolVal(p4n, "ceo_verified"))
+                    .build());
+            }
 
             // P5
-            var p5n = node.path("p5");
-            f.setP5(FactJson.P5Facts.builder()
-                .taxComplianceStatus(text(p5n, "tax_compliance_status"))
-                .registeredCapitalUsd(doubleVal(p5n, "registered_capital_usd"))
-                .hasFinancialReport(boolVal(p5n, "has_financial_report"))
-                .revenueTrend(text(p5n, "revenue_trend"))
-                .build());
+            if (p5 != null && p5.isFound()) {
+                var p5n = node.path("p5");
+                f.setP5(FactJson.P5Facts.builder()
+                    .taxComplianceStatus(text(p5n, "tax_compliance_status"))
+                    .registeredCapitalUsd(doubleVal(p5n, "registered_capital_usd"))
+                    .hasFinancialReport(boolVal(p5n, "has_financial_report"))
+                    .revenueTrend(text(p5n, "revenue_trend"))
+                    .build());
+            }
 
             // P6 — use actual P6Data for sanction hit (ground truth, not Gemini interpretation)
-            var p6n = node.path("p6");
-            f.setP6(FactJson.P6Facts.builder()
-                .isSanctionHit(p6 != null ? p6.isSanctioned() : false)
-                .isPersonalAccountRequested(boolVal(p6n, "is_personal_account_requested"))
-                .bicVerified(boolVal(p6n, "bic_verified"))
-                .accountType(text(p6n, "account_type"))
-                .build());
+            if (p6 != null && p6.isFound()) {
+                var p6n = node.path("p6");
+                f.setP6(FactJson.P6Facts.builder()
+                    .isSanctionHit(p6.isSanctioned())
+                    .isPersonalAccountRequested(boolVal(p6n, "is_personal_account_requested"))
+                    .bicVerified(boolVal(p6n, "bic_verified"))
+                    .accountType(text(p6n, "account_type"))
+                    .build());
+            }
 
             // P7
-            var p7n = node.path("p7");
-            f.setP7(FactJson.P7Facts.builder()
-                .depositPercentage(intVal(p7n, "deposit_percentage"))
-                .hasWrittenContract(boolVal(p7n, "has_written_contract"))
-                .paymentMethodSafety(text(p7n, "payment_method_safety"))
-                .dealValueUsd(doubleVal(p7n, "deal_value_usd"))
-                .build());
+            if (p7 != null && p7.isFound()) {
+                var p7n = node.path("p7");
+                f.setP7(FactJson.P7Facts.builder()
+                    .depositPercentage(intVal(p7n, "deposit_percentage"))
+                    .hasWrittenContract(boolVal(p7n, "has_written_contract"))
+                    .paymentMethodSafety(text(p7n, "payment_method_safety"))
+                    .dealValueUsd(doubleVal(p7n, "deal_value_usd"))
+                    .build());
+            }
 
             // P8
-            var p8n = node.path("p8");
-            f.setP8(FactJson.P8Facts.builder()
-                .hasVerifiedLocation(boolVal(p8n, "has_verified_location"))
-                .isStockImageUsed(boolVal(p8n, "is_stock_image_used"))
-                .hasPhysicalEvidence(boolVal(p8n, "has_physical_evidence"))
-                .employeeCountRange(text(p8n, "employee_count_range"))
-                .build());
+            if (p8 != null && p8.isFound()) {
+                var p8n = node.path("p8");
+                f.setP8(FactJson.P8Facts.builder()
+                    .hasVerifiedLocation(boolVal(p8n, "has_verified_location"))
+                    .isStockImageUsed(boolVal(p8n, "is_stock_image_used"))
+                    .hasPhysicalEvidence(boolVal(p8n, "has_physical_evidence"))
+                    .employeeCountRange(text(p8n, "employee_count_range"))
+                    .build());
+            }
 
             return f;
         } catch (Exception e) {
             log.warn("FactJson parse failed: {}", e.getMessage());
-            return buildFallbackFacts(null, null, null, null, null, p6, null, null);
+            return buildFallbackFacts(p1, p2, p3, p4, p5, p6, p7, p8);
         }
     }
 
@@ -186,8 +208,9 @@ public class FactExtractor {
                 .taxComplianceStatus(p5.getTaxComplianceStatus()).registeredCapitalUsd(p5.getRegisteredCapitalUsd())
                 .hasFinancialReport(p5.getHasFinancialReport()).revenueTrend(p5.getRevenueTrend()).build());
         }
-        f.setP6(FactJson.P6Facts.builder()
-            .isSanctionHit(p6 != null && p6.isSanctioned()).build());
+        if (p6 != null && p6.isFound()) {
+            f.setP6(FactJson.P6Facts.builder().isSanctionHit(p6.isSanctioned()).build());
+        }
         if (p7 != null && p7.isFound()) {
             f.setP7(FactJson.P7Facts.builder()
                 .depositPercentage(p7.getDepositPercentage()).hasWrittenContract(p7.getHasWrittenContract())

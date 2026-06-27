@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
 import { useAuth } from "@/providers/auth-provider";
+import { useLanguage } from "@/providers/language-provider";
 import { getReports } from "@/services/report.service";
 import { ReportListItem } from "@/types/report";
 
@@ -27,10 +28,10 @@ function getRiskBadge(risk: string) {
 }
 
 function getScoreRing(score: number) {
-  if (score >= 75) return { color: "#00D26A", label: "Thấp", cls: "score-excellent" };
-  if (score >= 50) return { color: "#84CC16", label: "Trung bình thấp", cls: "score-good" };
-  if (score >= 30) return { color: "#F59E0B", label: "Trung bình cao", cls: "score-medium" };
-  return { color: "#EF4444", label: "Cao", cls: "score-poor" };
+  if (score >= 75) return { color: "#00D26A", labelKey: "score.low", cls: "score-excellent" };
+  if (score >= 50) return { color: "#84CC16", labelKey: "score.lowMid", cls: "score-good" };
+  if (score >= 30) return { color: "#F59E0B", labelKey: "score.highMid", cls: "score-medium" };
+  return { color: "#EF4444", labelKey: "score.high", cls: "score-poor" };
 }
 
 function StatCard({
@@ -62,7 +63,8 @@ function StatCard({
 }
 
 function ScoreCircle({ score }: { score: number }) {
-  const { color, label } = getScoreRing(score);
+  const { t } = useLanguage();
+  const { color, labelKey } = getScoreRing(score);
   const radius = 20;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
@@ -82,22 +84,23 @@ function ScoreCircle({ score }: { score: number }) {
         <text x="24" y="28" textAnchor="middle" fontSize="11" fontWeight="700" fill={color}>{score}</text>
       </svg>
       <div>
-        <p className="text-xs font-bold" style={{ color }}>Rủi ro {label}</p>
+        <p className="text-xs font-bold" style={{ color }}>{t("dash.riskPrefix")} {t(labelKey)}</p>
       </div>
     </div>
   );
 }
 
 function ActivityFeed({ reports }: { reports: ReportListItem[] }) {
+  const { t } = useLanguage();
   const recent = reports.slice(0, 5);
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
       <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
         <Clock className="w-4 h-4 text-[#00D26A]" />
-        Hoạt động gần đây
+        {t("dash.recentActivity")}
       </h3>
       {recent.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-6">Chưa có hoạt động</p>
+        <p className="text-sm text-gray-400 text-center py-6">{t("dash.noActivity")}</p>
       ) : (
         <div className="space-y-3">
           {recent.map((r) => (
@@ -132,6 +135,7 @@ function ActivityFeed({ reports }: { reports: ReportListItem[] }) {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const [reports, setReports] = useState<ReportListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -147,7 +151,7 @@ export default function DashboardPage() {
 
   const handleQuickVerify = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quickSearch.trim()) { toast.error("Vui lòng nhập tên doanh nghiệp."); return; }
+    if (!quickSearch.trim()) { toast.error(t("dash.errEnterName")); return; }
     router.push(`/verify?q=${encodeURIComponent(quickSearch)}&country=${quickCountry}`);
   };
 
@@ -157,7 +161,7 @@ export default function DashboardPage() {
   const processing = reports.filter((r) => (r.status as string) === "PROCESSING" || (r.status as string) === "DEEP_SCANNING").length;
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Chào buổi sáng" : hour < 18 ? "Chào buổi chiều" : "Chào buổi tối";
+  const greeting = hour < 12 ? t("dash.greetingMorning") : hour < 18 ? t("dash.greetingAfternoon") : t("dash.greetingEvening");
 
   return (
     <AuthGuard>
@@ -171,8 +175,8 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-gray-400 font-medium mb-1">{greeting} 👋</p>
                 <h1 className="text-2xl font-extrabold text-gray-900">
-                  {user?.fullName?.split(" ").slice(-1)[0] || "Bạn"},
-                  <span className="text-gray-400 font-normal"> đây là tổng quan hôm nay.</span>
+                  {user?.fullName?.split(" ").slice(-1)[0] || t("chat.you")},
+                  <span className="text-gray-400 font-normal">{t("dash.overviewToday")}</span>
                 </h1>
               </div>
               <div className="flex items-center gap-3">
@@ -181,14 +185,14 @@ export default function DashboardPage() {
                   className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
                 >
                   <Zap className="w-4 h-4 text-[#00D26A]" />
-                  Hỏi AI
+                  {t("dash.askAi")}
                 </button>
                 <button
                   onClick={() => router.push("/verify")}
                   className="flex items-center gap-2 px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90 transition-opacity shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
-                  Thẩm định mới
+                  {t("nav.newVerify")}
                 </button>
               </div>
             </div>
@@ -196,28 +200,28 @@ export default function DashboardPage() {
             {/* ── Stat Cards ── */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
               <StatCard
-                title="Tổng báo cáo" value={totalReports}
-                sub={`${completed} hoàn thành`}
+                title={t("dash.stat.totalReports")} value={totalReports}
+                sub={t("dash.stat.completedSuffix", { n: completed })}
                 icon={FileText} color="#00D26A"
-                trend={{ value: 12, label: "so với tháng trước" }}
+                trend={{ value: 12, label: "" }}
                 href="/reports"
               />
               <StatCard
-                title="Đang xử lý" value={processing}
-                sub="đang quét dữ liệu"
+                title={t("dash.stat.processing")} value={processing}
+                sub={t("dash.stat.processingSub")}
                 icon={RefreshCw} color="#0EA5E9"
                 href="/reports"
               />
               <StatCard
-                title="Cảnh báo rủi ro cao" value={highRisk}
-                sub="cần xem xét ngay"
+                title={t("dash.stat.highRisk")} value={highRisk}
+                sub={t("dash.stat.highRiskSub")}
                 icon={AlertTriangle} color="#EF4444"
-                trend={highRisk > 0 ? { value: -5, label: "giảm so với tháng trước" } : undefined}
+                trend={highRisk > 0 ? { value: -5, label: "" } : undefined}
                 href="/reports"
               />
               <StatCard
-                title="Quốc gia đã quét" value={new Set(reports.map((r) => r.countryIso2).filter(Boolean)).size}
-                sub="190+ quốc gia hỗ trợ"
+                title={t("dash.stat.countries")} value={new Set(reports.map((r) => r.countryIso2).filter(Boolean)).size}
+                sub={t("dash.stat.countriesSub")}
                 icon={Globe} color="#8B5CF6"
               />
             </div>
@@ -231,8 +235,8 @@ export default function DashboardPage() {
                   <Search className="w-4 h-4 text-[#00D26A]" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-bold text-gray-900">Thẩm định nhanh</h2>
-                  <p className="text-xs text-gray-400">Nhập tên công ty để bắt đầu thẩm định 8 trụ cột</p>
+                  <h2 className="text-sm font-bold text-gray-900">{t("dash.quickVerify")}</h2>
+                  <p className="text-xs text-gray-400">{t("dash.quickVerifySub")}</p>
                 </div>
               </div>
               <form onSubmit={handleQuickVerify} className="flex gap-3 flex-wrap">
@@ -243,7 +247,7 @@ export default function DashboardPage() {
                     onChange={(e) => setQuickSearch(e.target.value)}
                     onFocus={() => setSearchFocused(true)}
                     onBlur={() => setSearchFocused(false)}
-                    placeholder="Tên công ty, mã số thuế..."
+                    placeholder={t("dash.quickPlaceholder")}
                     className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus-ms transition-all"
                   />
                 </div>
@@ -252,22 +256,22 @@ export default function DashboardPage() {
                   onChange={(e) => setQuickCountry(e.target.value)}
                   className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus-ms bg-white text-gray-700"
                 >
-                  <option value="">Tất cả quốc gia</option>
-                  <option value="VN">🇻🇳 Việt Nam</option>
-                  <option value="CN">🇨🇳 Trung Quốc</option>
-                  <option value="US">🇺🇸 Hoa Kỳ</option>
-                  <option value="DE">🇩🇪 Đức</option>
-                  <option value="GB">🇬🇧 Anh Quốc</option>
-                  <option value="JP">🇯🇵 Nhật Bản</option>
-                  <option value="KR">🇰🇷 Hàn Quốc</option>
-                  <option value="IN">🇮🇳 Ấn Độ</option>
-                  <option value="SG">🇸🇬 Singapore</option>
+                  <option value="">{t("country.all")}</option>
+                  <option value="VN">{t("country.vn")}</option>
+                  <option value="CN">{t("country.cn")}</option>
+                  <option value="US">{t("country.us")}</option>
+                  <option value="DE">{t("country.de")}</option>
+                  <option value="GB">{t("country.gb")}</option>
+                  <option value="JP">{t("country.jp")}</option>
+                  <option value="KR">{t("country.kr")}</option>
+                  <option value="IN">{t("country.in")}</option>
+                  <option value="SG">{t("country.sg")}</option>
                 </select>
                 <button
                   type="submit"
                   className="px-6 py-2.5 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 transition-opacity text-sm shadow-sm"
                 >
-                  Bắt đầu thẩm định →
+                  {t("dash.startVerify")}
                 </button>
               </form>
             </div>
@@ -279,10 +283,10 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
                   <h2 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                     <BarChart3 className="w-4 h-4 text-[#00D26A]" />
-                    Báo cáo gần đây
+                    {t("dash.recentReports")}
                   </h2>
                   <Link href="/reports" className="text-xs text-[#00D26A] hover:text-[#00843F] font-semibold flex items-center gap-1">
-                    Xem tất cả <ChevronRight className="w-3 h-3" />
+                    {t("dash.viewAll")} <ChevronRight className="w-3 h-3" />
                   </Link>
                 </div>
 
@@ -297,14 +301,14 @@ export default function DashboardPage() {
                     <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                       <FileText className="w-8 h-8 text-gray-200" />
                     </div>
-                    <p className="text-gray-500 text-sm font-medium mb-1">Chưa có báo cáo nào</p>
-                    <p className="text-gray-400 text-xs mb-4">Bắt đầu thẩm định doanh nghiệp đầu tiên của bạn</p>
+                    <p className="text-gray-500 text-sm font-medium mb-1">{t("dash.noReports")}</p>
+                    <p className="text-gray-400 text-xs mb-4">{t("dash.noReportsSub")}</p>
                     <Link
                       href="/verify"
                       className="inline-flex items-center gap-2 px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-xl"
                     >
                       <Plus className="w-4 h-4" />
-                      Tạo báo cáo đầu tiên
+                      {t("dash.createFirst")}
                     </Link>
                   </div>
                 ) : (
@@ -312,12 +316,12 @@ export default function DashboardPage() {
                     <table className="w-full">
                       <thead>
                         <tr className="text-[11px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/60">
-                          <th className="px-6 py-3 text-left">Doanh nghiệp</th>
-                          <th className="px-6 py-3 text-left">Quốc gia</th>
-                          <th className="px-6 py-3 text-left">Điểm rủi ro</th>
-                          <th className="px-6 py-3 text-left">Mức rủi ro</th>
-                          <th className="px-6 py-3 text-left">Trạng thái</th>
-                          <th className="px-6 py-3 text-left">Ngày</th>
+                          <th className="px-6 py-3 text-left">{t("dash.col.company")}</th>
+                          <th className="px-6 py-3 text-left">{t("dash.col.country")}</th>
+                          <th className="px-6 py-3 text-left">{t("dash.col.riskScore")}</th>
+                          <th className="px-6 py-3 text-left">{t("dash.col.riskLevel")}</th>
+                          <th className="px-6 py-3 text-left">{t("dash.col.status")}</th>
+                          <th className="px-6 py-3 text-left">{t("dash.col.date")}</th>
                           <th className="px-6 py-3 text-left"></th>
                         </tr>
                       </thead>
@@ -340,9 +344,9 @@ export default function DashboardPage() {
                             </td>
                             <td className="px-6 py-3.5">
                               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getRiskBadge(report.riskLevel)}`}>
-                                {report.riskLevel === "LOW" ? "Thấp" :
-                                  report.riskLevel === "MEDIUM" ? "Trung bình" :
-                                  report.riskLevel === "HIGH" ? "Cao" : report.riskLevel || "—"}
+                                {report.riskLevel === "LOW" ? t("risk.low") :
+                                  report.riskLevel === "MEDIUM" ? t("risk.medium") :
+                                  report.riskLevel === "HIGH" ? t("risk.high") : report.riskLevel || "—"}
                               </span>
                             </td>
                             <td className="px-6 py-3.5">
@@ -356,9 +360,9 @@ export default function DashboardPage() {
                                   <RefreshCw className="w-3 h-3 animate-spin" />
                                 )}
                                 {report.status === "FAILED" && <AlertTriangle className="w-3 h-3" />}
-                                {report.status === "COMPLETED" ? "Hoàn thành" :
-                                  report.status === "PROCESSING" ? "Đang xử lý" :
-                                  report.status === "FAILED" ? "Thất bại" : report.status}
+                                {report.status === "COMPLETED" ? t("status.completed") :
+                                  report.status === "PROCESSING" ? t("status.processing") :
+                                  report.status === "FAILED" ? t("status.failed") : report.status}
                               </span>
                             </td>
                             <td className="px-6 py-3.5 text-xs text-gray-400">
@@ -397,14 +401,14 @@ export default function DashboardPage() {
                   <div className="absolute top-0 right-0 w-24 h-24 bg-[#00D26A]/10 rounded-full -translate-y-8 translate-x-8" />
                   <div className="absolute bottom-0 left-0 w-16 h-16 bg-[#00D26A]/5 rounded-full translate-y-6 -translate-x-6" />
                   <div className="relative">
-                    <span className="text-[10px] font-bold text-[#5FD48A] uppercase tracking-widest">Nâng cấp</span>
-                    <h3 className="text-white font-bold text-base mt-1 mb-2">Mở khóa toàn bộ tính năng</h3>
-                    <p className="text-[#7BAA8C] text-xs mb-4">Thẩm định không giới hạn, API access, và nhiều hơn nữa.</p>
+                    <span className="text-[10px] font-bold text-[#5FD48A] uppercase tracking-widest">{t("dash.upgrade")}</span>
+                    <h3 className="text-white font-bold text-base mt-1 mb-2">{t("dash.unlockAll")}</h3>
+                    <p className="text-[#7BAA8C] text-xs mb-4">{t("dash.unlockDesc")}</p>
                     <Link
                       href="/pricing"
                       className="inline-flex items-center gap-2 px-4 py-2 bg-[#00D26A] text-white text-sm font-bold rounded-xl hover:bg-[#00B85D] transition-colors"
                     >
-                      Xem các gói <ChevronRight className="w-3.5 h-3.5" />
+                      {t("dash.viewPlans")} <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
                   </div>
                 </div>
@@ -414,9 +418,9 @@ export default function DashboardPage() {
                   <div className="flex items-start gap-3">
                     <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-xs font-bold text-blue-800 mb-1">Mẹo sử dụng</p>
+                      <p className="text-xs font-bold text-blue-800 mb-1">{t("dash.tip")}</p>
                       <p className="text-xs text-blue-600">
-                        Sử dụng <strong>AI Assistant</strong> để phân tích báo cáo và nhận tư vấn thương mại quốc tế theo ngữ cảnh.
+                        {t("dash.tipText")}
                       </p>
                     </div>
                   </div>

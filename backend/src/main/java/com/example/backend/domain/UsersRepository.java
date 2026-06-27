@@ -53,6 +53,14 @@ public interface UsersRepository extends JpaRepository<Users, UUID> {
            "WHERE u.id = :userId")
     void refundOneQuota(@Param("userId") UUID userId);
 
+    // Top-up: atomically add purchased credits to the user's balance.
+    // Returns rows updated (1 = OK, 0 = user missing) so the caller can verify.
+    @Modifying
+    @Transactional
+    @Query("UPDATE Users u SET u.quotaRemaining = u.quotaRemaining + :amount " +
+           "WHERE u.id = :userId")
+    int addQuota(@Param("userId") UUID userId, @Param("amount") int amount);
+
     // Cycle reset: called when anniversary date passes for paid plans
     @Modifying
     @Transactional

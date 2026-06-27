@@ -52,6 +52,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET,  "/api/v1/auth/verify-email").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/forgot-password").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/reset-password").permitAll()
+                // SePay webhook is authenticated by its own Apikey header, not JWT.
+                .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhooks/sepay").permitAll()
                 .requestMatchers("/api/v1/test-sse").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/actuator/**").permitAll()
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
@@ -87,7 +89,12 @@ public class SecurityConfig {
 
     @Bean
     public RestTemplate restTemplate() {
-        return new RestTemplate();
+        // Bound every outbound crawler call so one hung host can't pin a scoring
+        // thread for the full 180s SSE window.
+        var f = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        f.setConnectTimeout(5000);
+        f.setReadTimeout(12000);
+        return new RestTemplate(f);
     }
 
     @Bean

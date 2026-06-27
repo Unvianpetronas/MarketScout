@@ -1,32 +1,388 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { Copy, List, ArrowLeft, Shield, Lock } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Copy, List, ArrowLeft, Minus, Plus, CheckCircle2, Clock } from "lucide-react";
 import { toast } from "sonner";
+
+import { createTopup, createPlanCheckout, getTopupStatus } from "@/services/payment.service";
+import { getMyQuota } from "@/services/quota.service";
+import { TopupResponse, TopupStatus, PRICE_PER_CREDIT_VND } from "@/types/payment";
+import { useLanguage } from "@/providers/language-provider";
+import { useAuth } from "@/providers/auth-provider";
+
+const formatVnd = (n: number) => new Intl.NumberFormat("vi-VN").format(n);
+
+// Plan display info (mirrors the pricing page). Price also returned by the
+// backend in the order, this is only for the pre-order summary.
+const PLAN_INFO: Record<string, { name: string; priceVnd: number; quota: number }> = {
+  starter: { name: "Starter", priceVnd: 2_000_000, quota: 15 },
+  pro: { name: "Pro", priceVnd: 5_800_000, quota: 50 },
+};
+
+const handleCopy = (text: string) =>
+  navigator.clipboard.writeText(text).then(() => toast.success("Copied to clipboard!"));
+
+// Backend Instant may arrive as an ISO string, epoch seconds, or epoch millis.
+const parseExpiry = (v: string | number): number => {
+  if (typeof v === "number") return v < 1e12 ? v * 1000 : v; // seconds → ms
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? Date.now() : t;
+};
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-xs text-gray-500">{label}</span>
+      <span className="text-white font-semibold">{value}</span>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// Unified real SePay VietQR checkout — handles both quota top-up and plan buy
+// ════════════════════════════════════════════════════════════════════════
+
+function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: string }) {
+  const router = useRouter();
+  const { t, lang } = useLanguage();
+  const { refreshUser } = useAuth();
+
+  const isTopup = mode === "topup";
+  const planInfo = PLAN_INFO[planKey];
+  const planName = planInfo?.name ?? (planKey.charAt(0).toUpperCase() + planKey.slice(1));
+
+  const [quantity, setQuantity] = useState(1);
+  const [order, setOrder] = useState<TopupResponse | null>(null);
+  const [status, setStatus] = useState<TopupStatus>("pending");
+  const [creating, setCreating] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [redirectIn, setRedirectIn] = useState(6);
+  const [qrFailed, setQrFailed] = useState(false);
+
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const total = isTopup ? quantity * PRICE_PER_CREDIT_VND : (order?.amountVnd ?? planInfo?.priceVnd ?? 0);
+  const redirectUrl = isTopup ? "/dashboard?topup=success" : "/dashboard?plan=success";
+
+  const stopTimers = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (tickRef.current) clearInterval(tickRef.current);
+    pollRef.current = null;
+    tickRef.current = null;
+  }, []);
+
+  useEffect(() => stopTimers, [stopTimers]);
+
+  const handleCreate = async () => {
+    if (isTopup && quantity < 1) return;
+    setCreating(true);
+    setQrFailed(false);
+    try {
+      const resp = isTopup ? await createTopup(quantity) : await createPlanCheckout(planKey);
+      setOrder(resp);
+      setStatus(resp.status);
+      setSecondsLeft(Math.max(0, Math.floor((parseExpiry(resp.expiresAt) - Date.now()) / 1000)));
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || t("checkout.creatingError"));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // Poll status + count down to expiry once an order exists.
+  useEffect(() => {
+    if (!order || status !== "pending") return;
+
+    pollRef.current = setInterval(async () => {
+      try {
+        const s = await getTopupStatus(order.invoiceId);
+        if (s.status === "paid") {
+          setStatus("paid");
+          setRedirectIn(6);
+          stopTimers();
+          toast.success(t("checkout.paidToast"));
+          // Refresh user/quota so the new plan or credits show immediately.
+          await refreshUser().catch(() => undefined);
+          await getMyQuota().catch(() => undefined);
+        } else if (s.status === "expired") {
+          setStatus("expired");
+          stopTimers();
+        }
+      } catch {
+        /* transient error — keep polling */
+      }
+    }, 4000);
+
+    tickRef.current = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          setStatus("expired");
+          stopTimers();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return stopTimers;
+  }, [order, status, stopTimers, t, refreshUser]);
+
+  // Once paid, count down and auto-redirect to the dashboard.
+  useEffect(() => {
+    if (status !== "paid") return;
+    const id = setInterval(() => {
+      setRedirectIn((prev) => {
+        if (prev <= 1) {
+          clearInterval(id);
+          router.push(redirectUrl);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [status, router, redirectUrl]);
+
+  const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
+  const ss = String(secondsLeft % 60).padStart(2, "0");
+  const successCount = order?.quantity ?? 0;
+
+  return (
+    <main className="max-w-6xl mx-auto px-6 py-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* LEFT — header + (quantity for top-up) + QR */}
+        <div className="lg:col-span-2 space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold text-white mb-1">
+              {isTopup ? t("checkout.topupTitle") : t("checkout.planTitle", { plan: planName })}
+            </h1>
+            <p className="text-gray-400 text-sm">
+              {isTopup
+                ? t("checkout.topupSubtitle", { price: formatVnd(PRICE_PER_CREDIT_VND) })
+                : t("checkout.planSubtitle")}
+            </p>
+          </div>
+
+          {/* Quantity selector — top-up only */}
+          {isTopup && (
+            <div className="bg-[#1A2035] rounded-xl border border-white/10 p-6">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">{t("checkout.credits")}</p>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  disabled={!!order}
+                  className="w-10 h-10 rounded-lg border border-white/10 bg-[#0A0E1A] text-white flex items-center justify-center hover:border-[#00D26A] disabled:opacity-40"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <input
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={quantity}
+                  disabled={!!order}
+                  onChange={(e) => setQuantity(Math.min(1000, Math.max(1, Number(e.target.value) || 1)))}
+                  className="w-24 text-center px-3 py-2.5 bg-[#0A0E1A] border border-white/10 rounded-lg text-white text-lg font-bold focus:outline-none focus:border-[#00D26A] disabled:opacity-60"
+                />
+                <button
+                  onClick={() => setQuantity((q) => Math.min(1000, q + 1))}
+                  disabled={!!order}
+                  className="w-10 h-10 rounded-lg border border-white/10 bg-[#0A0E1A] text-white flex items-center justify-center hover:border-[#00D26A] disabled:opacity-40"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+                <div className="ml-auto text-right">
+                  <p className="text-xs text-gray-500">{t("checkout.total")}</p>
+                  <p className="text-white text-xl font-bold">{formatVnd(total)} <span className="text-sm">VND</span></p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* VietQR panel — only after an order is created */}
+          {order && (
+            <div className="bg-[#1A2035] rounded-xl border border-white/10 p-6">
+              {status === "paid" ? (
+                <div className="flex flex-col items-center text-center py-8">
+                  <div className="relative mb-4">
+                    <span className="absolute inset-0 rounded-full bg-[#00D26A]/20 animate-ping" />
+                    <div className="relative w-16 h-16 rounded-full bg-[#00D26A]/15 flex items-center justify-center">
+                      <CheckCircle2 className="w-10 h-10 text-[#00D26A]" />
+                    </div>
+                  </div>
+                  <h3 className="text-white text-2xl font-bold mb-1">{t("checkout.successTitle")}</h3>
+                  <p className="text-gray-400 text-sm mb-4">
+                    {isTopup
+                      ? t("checkout.successDesc", { count: successCount })
+                      : t("checkout.planSuccessDesc", { count: successCount })}
+                  </p>
+                  <div className="w-full max-w-xs bg-[#0A0E1A] border border-white/10 rounded-lg px-4 py-3 mb-4 flex items-center justify-center gap-2 text-sm text-gray-300">
+                    <Clock className="w-4 h-4 text-[#00D26A]" />
+                    {t("checkout.redirectIn")}
+                    <span className="text-white font-bold tabular-nums">{redirectIn}s</span>
+                  </div>
+                  <button
+                    onClick={() => router.push(redirectUrl)}
+                    className="px-6 py-2.5 bg-[#00D26A] text-black font-bold rounded-lg hover:bg-[#00b85d] transition-colors"
+                  >
+                    {t("checkout.goDashboard")}
+                  </button>
+                </div>
+              ) : status === "expired" ? (
+                <div className="flex flex-col items-center text-center py-6">
+                  <Clock className="w-14 h-14 text-orange-400 mb-3" />
+                  <h3 className="text-white text-lg font-bold mb-1">{t("checkout.expiredTitle")}</h3>
+                  <p className="text-gray-400 text-sm mb-4">{t("checkout.expiredDesc")}</p>
+                  <button
+                    onClick={() => { setOrder(null); setStatus("pending"); }}
+                    className="px-5 py-2.5 bg-[#00D26A] text-black font-bold rounded-lg hover:bg-[#00b85d]"
+                  >
+                    {t("checkout.createNew")}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-6">
+                  {/* QR */}
+                  <div className="shrink-0">
+                    <div className="bg-white rounded-xl p-3 w-44 h-44 flex items-center justify-center">
+                      {qrFailed ? (
+                        <p className="text-center text-[11px] text-gray-500 px-1">{t("checkout.qrFailed")}</p>
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={order.qrUrl}
+                          alt="VietQR payment code"
+                          className="w-full h-full object-contain"
+                          onError={() => setQrFailed(true)}
+                        />
+                      )}
+                    </div>
+                    <div className="mt-2 flex items-center justify-center gap-1.5 text-orange-400 text-xs font-semibold">
+                      <Clock className="w-3.5 h-3.5" />
+                      {t("checkout.expiresIn")} {mm}:{ss}
+                    </div>
+                  </div>
+
+                  {/* Transfer details */}
+                  <div className="flex-1 space-y-3">
+                    <span className="bg-orange-500/20 text-orange-400 text-xs px-2 py-0.5 rounded font-medium inline-block">
+                      {t("checkout.pendingTransfer")}
+                    </span>
+
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold">{t("checkout.transferContent")}</p>
+                      <div className="bg-[#0A0E1A] rounded-lg p-3 border border-white/10 flex items-center justify-between">
+                        <span className="font-mono text-white text-base font-bold tracking-widest">{order.transferContent}</span>
+                        <button onClick={() => handleCopy(order.transferContent)} className="text-gray-400 hover:text-[#00D26A]">
+                          <Copy className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-orange-300 mt-1">{t("checkout.transferNote")}</p>
+                    </div>
+
+                    <div className="space-y-2 text-sm">
+                      <Row label={t("checkout.bank")} value={order.bankCode} />
+                      <Row label={t("checkout.accountName")} value={order.accountName} />
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">{t("checkout.accountNo")}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-mono font-bold">{order.accountNo}</span>
+                          <button onClick={() => handleCopy(order.accountNo)} className="text-gray-500 hover:text-[#00D26A]">
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">{t("checkout.amount")}</span>
+                        <span className="text-white font-bold">{formatVnd(order.amountVnd)} VND</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-blue-950/50 border border-blue-800/30 rounded-lg p-3">
+                      <p className="text-blue-300 text-xs">{t("checkout.autoCredit")}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT — order summary */}
+        <div>
+          <div className="bg-gradient-to-b from-[#1A2035] to-[#0F1629] rounded-2xl border border-white/10 p-6 sticky top-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-4">{t("checkout.orderSummary")}</p>
+
+            <div className="bg-gradient-to-br from-[#1A2840] to-[#0F1A30] rounded-xl border border-white/10 p-5 mb-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="bg-[#00D26A]/10 text-[#00D26A] text-xs font-bold px-2 py-1 rounded">
+                  {isTopup ? t("checkout.quotaTopupBadge") : t("checkout.planBadge")}
+                </span>
+                <List className="w-4 h-4 text-gray-400" />
+              </div>
+
+              {isTopup ? (
+                <>
+                  <h3 className="text-white text-xl font-bold mb-1">{quantity} {t("checkout.creditUnit")}{quantity > 1 && lang === "en" ? "s" : ""}</h3>
+                  <p className="text-[#00D26A] text-sm mb-4">{t("checkout.payg")}</p>
+                  <div className="space-y-2.5 mb-4 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">{t("checkout.unitPrice")}</span>
+                      <span className="text-white font-medium">{formatVnd(PRICE_PER_CREDIT_VND)} VND</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-400">{t("checkout.quantity")}</span>
+                      <span className="text-white font-medium">× {quantity}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-white text-xl font-bold mb-1">{planName}</h3>
+                  {planInfo && (
+                    <p className="text-[#00D26A] text-sm mb-4">{t("checkout.perMonth", { n: planInfo.quota })}</p>
+                  )}
+                </>
+              )}
+
+              <div className="border-t border-white/10 pt-4">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-gray-400 text-sm">{t("checkout.total")}</span>
+                  <span className="text-white text-3xl font-bold">{formatVnd(total)} <span className="text-lg">VND</span></span>
+                </div>
+              </div>
+            </div>
+
+            {!order && (
+              <button
+                onClick={handleCreate}
+                disabled={creating}
+                className="w-full py-4 bg-[#00D26A] text-black font-bold rounded-xl hover:bg-[#00b85d] transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-base"
+              >
+                {creating && <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />}
+                {t("checkout.generateQr")}
+              </button>
+            )}
+
+            <p className="text-xs text-gray-500 text-center mt-3">{t("checkout.securedBy")}</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
 
 function CheckoutContent() {
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
   const planKey = searchParams.get("plan") || "starter";
-
-  const [method, setMethod] = useState<"vietqr" | "card" | "momo">("vietqr");
-  const [isPaying, setIsPaying] = useState(false);
-  const [transferContent] = useState(`MSCOUT928374X`);
-
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => toast.success("Copied to clipboard!"));
-  };
-
-  const handlePay = async () => {
-    setIsPaying(true);
-    setTimeout(() => {
-      setIsPaying(false);
-      toast.success("Payment initiated. Please complete the transfer.");
-    }, 1500);
-  };
-
-  const planName = planKey === "pro" ? "Scale Top-Up Quota" : planKey === "enterprise" ? "Enterprise Custom" : "Scale Top-Up Quota";
+  const mode: "topup" | "plan" = planKey === "topup" ? "topup" : "plan";
 
   return (
     <div className="min-h-screen bg-[#0A0E1A]">
@@ -41,319 +397,26 @@ function CheckoutContent() {
             <span className="text-[#00D26A] text-xs ml-2">B2B INTELLIGENCE</span>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="text-gray-400 text-sm flex items-center gap-1 hover:text-white transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </Link>
-          <span className="bg-[#00D26A]/10 text-[#00D26A] border border-[#00D26A]/30 rounded font-mono text-xs px-2 py-1">
-            Client ID: SCOUT-9482-VN
-          </span>
-        </div>
+        <Link href="/dashboard" className="text-gray-400 text-sm flex items-center gap-1 hover:text-white transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+          {t("checkout.backToDashboard")}
+        </Link>
       </nav>
 
-      {/* Info bar */}
-      <div className="bg-[#1A1A0A] border-b border-yellow-900/30 py-2 px-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-          <span className="text-yellow-400 text-xs">Demo Mode Active — Payments are simulated in this environment.</span>
-        </div>
-        <button className="text-yellow-400 text-xs hover:underline">TOGGLE STATE SIMULATION</button>
-      </div>
-
-      <main className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* LEFT COLUMN */}
-          <div className="lg:col-span-2 space-y-6">
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-1">Secure Checkout</h1>
-              <p className="text-gray-400 text-sm">Complete your payment to activate your plan instantly.</p>
-            </div>
-
-            {/* Payment Method */}
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Select Payment Method</p>
-              <div className="grid grid-cols-3 gap-3">
-                {/* VietQR */}
-                <button
-                  onClick={() => setMethod("vietqr")}
-                  className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
-                    method === "vietqr"
-                      ? "border-[#00D26A] bg-[#00D26A]/5"
-                      : "border-white/10 bg-[#1A2035] hover:border-white/20"
-                  }`}
-                >
-                  <div className={`w-3 h-3 rounded-full border-2 ${method === "vietqr" ? "border-[#00D26A] bg-[#00D26A]" : "border-gray-500"}`} />
-                  <span className="text-white text-sm font-semibold">VietQR</span>
-                  {method === "vietqr" && (
-                    <span className="bg-[#00D26A] text-black text-[10px] font-bold px-1.5 py-0.5 rounded">INSTANT</span>
-                  )}
-                </button>
-
-                {/* Visa/CC */}
-                <button
-                  onClick={() => setMethod("card")}
-                  className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
-                    method === "card"
-                      ? "border-[#00D26A] bg-[#00D26A]/5"
-                      : "border-white/10 bg-[#1A2035] hover:border-white/20"
-                  }`}
-                >
-                  <div className={`w-3 h-3 rounded-full border-2 ${method === "card" ? "border-[#00D26A] bg-[#00D26A]" : "border-gray-500"}`} />
-                  <span className="text-white text-sm font-semibold">Visa / Credit Card</span>
-                  <div className="flex gap-1">
-                    <span className="text-blue-400 text-xs font-bold">VISA</span>
-                    <span className="text-red-400 text-xs font-bold">MC</span>
-                  </div>
-                </button>
-
-                {/* MoMo */}
-                <button
-                  onClick={() => setMethod("momo")}
-                  className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
-                    method === "momo"
-                      ? "border-[#00D26A] bg-[#00D26A]/5"
-                      : "border-white/10 bg-[#1A2035] hover:border-white/20"
-                  }`}
-                >
-                  <div className={`w-3 h-3 rounded-full border-2 ${method === "momo" ? "border-[#00D26A] bg-[#00D26A]" : "border-gray-500"}`} />
-                  <span className="text-white text-sm font-semibold">MoMo</span>
-                  <span className="text-pink-400 text-xs font-bold">MoMo</span>
-                </button>
-              </div>
-            </div>
-
-            {/* VietQR Panel */}
-            {method === "vietqr" && (
-              <div className="bg-[#1A2035] rounded-xl border border-white/10 p-6">
-                <div className="flex gap-6">
-                  {/* QR */}
-                  <div className="shrink-0">
-                    <div className="bg-white rounded-xl p-4 w-40 h-40 flex items-center justify-center">
-                      <div className="w-full h-full bg-gray-200 rounded flex items-center justify-center">
-                        <svg viewBox="0 0 100 100" className="w-24 h-24">
-                          <rect x="10" y="10" width="30" height="30" fill="black" rx="2"/>
-                          <rect x="15" y="15" width="20" height="20" fill="white" rx="1"/>
-                          <rect x="20" y="20" width="10" height="10" fill="black"/>
-                          <rect x="60" y="10" width="30" height="30" fill="black" rx="2"/>
-                          <rect x="65" y="15" width="20" height="20" fill="white" rx="1"/>
-                          <rect x="70" y="20" width="10" height="10" fill="black"/>
-                          <rect x="10" y="60" width="30" height="30" fill="black" rx="2"/>
-                          <rect x="15" y="65" width="20" height="20" fill="white" rx="1"/>
-                          <rect x="20" y="70" width="10" height="10" fill="black"/>
-                          <rect x="45" y="45" width="10" height="10" fill="black"/>
-                          <rect x="60" y="45" width="10" height="10" fill="black"/>
-                          <rect x="75" y="45" width="10" height="10" fill="black"/>
-                          <rect x="45" y="60" width="10" height="10" fill="black"/>
-                          <rect x="60" y="75" width="10" height="10" fill="black"/>
-                          <rect x="75" y="60" width="10" height="10" fill="black"/>
-                        </svg>
-                      </div>
-                    </div>
-                    <p className="text-center text-xs text-gray-500 mt-2 font-semibold uppercase tracking-wider">NAPAS AUTOPAY</p>
-                    <div className="mt-1 bg-[#00D26A]/10 rounded px-2 py-0.5 text-center">
-                      <span className="text-[#00D26A] text-[10px] font-bold">VietQR</span>
-                    </div>
-                  </div>
-
-                  {/* Transfer details */}
-                  <div className="flex-1 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Transfer Content</span>
-                      <span className="bg-orange-500/20 text-orange-400 text-xs px-2 py-0.5 rounded font-medium">
-                        Pending - Waiting for confirmation
-                      </span>
-                    </div>
-
-                    <div>
-                      <p className="text-xs text-gray-500 mb-1 uppercase tracking-wider font-semibold">Message Content</p>
-                      <div className="bg-[#1A2035] rounded-lg p-4 border border-white/10 flex items-center justify-between">
-                        <span className="font-mono text-white text-lg font-bold tracking-widest">{transferContent}</span>
-                        <button
-                          onClick={() => handleCopy(transferContent)}
-                          className="text-gray-400 hover:text-[#00D26A] transition-colors"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">Bank</span>
-                        <span className="text-white text-sm font-semibold">Techcombank (TCB)</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">Account Number</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-white text-sm font-mono font-bold">1903 5284 9110 88</span>
-                          <button onClick={() => handleCopy("190352849110 88")} className="text-gray-500 hover:text-[#00D26A]">
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-blue-950/50 border border-blue-800/30 rounded-lg p-3">
-                      <p className="text-blue-300 text-xs">
-                        Your account will be automatically activated within 2 minutes of confirmed transfer detection.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Card Panel */}
-            {method === "card" && (
-              <div className="bg-[#1A2035] rounded-xl border border-white/10 p-6">
-                <h3 className="text-sm font-bold text-white mb-4">Card Details</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Card Number</label>
-                    <input placeholder="1234 5678 9012 3456" className="w-full px-3 py-2.5 bg-[#0A0E1A] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-[#00D26A]" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Expiry</label>
-                      <input placeholder="MM / YY" className="w-full px-3 py-2.5 bg-[#0A0E1A] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-[#00D26A]" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">CVV</label>
-                      <input placeholder="•••" className="w-full px-3 py-2.5 bg-[#0A0E1A] border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:border-[#00D26A]" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* MoMo Panel */}
-            {method === "momo" && (
-              <div className="bg-[#1A2035] rounded-xl border border-white/10 p-6">
-                <h3 className="text-sm font-bold text-white mb-4">MoMo Wallet Transfer</h3>
-                <div className="bg-pink-950/30 border border-pink-800/30 rounded-lg p-4">
-                  <p className="text-sm font-semibold text-pink-400 mb-1">Transfer to MoMo Number</p>
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-bold text-white font-mono">0901 234 567</p>
-                    <button onClick={() => handleCopy("0901234567")} className="text-pink-400 hover:text-pink-300">
-                      <Copy className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <p className="text-xs text-pink-300 mt-2">Include transfer content: <strong>{transferContent}</strong></p>
-                </div>
-              </div>
-            )}
-
-            {/* Bottom badges */}
-            <div className="flex gap-4">
-              <div className="flex items-center gap-2 bg-[#1A2035] border border-white/10 rounded-lg px-4 py-2.5">
-                <div className="w-5 h-5 bg-[#00D26A] rounded-full flex items-center justify-center">
-                  <svg className="w-3 h-3 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <span className="text-white text-xs font-semibold">100% REFUND POLICY</span>
-              </div>
-              <div className="flex items-center gap-2 bg-[#1A2035] border border-white/10 rounded-lg px-4 py-2.5">
-                <Shield className="w-4 h-4 text-blue-400" />
-                <span className="text-white text-xs font-semibold">ENTERPRISE GRADE SECURITY</span>
-              </div>
-              <div className="flex items-center gap-2 bg-[#1A2035] border border-white/10 rounded-lg px-4 py-2.5">
-                <Lock className="w-4 h-4 text-gray-300" />
-                <span className="text-white text-xs font-semibold">ISO 27001 &amp; PCI-DSS COMPLIANT</span>
-              </div>
-            </div>
-
-            {/* Trust copy */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-gray-500 leading-relaxed">
-              <p>
-                Full refund within the first 24 hours if no verify quota has been consumed. Risk-free purchase.
-              </p>
-              <p>
-                Payment processes securely through certified payment gateways. System checks transaction logs every 3 seconds.
-              </p>
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN — Order Summary */}
-          <div>
-            <div className="bg-gradient-to-b from-[#1A2035] to-[#0F1629] rounded-2xl border border-white/10 p-6 sticky top-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-4">Order Summary</p>
-
-              <div className="bg-gradient-to-br from-[#1A2840] to-[#0F1A30] rounded-xl border border-white/10 p-5 mb-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="bg-[#00D26A]/10 text-[#00D26A] text-xs font-bold px-2 py-1 rounded">B2B PLAN</span>
-                  <List className="w-4 h-4 text-gray-400" />
-                </div>
-                <h3 className="text-white text-xl font-bold mb-1">{planName}</h3>
-                <p className="text-[#00D26A] text-sm mb-4">MarketScout Verification API Access</p>
-
-                <div className="space-y-2.5 mb-4">
-                  {[
-                    { label: "Included Quota", value: "200 queries/mo" },
-                    { label: "Rate Limit", value: "60 req/min" },
-                    { label: "Concurrent Keys", value: "3 API keys" },
-                    { label: "SLA", value: "99.9% uptime" },
-                  ].map((row) => (
-                    <div key={row.label} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400">{row.label}</span>
-                      <span className="text-white font-medium">{row.value}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="border-t border-white/10 pt-4">
-                  <div className="flex items-baseline justify-between">
-                    <span className="text-gray-400 text-sm">Due Today</span>
-                    <span className="text-white text-3xl font-bold">2.000.000 <span className="text-lg">VND</span></span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={handlePay}
-                disabled={isPaying}
-                className="w-full py-4 bg-[#00D26A] text-black font-bold rounded-xl hover:bg-[#00b85d] transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-base"
-              >
-                {isPaying ? (
-                  <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                ) : null}
-                {!isPaying && "✓ "} Pay Now & Activate →
-              </button>
-
-              <p className="text-xs text-gray-500 text-center mt-3">
-                Encrypted via TLS 1.3 · Powered by NAPAS
-              </p>
-              <p className="text-xs text-gray-600 text-center mt-1">
-                By continuing, you agree to MarketScout&apos;s B2B Terms of Service.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-12 border-t border-white/10 pt-6 flex items-center justify-between">
-          <p className="text-gray-500 text-xs">&copy; 2025 MarketScout Inc. All rights reserved.</p>
-          <div className="flex gap-4">
-            {["Terms", "Privacy", "Enterprise SLA"].map((link) => (
-              <a key={link} href="#" className="text-gray-500 hover:text-gray-300 text-xs transition-colors">
-                {link}
-              </a>
-            ))}
-          </div>
-        </div>
-      </main>
+      <VietQrCheckout mode={mode} planKey={planKey} />
     </div>
   );
 }
 
 export default function CheckoutPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#0A0E1A] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#00D26A]/30 border-t-[#00D26A] rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#0A0E1A] flex items-center justify-center">
+          <div className="w-8 h-8 border-2 border-[#00D26A]/30 border-t-[#00D26A] rounded-full animate-spin" />
+        </div>
+      }
+    >
       <CheckoutContent />
     </Suspense>
   );
