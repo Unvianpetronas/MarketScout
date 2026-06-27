@@ -18,4 +18,5 @@ public class CompanyResolutionResult {
     private boolean ambiguous;          // true → cần hỏi lại user
     private boolean vietnam;            // true → là công ty VN
     private List<String> alternatives;  // gợi ý khi ambiguous=true
+    private String clarifyQuestion;     // câu hỏi-lại thân thiện do AI sinh (rỗng nếu không cần hỏi)
 }

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getAccessToken, getRefreshToken, setAccessToken, clearTokens } from "@/lib/token-storage";
+import { getAccessToken, getRefreshToken, setAccessToken, setRefreshToken, clearTokens } from "@/lib/token-storage";
 
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -27,6 +27,10 @@ function performRefresh(): Promise<string | null> {
           { refreshToken }
         );
         setAccessToken(data.token);
+        // The backend ROTATES the refresh token on every refresh (old one is
+        // deleted server-side). Persist the new one, otherwise the next refresh
+        // sends a dead token and the user gets logged out.
+        if (data.refreshToken) setRefreshToken(data.refreshToken);
         return data.token as string;
       } catch {
         return null;

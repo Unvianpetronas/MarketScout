@@ -35,12 +35,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ScoringEngine {
+
+    // Dedicated daemon pool for blocking crawler HTTP — keeps these off
+    // ForkJoinPool.commonPool() so they can't starve other parallel streams.
+    private final ExecutorService crawlerPool = Executors.newFixedThreadPool(8, r -> {
+        Thread t = new Thread(r, "crawler-pool");
+        t.setDaemon(true);
+        return t;
+    });
 
     private final CrawlerP1Router crawlerP1;
     private final CrawlerP2 crawlerP2;
@@ -89,8 +99,10 @@ public class ScoringEngine {
 
             savePillarResults(reportId, result.getPillars(), report);
 
-            // Trigger deal safety async
-            dealSafetyAgent.analyzeAsync(reportId, result);
+            // Trigger deal safety async — skip entirely on hard-stop to save a Gemini call.
+            if (!result.isHardStop()) {
+                dealSafetyAgent.analyzeAsync(reportId, result);
+            }
 
             if (sseCallback != null) {
                 sseCallback.accept(toJson(result));
@@ -125,32 +137,11 @@ public class ScoringEngine {
 
     private ScoringResult runPipeline(CompanyInput input, UUID reportId,
                                        Consumer<String> sseCallback) {
-        emit(sseCallback, "crawler", "thinking", "Đang thu thập dữ liệu từ 8 nguồn song song...");
+        emit(sseCallback, "crawler", "thinking", "Đang kiểm tra danh sách trừng phạt...");
 
-        // Step 1: P6 check in parallel with others (but P6 result evaluated FIRST)
-        CompletableFuture<P6Data> p6f = CompletableFuture.supplyAsync(() -> crawlerP6.fetch(input));
-        CompletableFuture<P1Data> p1f = CompletableFuture.supplyAsync(() -> crawlerP1.fetch(input));
-        CompletableFuture<P2Data> p2f = CompletableFuture.supplyAsync(() -> crawlerP2.fetch(input));
-        CompletableFuture<P3Data> p3f = CompletableFuture.supplyAsync(() ->
-            input.isVietnam() ? crawlerP3VN.fetch(input) : crawlerP3Intl.fetch(input));
-        CompletableFuture<P4Data> p4f = CompletableFuture.supplyAsync(() -> crawlerP4.fetch(input));
-        CompletableFuture<P5Data> p5f = CompletableFuture.supplyAsync(() ->
-            input.isVietnam() ? crawlerP5VN.fetch(input) : crawlerP5Intl.fetch(input));
-        CompletableFuture<P8Data> p8f = CompletableFuture.supplyAsync(() -> crawlerP8.fetch(input));
-
-        CompletableFuture.allOf(p1f, p2f, p3f, p4f, p5f, p6f, p8f).join();
-
-        P6Data p6 = getOrSkip(p6f, input, "P6");
-        P1Data p1 = getOrSkip(p1f, input, "P1");
-        P2Data p2 = getOrSkip(p2f, input, "P2");
-        P3Data p3 = getOrSkip(p3f, input, "P3");
-        P4Data p4 = getOrSkip(p4f, input, "P4");
-        P5Data p5 = getOrSkip(p5f, input, "P5");
-        P8Data p8 = getOrSkip(p8f, input, "P8");
-        P7Data p7 = P7Data.builder().state(PillarData.DataState.SKIP).companyName(input.getName())
-            .errorMsg("Chưa có thông tin giao dịch từ user").fetchedAt(java.time.LocalDateTime.now()).build();
-
-        // Step 2: HARD STOP check
+        // Step 1: P6 FIRST and sequential. A sanctioned company is a hard-stop, so
+        // there's no point spending Gemini/Tavily/Places on the other 7 pillars.
+        P6Data p6 = crawlerP6.fetch(input);
         if (p6.isSanctioned()) {
             emit(sseCallback, "safety", "done", "HARD STOP — " + input.getName() + " nằm trong danh sách trừng phạt");
             return ScoringResult.builder()
@@ -160,10 +151,30 @@ public class ScoringEngine {
                 .riskLevel("Nghiêm trọng").status("HARD_STOP")
                 .pillars(List.of(rubricLoader.getRubric().scoreP6(
                     FactJson.P6Facts.builder().isSanctionHit(true).build())))
-                .registrationId(p1.getRegistrationId())
-                .registrationType(p1.getRegistrationType())
                 .build();
         }
+
+        // Step 2: not sanctioned — fan out the remaining crawlers on the dedicated pool.
+        emit(sseCallback, "crawler", "thinking", "Đang thu thập dữ liệu từ các nguồn còn lại...");
+        CompletableFuture<P1Data> p1f = CompletableFuture.supplyAsync(() -> crawlerP1.fetch(input), crawlerPool);
+        CompletableFuture<P2Data> p2f = CompletableFuture.supplyAsync(() -> crawlerP2.fetch(input), crawlerPool);
+        CompletableFuture<P3Data> p3f = CompletableFuture.supplyAsync(() ->
+            input.isVietnam() ? crawlerP3VN.fetch(input) : crawlerP3Intl.fetch(input), crawlerPool);
+        CompletableFuture<P4Data> p4f = CompletableFuture.supplyAsync(() -> crawlerP4.fetch(input), crawlerPool);
+        CompletableFuture<P5Data> p5f = CompletableFuture.supplyAsync(() ->
+            input.isVietnam() ? crawlerP5VN.fetch(input) : crawlerP5Intl.fetch(input), crawlerPool);
+        CompletableFuture<P8Data> p8f = CompletableFuture.supplyAsync(() -> crawlerP8.fetch(input), crawlerPool);
+
+        CompletableFuture.allOf(p1f, p2f, p3f, p4f, p5f, p8f).join();
+
+        P1Data p1 = getOrSkip(p1f, input, "P1");
+        P2Data p2 = getOrSkip(p2f, input, "P2");
+        P3Data p3 = getOrSkip(p3f, input, "P3");
+        P4Data p4 = getOrSkip(p4f, input, "P4");
+        P5Data p5 = getOrSkip(p5f, input, "P5");
+        P8Data p8 = getOrSkip(p8f, input, "P8");
+        P7Data p7 = P7Data.builder().state(PillarData.DataState.SKIP).companyName(input.getName())
+            .errorMsg("Chưa có thông tin giao dịch từ user").fetchedAt(java.time.LocalDateTime.now()).build();
 
         emit(sseCallback, "scoring", "thinking", "Đang phân tích và tính điểm...");
 

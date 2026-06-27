@@ -66,7 +66,7 @@ public class PasswordResetService {
 
         // ── Gửi email ───────────────────────────────────────────────
         String resetUrl = frontendUrl + "/reset-password?token=" + token;
-        boolean isVi = !"en".equalsIgnoreCase(language);
+        boolean isVi = false; // all outgoing emails are English
 
         send(
                 toEmail,

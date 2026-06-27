@@ -180,8 +180,35 @@ public class ChatService {
                 log.warn("SSE send failed (findPartners callback): {}", ex.getMessage());
             }
         });
-        String message = "Tìm thấy " + leads.size() + " kết quả";
-        sendEvent(emitter, AgentEvent.done("result", message, leads));
+
+        long sanctioned = leads.stream().filter(l -> l.isSanctionHit()).count();
+        long safe = leads.size() - sanctioned;
+        String what = intent.getProduct() != null && !intent.getProduct().isBlank()
+            ? intent.getProduct() : "đối tác";
+        String where = intent.getMarket() != null && !intent.getMarket().isBlank()
+            ? " tại " + intent.getMarket() : "";
+
+        String message;
+        if (leads.isEmpty()) {
+            message = "Mình chưa tìm thấy đối tác phù hợp cho \"" + what + "\"" + where
+                + ". Bạn thử mô tả cụ thể hơn về ngành hàng và thị trường giúp mình nhé.";
+        } else {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Mình tìm thấy ").append(leads.size())
+              .append(" đối tác tiềm năng cho \"").append(what).append("\"").append(where).append(". ")
+              .append(safe).append(" đối tác chưa phát hiện rủi ro");
+            if (sanctioned > 0) {
+                sb.append(", ").append(sanctioned).append(" nằm trong danh sách trừng phạt (đã đánh dấu)");
+            }
+            sb.append(". Bạn có thể mở trang \"Tìm đối tác\" để xem chi tiết và thẩm định từng đơn vị.");
+            message = sb.toString();
+        }
+
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("leads", findPartnersService.topClean(leads));
+        data.put("total", leads.size());
+        data.put("sanctioned", sanctioned);
+        sendEvent(emitter, AgentEvent.done("result", message, data));
         return message;
     }
 
@@ -208,7 +235,7 @@ public class ChatService {
         // Tên mơ hồ → hỏi lại, không chạy crawler
         if (resolved.isAmbiguous()) {
             companyResolverService.savePendingClarification(sessionKey, resolved);
-            String clarifyMsg = buildClarifyMessage(resolved);
+            String clarifyMsg = companyResolverService.buildClarifyMessage(resolved);
             sendEvent(emitter, AgentEvent.done("clarify", clarifyMsg,
                 java.util.Map.of("alternatives", resolved.getAlternatives(), "pending", true)));
             return clarifyMsg;
@@ -300,7 +327,7 @@ public class ChatService {
 
         if (resolved.isAmbiguous()) {
             companyResolverService.savePendingClarification(sessionKey, resolved);
-            String clarifyMsg = buildClarifyMessage(resolved);
+            String clarifyMsg = companyResolverService.buildClarifyMessage(resolved);
             sendEvent(emitter, AgentEvent.done("clarify", clarifyMsg,
                 java.util.Map.of("alternatives", resolved.getAlternatives(), "pending", true)));
             return clarifyMsg;
@@ -433,11 +460,10 @@ public class ChatService {
             }
         }
 
-        String systemPrompt = "Bạn là MarketScout AI. Giải thích kết quả thẩm định cho người dùng.\nTone: Rõ ràng, dễ hiểu, tư vấn thực tế.\nTrả lời bằng tiếng Việt.\n";
         String userPrompt = (reportContext.isBlank() ? "" : "[BÁO CÁO]\n" + reportContext + "\n\n")
             + "[CÂU HỎI]\n" + req.getMessage();
 
-        String reply = geminiService.callWithSystemPrompt(systemPrompt, userPrompt);
+        String reply = geminiService.callWithSystemPrompt(MarketScoutPrompts.EXPLAIN_REPORT_SYSTEM, userPrompt);
         sendEvent(emitter, AgentEvent.done("result", reply, null));
         return reply;
     }
@@ -450,18 +476,6 @@ public class ChatService {
         log.info("handleGeneralQA reply string length: {}", reply != null ? reply.length() : "null");
         sendEvent(emitter, AgentEvent.done("result", reply, null));
         return reply;
-    }
-
-    private String buildClarifyMessage(CompanyResolutionResult resolved) {
-        StringBuilder sb = new StringBuilder("Bạn muốn tra cứu công ty nào? \"")
-            .append(resolved.getNormalizedName())
-            .append("\" có thể là nhiều công ty khác nhau.");
-        if (resolved.getAlternatives() != null && !resolved.getAlternatives().isEmpty()) {
-            sb.append(" Ý bạn có phải: ").append(String.join(", ", resolved.getAlternatives())).append("?");
-        } else {
-            sb.append(" Vui lòng cung cấp thêm thông tin (tên đầy đủ, quốc gia, MST...).");
-        }
-        return sb.toString();
     }
 
     private void sendEvent(SseEmitter emitter, AgentEvent event) throws Exception {

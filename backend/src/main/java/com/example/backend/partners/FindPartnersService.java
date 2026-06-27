@@ -8,6 +8,7 @@ import com.example.backend.shared.cache.CacheService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -25,36 +26,48 @@ public class FindPartnersService {
     private final CacheService cacheService;
     private final ObjectMapper objectMapper;
 
+    @Value("${app.partners.max-sanction-check:8}")
+    private int maxSanctionCheck;
+
+    @Value("${app.partners.display-count:5}")
+    private int displayCount;
+
     public List<LeadResult> findAndFilter(IntentResult intent, String sessionId,
                                            Consumer<String> sseCallback) {
-        emit(sseCallback, AgentEvent.thinking("manager", "Phân loại yêu cầu: " + intent.getIntent()));
+        emit(sseCallback, AgentEvent.thinking("manager", "Đang phân tích yêu cầu của bạn..."));
         emit(sseCallback, AgentEvent.thinking("crawler",
-            "Đang tìm " + (intent.getProduct() != null ? intent.getProduct() : "") +
-            " tại " + (intent.getMarket() != null ? intent.getMarket() : "thị trường quốc tế") + "..."));
+            "Đang tìm " + (intent.getProduct() != null ? intent.getProduct() : "đối tác") +
+            (intent.getMarket() != null ? " tại " + intent.getMarket() : "") + "..."));
 
         // Step 1: Tavily search
         List<LeadResult> leads = tavilyClient.searchLeads(intent.getIntent(), intent.getProduct(), intent.getMarket());
         log.info("Tavily returned {} leads", leads.size());
 
-        // Step 2: P6 sanctions filter (parallel)
-        emit(sseCallback, AgentEvent.thinking("safety", "Kiểm tra danh sách trừng phạt OFAC/UN/EU..."));
-        leads = crawlerP6.batchCheck(leads);
+        // Step 2: only screen the top-N leads against sanctions — capping how many
+        // OpenSanctions queries one search can ever cost. The cap is applied BEFORE
+        // the check (not after) so we never burn budget on leads we won't show.
+        List<LeadResult> candidates = leads.subList(0, Math.min(maxSanctionCheck, leads.size()));
 
-        // Take top 5 clean leads (sanctioned leads shown with warning)
-        List<LeadResult> clean = leads.stream()
-            .filter(l -> !l.isSanctionHit())
-            .limit(5)
-            .collect(Collectors.toList());
+        emit(sseCallback, AgentEvent.thinking("safety", "Đang kiểm tra danh sách trừng phạt OFAC/UN/EU..."));
+        candidates = crawlerP6.batchCheck(candidates);
+        log.info("P6 sanction-checked {}/{} leads (cap={})", candidates.size(), leads.size(), maxSanctionCheck);
 
-        // Step 3: Cache in Redis
+        // Cache the screened candidates in Redis for the session. The final
+        // user-facing summary is built by the caller (ChatService) so the chat
+        // shows ONE clean result instead of a stack of step events.
         String key = "leads:" + sessionId;
-        cacheService.setRedisOnly(key, leads, Duration.ofHours(24));
-        log.info("Cached {} leads to Redis key {}", leads.size(), key);
+        cacheService.setRedisOnly(key, candidates, Duration.ofHours(24));
+        log.info("Cached {} candidates to Redis key {} (display cap={})", candidates.size(), key, displayCount);
 
-        emit(sseCallback, AgentEvent.done("result",
-            "Tìm thấy " + clean.size() + " đối tác tiềm năng", clean));
+        return candidates; // screened set (incl. sanctioned) for FE to show warnings
+    }
 
-        return leads; // return all (including sanctioned) for FE to show warning
+    /** Top non-sanctioned leads to feature, capped by display-count. */
+    public List<LeadResult> topClean(List<LeadResult> candidates) {
+        return candidates.stream()
+            .filter(l -> !l.isSanctionHit())
+            .limit(displayCount)
+            .collect(Collectors.toList());
     }
 
     private void emit(Consumer<String> callback, AgentEvent event) {

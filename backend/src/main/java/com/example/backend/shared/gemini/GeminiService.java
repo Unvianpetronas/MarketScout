@@ -64,7 +64,19 @@ public class GeminiService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    private final RestTemplate restTemplate;
+    // Gemini needs its OWN RestTemplate with a generous read timeout — the shared
+    // bean is capped at 12s to protect the scoring pipeline from hung crawlers,
+    // but generateContent routinely takes 20-40s, which would otherwise throw
+    // "Read timed out". Built here (not injected) so it never collides with the
+    // shared bean.
+    private final RestTemplate restTemplate = buildGeminiRestTemplate();
+
+    private static RestTemplate buildGeminiRestTemplate() {
+        var f = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        f.setConnectTimeout(10_000);
+        f.setReadTimeout(60_000);
+        return new RestTemplate(f);
+    }
 
     public record GeminiMessage(String role, String text) {}
 

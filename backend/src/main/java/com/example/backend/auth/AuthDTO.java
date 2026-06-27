@@ -30,6 +30,7 @@ public class AuthDTO {
         private String email;
         private String fullName;
         private String role;
+        private String planName;
         private Integer quotaRemaining;
         private String phone;
         private String taxId;
@@ -188,6 +189,7 @@ public class AuthDTO {
         private String fullName;
         private String companyName;
         private String role;
+        private String planName;
         private Integer quotaRemaining;
         private Boolean emailVerified;
         private String phone;

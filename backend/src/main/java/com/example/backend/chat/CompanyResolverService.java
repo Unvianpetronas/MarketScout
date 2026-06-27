@@ -30,14 +30,15 @@ public class CompanyResolverService {
         Bạn là service phân giải tên công ty cho hệ thống thẩm định đối tác thương mại.
         Nhiệm vụ: phân tích tên công ty từ tin nhắn và trả về JSON duy nhất, không kèm text khác.
 
-        ## 7 quy tắc cốt lõi
+        ## Quy tắc cốt lõi
         1. Không tự bịa mã số thuế/LEI — chỉ suy luận tên và quốc gia khả dĩ.
         2. Tên gõ sai gần giống thương hiệu nổi tiếng → sửa gợi ý nhưng vẫn đánh dấu ambiguous=true.
-        3. Chỉ ambiguous=false khi có hậu tố pháp lý (TNHH, JSC, Corp, Inc, Ltd, Cổ phần...), hoặc quốc gia cụ thể, hoặc MST/mã số đi kèm.
-        4. Tên ngắn (≤2 từ), không hậu tố, không quốc gia → luôn ambiguous=true, kể cả khi nhận ra ngay là thương hiệu nổi tiếng (Apple, Google, Samsung...).
+        3. ambiguous=true BẮT BUỘC khi: tên là địa danh + từ chung ("Công ty Hà Nam", "Doanh nghiệp Hải Phòng"); tên ngắn (≤2 từ) không hậu tố pháp lý/quốc gia/mã số; không rõ quốc gia; hoặc gõ sai gần giống thương hiệu lớn.
+        4. ambiguous=false CHỈ khi có hậu tố pháp lý (TNHH, Cổ phần, JSC, Corp, Inc, Ltd, GmbH...) HOẶC có MST/LEI HOẶC tên đầy đủ kèm quốc gia rõ ràng.
         5. isVietnam chỉ = true khi có dấu hiệu VN rõ ràng: MST, hậu tố TNHH/Cổ phần/Hợp danh/DNTN, địa danh VN cụ thể, hoặc từ "Việt Nam" trong tên. KHÔNG suy luận theo ngôn ngữ của tin nhắn.
         6. Luôn đưa 1-3 gợi ý trong alternatives khi ambiguous=true.
-        7. Chỉ trả JSON, không kèm text giải thích khác. Không bọc trong markdown code block.
+        7. Khi ambiguous=true, sinh "clarifyQuestion": một câu hỏi-lại NGẮN GỌN, thân thiện, xưng "mình" gọi "bạn", nêu vì sao cần làm rõ và xin thêm (tên đầy đủ / MST / tỉnh thành / website). Khi ambiguous=false để "clarifyQuestion" rỗng.
+        8. Chỉ trả JSON, không kèm text giải thích khác. Không bọc trong markdown code block.
 
         ## Schema JSON output
         {
@@ -46,7 +47,8 @@ public class CompanyResolverService {
           "countryIso2": "VN" hoặc "US" hoặc null,
           "ambiguous": true hoặc false,
           "isVietnam": true hoặc false,
-          "alternatives": ["gợi ý 1", "gợi ý 2"]
+          "alternatives": ["gợi ý 1", "gợi ý 2"],
+          "clarifyQuestion": "câu hỏi-lại thân thiện hoặc rỗng"
         }
         """;
 
@@ -95,6 +97,26 @@ public class CompanyResolverService {
         cacheService.delete(PENDING_KEY_PREFIX + sessionKey);
     }
 
+    /**
+     * Câu hỏi-lại gửi cho user khi tên công ty mơ hồ.
+     * Ưu tiên clarifyQuestion do AI sinh; nếu rỗng thì dựng câu mặc định
+     * gợi ý alternatives + xin thêm thông tin (tên đầy đủ / MST / tỉnh thành / website).
+     */
+    public String buildClarifyMessage(CompanyResolutionResult r) {
+        if (r.getClarifyQuestion() != null && !r.getClarifyQuestion().isBlank()) {
+            return r.getClarifyQuestion().trim();
+        }
+        StringBuilder sb = new StringBuilder("Bạn muốn tra cứu công ty nào? \"")
+            .append(r.getNormalizedName())
+            .append("\" có thể là nhiều công ty khác nhau.");
+        if (r.getAlternatives() != null && !r.getAlternatives().isEmpty()) {
+            sb.append(" Ý bạn có phải: ").append(String.join(", ", r.getAlternatives())).append("?");
+        } else {
+            sb.append(" Bạn cho mình xin thêm tên đầy đủ, mã số thuế, tỉnh/thành hoặc website nhé.");
+        }
+        return sb.toString();
+    }
+
     public String buildContextFromPending(CompanyResolutionResult pending) {
         StringBuilder sb = new StringBuilder("Đang chờ làm rõ về công ty: \"")
             .append(pending.getNormalizedName()).append("\"");
@@ -116,6 +138,7 @@ public class CompanyResolverService {
             String countryIso2 = node.path("countryIso2").isNull() ? null : node.path("countryIso2").asText(null);
             boolean ambiguous = node.path("ambiguous").asBoolean(false);
             boolean isVietnam = node.path("isVietnam").asBoolean(false);
+            String clarifyQuestion = node.path("clarifyQuestion").asText("").trim();
 
             List<String> alternatives = List.of();
             if (node.has("alternatives") && node.path("alternatives").isArray()) {
@@ -140,6 +163,7 @@ public class CompanyResolverService {
                 .ambiguous(ambiguous)
                 .vietnam(isVietnam)
                 .alternatives(alternatives)
+                .clarifyQuestion(clarifyQuestion)
                 .build();
 
         } catch (Exception e) {
