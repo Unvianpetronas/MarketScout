@@ -33,12 +33,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- one-time auth bootstrap on mount */
     const token = getAccessToken();
     if (token) {
       refreshUser().finally(() => setIsLoading(false));
     } else {
       setIsLoading(false);
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [refreshUser]);
 
   const login = async (data: LoginRequest, rememberMe = false) => {
@@ -49,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: response.email,
       fullName: response.fullName,
       role: response.role,
+      planName: response.planName,
       quotaRemaining: response.quotaRemaining,
       companyName: response.companyName,
       emailVerified: true,

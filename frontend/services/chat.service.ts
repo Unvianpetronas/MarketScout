@@ -60,7 +60,9 @@ export const sendMessage = async (
  */
 export const streamPipelineMessage = (
     data: SseMessageRequest,
-    onChunk: (chunk: string) => void,
+    // status mirrors the backend AgentEvent.status: "thinking" | "done" | "error".
+    // Plain-text / untyped payloads arrive with status undefined (treated as final).
+    onChunk: (chunk: string, status?: string) => void,
     onDone: () => void,
     onError: (err: Error) => void,
     onMeta?: (meta: Record<string, unknown>) => void
@@ -122,7 +124,7 @@ export const streamPipelineMessage = (
               console.log("[SSE] → onChunk (string):", parsed.slice(0, 80)); //  DEBUG
               onChunk(parsed);
             } else {
-              const event = parsed as { message?: string; data?: unknown };
+              const event = parsed as { message?: string; status?: string; data?: unknown };
               console.log("[SSE] parsed event:", parsed); //  DEBUG
               if (
                   onMeta &&
@@ -135,7 +137,7 @@ export const streamPipelineMessage = (
               }
               if (event.message) {
                 console.log("[SSE] → onChunk (message):", event.message.slice(0, 80)); //  DEBUG
-                onChunk(event.message);
+                onChunk(event.message, event.status);
               } else {
                 console.warn("[SSE] ⚠️ event KHÔNG có field message — bị bỏ qua:", parsed); //  DEBUG
               }

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
 import { useAuth } from "@/providers/auth-provider";
+import { useLanguage } from "@/providers/language-provider";
 import { updateProfile, changePassword } from "@/services/auth.service";
 import { getMyQuota } from "@/services/quota.service";
 import { QuotaStatus } from "@/types/quota";
@@ -23,10 +24,10 @@ const MOCK_BILLING = [
 ];
 
 const TABS = [
-  { id: "profile", label: "Thông tin cá nhân", icon: User },
-  { id: "subscription", label: "Gói & Quota", icon: Zap },
-  { id: "security", label: "Bảo mật", icon: Shield },
-  { id: "billing", label: "Thanh toán", icon: CreditCard },
+  { id: "profile", labelKey: "profile.tab.profile", icon: User },
+  { id: "subscription", labelKey: "profile.tab.subscription", icon: Zap },
+  { id: "security", labelKey: "profile.tab.security", icon: Shield },
+  { id: "billing", labelKey: "profile.tab.billing", icon: CreditCard },
 ];
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
@@ -40,6 +41,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
+  const { t } = useLanguage();
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
   const [activeTab, setActiveTab] = useState("profile");
 
@@ -56,10 +58,12 @@ export default function ProfilePage() {
   const [notifications, setNotifications] = useState({ quotaAlert: true, reportComplete: true, marketing: false });
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- sync form + quota from loaded user */
     if (user) {
       setProfileForm({ fullName: user.fullName || "", email: user.email || "", phone: user.phone || "", taxId: user.taxId || "" });
     }
     getMyQuota().then(setQuota).catch(() => null);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [user]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -68,23 +72,23 @@ export default function ProfilePage() {
     try {
       await updateProfile({ fullName: profileForm.fullName, phone: profileForm.phone, taxId: profileForm.taxId });
       await refreshUser();
-      toast.success("Cập nhật hồ sơ thành công!");
+      toast.success(t("profile.savedOk"));
     } catch (err: unknown) {
-      toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Cập nhật thất bại.");
+      toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || t("profile.saveFail"));
     } finally { setIsSavingProfile(false); }
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) { toast.error("Mật khẩu không khớp."); return; }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) { toast.error(t("profile.pwMismatch")); return; }
     setIsChangingPassword(true);
     try {
       await changePassword({ currentPassword: passwordForm.currentPassword, newPassword: passwordForm.newPassword });
-      toast.success("Đổi mật khẩu thành công!");
+      toast.success(t("profile.pwOk"));
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setShowPasswordForm(false);
     } catch (err: unknown) {
-      toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Đổi mật khẩu thất bại.");
+      toast.error((err as { response?: { data?: { message?: string } } })?.response?.data?.message || t("profile.pwFail"));
     } finally { setIsChangingPassword(false); }
   };
 
@@ -104,8 +108,8 @@ export default function ProfilePage() {
           {/* ── Settings Tabs Sidebar ── */}
           <aside className="w-56 bg-white border-r border-gray-100 flex flex-col shrink-0">
             <div className="p-5 border-b border-gray-100">
-              <h2 className="text-sm font-bold text-gray-900">Cài đặt tài khoản</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Quản lý tài khoản của bạn</p>
+              <h2 className="text-sm font-bold text-gray-900">{t("profile.accountSettings")}</h2>
+              <p className="text-xs text-gray-400 mt-0.5">{t("profile.manageAccount")}</p>
             </div>
             <nav className="px-2 pt-4 flex-1 space-y-0.5">
               {TABS.map((tab) => (
@@ -116,16 +120,16 @@ export default function ProfilePage() {
                       : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
                   }`}>
                   <tab.icon className={`w-4 h-4 shrink-0 ${activeTab === tab.id ? "text-[#00D26A]" : "text-gray-400"}`} />
-                  {tab.label}
+                  {t(tab.labelKey)}
                 </button>
               ))}
             </nav>
             {/* Help card */}
             <div className="m-3 bg-[#0A1A12] rounded-2xl p-4">
-              <p className="text-xs font-bold text-white mb-1">Cần hỗ trợ?</p>
-              <p className="text-xs text-gray-400 mb-3">Đội ngũ chúng tôi sẵn sàng giúp đỡ.</p>
+              <p className="text-xs font-bold text-white mb-1">{t("profile.needHelp")}</p>
+              <p className="text-xs text-gray-400 mb-3">{t("profile.helpDesc")}</p>
               <button className="text-xs text-[#00D26A] hover:underline font-semibold flex items-center gap-1">
-                Liên hệ hỗ trợ <ChevronRight className="w-3 h-3" />
+                {t("profile.contactSupport")} <ChevronRight className="w-3 h-3" />
               </button>
             </div>
           </aside>
@@ -148,14 +152,16 @@ export default function ProfilePage() {
                       </button>
                     </div>
                     <div>
-                      <h1 className="text-xl font-extrabold text-gray-900">{user?.fullName || "Người dùng"}</h1>
+                      <h1 className="text-xl font-extrabold text-gray-900">{user?.fullName || t("profile.userFallback")}</h1>
                       <p className="text-sm text-gray-400 mt-0.5">{user?.email}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <span className="flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                          <CheckCircle2 className="w-3 h-3" /> Đã xác thực
+                          <CheckCircle2 className="w-3 h-3" /> {t("profile.verified")}
                         </span>
                         <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1">
-                          <Star className="w-3 h-3" /> {user?.planName || "Free Plan"}
+                          <Star className="w-3 h-3" /> {user?.planName
+                            ? `${user.planName.charAt(0).toUpperCase()}${user.planName.slice(1)} ${t("nav.planSuffix")}`
+                            : t("nav.freePlan")}
                         </span>
                       </div>
                     </div>
@@ -165,12 +171,12 @@ export default function ProfilePage() {
                   <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
                     <h2 className="text-base font-bold text-gray-900 mb-5 flex items-center gap-2">
                       <User className="w-4 h-4 text-[#00D26A]" />
-                      Thông tin cá nhân
+                      {t("profile.tab.profile")}
                     </h2>
                     <form onSubmit={handleSaveProfile} className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Họ và tên</label>
+                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">{t("profile.fullName")}</label>
                           <div className="relative">
                             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                             <input value={profileForm.fullName}
@@ -179,7 +185,7 @@ export default function ProfilePage() {
                           </div>
                         </div>
                         <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Email (không thể đổi)</label>
+                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">{t("profile.emailLocked")}</label>
                           <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                             <input type="email" value={profileForm.email} disabled
@@ -187,7 +193,7 @@ export default function ProfilePage() {
                           </div>
                         </div>
                         <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Số điện thoại</label>
+                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">{t("profile.phone")}</label>
                           <div className="relative">
                             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                             <input value={profileForm.phone}
@@ -196,7 +202,7 @@ export default function ProfilePage() {
                           </div>
                         </div>
                         <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Mã số thuế</label>
+                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">{t("profile.taxId")}</label>
                           <div className="relative">
                             <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                             <input value={profileForm.taxId}
@@ -209,12 +215,12 @@ export default function ProfilePage() {
                         <button type="button" onClick={() => setShowPasswordForm(!showPasswordForm)}
                           className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">
                           <Lock className="w-4 h-4" />
-                          {showPasswordForm ? "Ẩn form đổi mật khẩu" : "Đổi mật khẩu"}
+                          {showPasswordForm ? t("profile.hidePw") : t("profile.changePw")}
                         </button>
                         <button type="submit" disabled={isSavingProfile}
                           className="flex items-center gap-2 px-5 py-2.5 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-60">
                           {isSavingProfile && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                          Lưu thay đổi
+                          {t("profile.saveChanges")}
                         </button>
                       </div>
                     </form>
@@ -222,13 +228,13 @@ export default function ProfilePage() {
                     {showPasswordForm && (
                       <form onSubmit={handleChangePassword} className="mt-6 pt-6 border-t border-gray-100 space-y-4">
                         <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                          <Lock className="w-4 h-4 text-[#00D26A]" /> Đổi mật khẩu
+                          <Lock className="w-4 h-4 text-[#00D26A]" /> {t("profile.changePw")}
                         </h3>
                         <div className="grid grid-cols-3 gap-4">
                           {[
-                            { key: "currentPassword" as const, label: "Mật khẩu hiện tại" },
-                            { key: "newPassword" as const, label: "Mật khẩu mới" },
-                            { key: "confirmPassword" as const, label: "Xác nhận mật khẩu" },
+                            { key: "currentPassword" as const, label: t("profile.currentPw") },
+                            { key: "newPassword" as const, label: t("profile.newPw") },
+                            { key: "confirmPassword" as const, label: t("profile.confirmPw") },
                           ].map(({ key, label }) => (
                             <div key={key}>
                               <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">{label}</label>
@@ -241,7 +247,7 @@ export default function ProfilePage() {
                         <button type="submit" disabled={isChangingPassword}
                           className="flex items-center gap-2 px-5 py-2.5 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90 disabled:opacity-60">
                           {isChangingPassword && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                          Cập nhật mật khẩu
+                          {t("profile.updatePw")}
                         </button>
                       </form>
                     )}
@@ -256,19 +262,21 @@ export default function ProfilePage() {
                     <div className="flex items-start justify-between mb-5">
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-widest text-[#00D26A] bg-[#E6F9F0] px-3 py-1 rounded-full">
-                          Gói hiện tại
+                          {t("profile.currentPlan")}
                         </span>
-                        <h2 className="text-xl font-extrabold text-gray-900 mt-3">{user?.planName || "Free Plan"}</h2>
-                        <p className="text-sm text-gray-400 mt-0.5">Chu kỳ tiếp theo: 28/10/2024</p>
+                        <h2 className="text-xl font-extrabold text-gray-900 mt-3">{user?.planName
+                          ? `${user.planName.charAt(0).toUpperCase()}${user.planName.slice(1)} ${t("nav.planSuffix")}`
+                          : t("nav.freePlan")}</h2>
+                        <p className="text-sm text-gray-400 mt-0.5">{t("profile.nextCyclePrefix")} 28/10/2024</p>
                       </div>
                       <Link href="/pricing" className="flex items-center gap-2 px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90">
-                        <Zap className="w-4 h-4" /> Nâng cấp gói
+                        <Zap className="w-4 h-4" /> {t("nav.upgrade")}
                       </Link>
                     </div>
 
                     <div className="bg-gray-50 rounded-2xl p-4 mb-4">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-bold text-gray-700">Sử dụng Quota</p>
+                        <p className="text-sm font-bold text-gray-700">{t("profile.quotaUsage")}</p>
                         <p className="text-sm font-bold text-gray-900">{quotaUsed.toLocaleString()} / {quotaTotal.toLocaleString()}</p>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
@@ -276,29 +284,29 @@ export default function ProfilePage() {
                           style={{ width: `${quotaPercent}%`, background: quotaPercent > 80 ? "#EF4444" : quotaPercent > 60 ? "#F59E0B" : "#00D26A" }} />
                       </div>
                       <div className="flex items-center justify-between text-xs text-gray-400">
-                        <span>{quotaRemaining.toLocaleString()} quota còn lại</span>
-                        <span className="text-[#00D26A] font-semibold">Quota mua thêm không hết hạn ✓</span>
+                        <span>{t("profile.quotaRemaining", { n: quotaRemaining.toLocaleString() })}</span>
+                        <span className="text-[#00D26A] font-semibold">{t("profile.quotaNoExpire")}</span>
                       </div>
                     </div>
 
                     {quotaPercent > 80 && (
                       <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm">
                         <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
-                        <span className="text-amber-700">Quota sắp cạn. Hãy nạp thêm để không gián đoạn dịch vụ.</span>
+                        <span className="text-amber-700">{t("profile.quotaLow")}</span>
                         <Link href="/checkout?plan=topup" className="ml-auto text-amber-700 font-bold hover:underline whitespace-nowrap">
-                          Nạp quota →
+                          {t("profile.topupArrow")}
                         </Link>
                       </div>
                     )}
 
                     <div className="flex gap-3 mt-4 pt-4 border-t border-gray-100">
-                      <button onClick={() => toast.info("Sẽ sớm ra mắt.")}
+                      <button onClick={() => toast.info(t("profile.comingSoon"))}
                         className="px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50">
-                        Hủy đăng ký
+                        {t("profile.cancelSub")}
                       </button>
                       <Link href="/checkout?plan=topup"
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700">
-                        <Zap className="w-4 h-4" /> Nạp thêm Quota
+                        <Zap className="w-4 h-4" /> {t("profile.topupMore")}
                       </Link>
                     </div>
                   </div>
@@ -310,13 +318,13 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
                     <h2 className="text-base font-bold text-gray-900 mb-5 flex items-center gap-2">
-                      <Bell className="w-4 h-4 text-[#00D26A]" /> Thông báo
+                      <Bell className="w-4 h-4 text-[#00D26A]" /> {t("profile.notifications")}
                     </h2>
                     <div className="space-y-0.5">
                       {[
-                        { key: "quotaAlert" as const, label: "Cảnh báo quota cạn", desc: "Nhận email khi quota dưới 20%" },
-                        { key: "reportComplete" as const, label: "Báo cáo hoàn thành", desc: "Thông báo khi thẩm định xong" },
-                        { key: "marketing" as const, label: "Cập nhật sản phẩm", desc: "Tin tức và tính năng mới" },
+                        { key: "quotaAlert" as const, label: t("profile.notif.quotaAlert"), desc: t("profile.notif.quotaAlertDesc") },
+                        { key: "reportComplete" as const, label: t("profile.notif.reportComplete"), desc: t("profile.notif.reportCompleteDesc") },
+                        { key: "marketing" as const, label: t("profile.notif.marketing"), desc: t("profile.notif.marketingDesc") },
                       ].map(({ key, label, desc }) => (
                         <div key={key} className="flex items-center justify-between py-3.5 border-b border-gray-50">
                           <div>
@@ -331,16 +339,16 @@ export default function ProfilePage() {
 
                   <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
                     <h2 className="text-base font-bold text-gray-900 mb-5 flex items-center gap-2">
-                      <Key className="w-4 h-4 text-[#00D26A]" /> Phiên đăng nhập
+                      <Key className="w-4 h-4 text-[#00D26A]" /> {t("profile.sessions")}
                     </h2>
                     <div className="flex items-center justify-between py-3 border-b border-gray-50">
                       <div>
-                        <p className="text-sm font-semibold text-gray-800">Phiên API & Web đang hoạt động</p>
-                        <p className="text-xs text-gray-400">Theo dõi và quản lý tất cả phiên xác thực</p>
+                        <p className="text-sm font-semibold text-gray-800">{t("profile.activeSessions")}</p>
+                        <p className="text-xs text-gray-400">{t("profile.sessionsDesc")}</p>
                       </div>
-                      <button onClick={() => toast.info("Đã thu hồi tất cả phiên.")}
+                      <button onClick={() => toast.info(t("profile.revokedToast"))}
                         className="px-3 py-1.5 border border-red-200 text-red-600 text-xs font-bold rounded-xl hover:bg-red-50">
-                        Thu hồi tất cả
+                        {t("profile.revokeAll")}
                       </button>
                     </div>
                   </div>
@@ -352,21 +360,21 @@ export default function ProfilePage() {
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                   <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                     <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-[#00D26A]" /> Lịch sử thanh toán
+                      <CreditCard className="w-4 h-4 text-[#00D26A]" /> {t("profile.billingHistory")}
                     </h2>
-                    <button onClick={() => toast.info("Xuất PDF sắp ra mắt.")}
+                    <button onClick={() => toast.info(t("profile.exportSoon"))}
                       className="flex items-center gap-1.5 text-sm text-[#00D26A] hover:underline font-semibold">
-                      <Download className="w-4 h-4" /> Xuất tất cả
+                      <Download className="w-4 h-4" /> {t("profile.exportAll")}
                     </button>
                   </div>
                   <table className="w-full">
                     <thead>
                       <tr className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/60">
-                        <th className="px-6 py-3 text-left">Ngày</th>
-                        <th className="px-6 py-3 text-left">Gói</th>
-                        <th className="px-6 py-3 text-left">Số tiền</th>
-                        <th className="px-6 py-3 text-left">Trạng thái</th>
-                        <th className="px-6 py-3 text-left">Hóa đơn</th>
+                        <th className="px-6 py-3 text-left">{t("profile.col.date")}</th>
+                        <th className="px-6 py-3 text-left">{t("profile.col.plan")}</th>
+                        <th className="px-6 py-3 text-left">{t("profile.col.amount")}</th>
+                        <th className="px-6 py-3 text-left">{t("profile.col.status")}</th>
+                        <th className="px-6 py-3 text-left">{t("profile.col.invoice")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -382,7 +390,7 @@ export default function ProfilePage() {
                             <span className="risk-low text-xs font-semibold px-2.5 py-0.5 rounded-full">{row.status}</span>
                           </td>
                           <td className="px-6 py-4">
-                            <button onClick={() => toast.info("Sắp ra mắt.")}
+                            <button onClick={() => toast.info(t("profile.soon"))}
                               className="flex items-center gap-1 text-xs text-[#00D26A] hover:underline font-semibold">
                               <Download className="w-3 h-3" /> PDF
                             </button>

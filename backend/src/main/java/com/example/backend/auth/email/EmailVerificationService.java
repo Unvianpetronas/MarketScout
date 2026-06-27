@@ -50,7 +50,7 @@ public class EmailVerificationService {
         redis.opsForValue().set(PREFIX + token, userId.toString(), TOKEN_TTL);
 
         String verifyUrl = baseUrl + "/api/v1/auth/verify-email?token=" + token;
-        boolean isVi = !"en".equalsIgnoreCase(language);
+        boolean isVi = false; // all outgoing emails are English
 
         send(
             toEmail,

@@ -14,10 +14,11 @@ export interface PillarResult {
   evidences?: Evidence[];
 }
 
+// Matches backend Evidence: { type: PASS|WARN|FAIL, text, source }
 export interface Evidence {
-  source: string;
-  snippet?: string;
-  url?: string;
+  type?: string;
+  text?: string;
+  source?: string;
 }
 
 export interface VerificationReport {

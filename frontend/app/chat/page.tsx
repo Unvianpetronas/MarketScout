@@ -17,12 +17,13 @@ import {
 } from "@/services/chat.service";
 import { ChatSession, ChatMessage } from "@/types/chat";
 import { useAuth } from "@/providers/auth-provider";
+import { useLanguage } from "@/providers/language-provider";
 
 const SUGGESTED_PROMPTS = [
-  { icon: Search, label: "Tìm đối tác xuất khẩu", prompt: "Tìm cho tôi các nhà xuất khẩu hàng điện tử tại Việt Nam" },
-  { icon: Shield, label: "Kiểm tra rủi ro", prompt: "What are the main red flags when dealing with a new Chinese supplier?" },
-  { icon: TrendingUp, label: "Phân tích thị trường", prompt: "Phân tích xu hướng thị trường xuất khẩu đồ gỗ Việt Nam sang EU năm 2024" },
-  { icon: Globe, label: "Tư vấn thương mại", prompt: "Hướng dẫn quy trình thẩm định đối tác thương mại quốc tế cho công ty vừa và nhỏ" },
+  { icon: Search, labelKey: "chat.prompt.findExport", textKey: "chat.promptText.findExport" },
+  { icon: Shield, labelKey: "chat.prompt.risk", textKey: "chat.promptText.risk" },
+  { icon: TrendingUp, labelKey: "chat.prompt.market", textKey: "chat.promptText.market" },
+  { icon: Globe, labelKey: "chat.prompt.advice", textKey: "chat.promptText.advice" },
 ];
 
 function TypingDots() {
@@ -40,6 +41,7 @@ function TypingDots() {
 }
 
 function MessageBubble({ msg, userInitials }: { msg: ChatMessage; userInitials: string }) {
+  const { t } = useLanguage();
   const isUser = msg.role === "user";
   return (
       <div className={`flex gap-3 animate-fade-in-up ${isUser ? "flex-row-reverse" : ""}`}>
@@ -55,7 +57,7 @@ function MessageBubble({ msg, userInitials }: { msg: ChatMessage; userInitials: 
 
         <div className={`max-w-[75%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1`}>
           <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider px-1">
-            {isUser ? "Bạn" : "MarketScout AI"}
+            {isUser ? t("chat.you") : t("chat.ai")}
           </p>
           <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
               isUser
@@ -69,7 +71,7 @@ function MessageBubble({ msg, userInitials }: { msg: ChatMessage; userInitials: 
                   href={`/reports/${msg.reportId}`}
                   className="flex items-center gap-1 text-[11px] font-semibold text-[#00843F] hover:underline px-1"
               >
-                Xem báo cáo chi tiết <ChevronRight className="w-3 h-3" />
+                {t("chat.viewReport")} <ChevronRight className="w-3 h-3" />
               </Link>
           )}
           {!isUser && (
@@ -86,6 +88,7 @@ function ChatContent() {
   const searchParams = useSearchParams();
   const reportId = searchParams.get("reportId") || undefined;
   const { user } = useAuth();
+  const { t } = useLanguage();
 
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
@@ -93,6 +96,7 @@ function ChatContent() {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [streamingStatus, setStreamingStatus] = useState("");
   const streamingContentRef = useRef("");
   const reportMetaRef = useRef<{
     reportId?: string;
@@ -128,6 +132,7 @@ function ChatContent() {
 
   useEffect(() => {
     const preMessage = searchParams.get("preMessage");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing input from a URL param
     if (preMessage) setInput(decodeURIComponent(preMessage));
   }, [searchParams]);
 
@@ -139,7 +144,7 @@ function ChatContent() {
       setMessages([]);
       inputRef.current?.focus();
     } catch {
-      toast.error("Không thể tạo session mới.");
+      toast.error(t("chat.errNewSession"));
     }
   };
 
@@ -153,7 +158,7 @@ function ChatContent() {
         setMessages([]);
       }
     } catch {
-      toast.error("Không thể xóa session.");
+      toast.error(t("chat.errDeleteSession"));
     }
   };
 
@@ -167,7 +172,7 @@ function ChatContent() {
         setSessions((prev) => [session!, ...prev]);
         setActiveSession(session);
       } catch {
-        toast.error("Không thể tạo session."); return;
+        toast.error(t("chat.errCreateSession")); return;
       }
     }
 
@@ -183,13 +188,20 @@ function ChatContent() {
     setInput("");
     setIsStreaming(true);
     setStreamingContent("");
+    setStreamingStatus("");
     streamingContentRef.current = "";
     reportMetaRef.current = null;
 
 
     streamPipelineMessage(
         { message: sentInput, sessionId: session.id, reportId },
-        (chunk) => {
+        (chunk, status) => {
+          // "thinking" events are progress only — show them as a transient status
+          // line, never fold them into the final answer bubble.
+          if (status === "thinking") {
+            setStreamingStatus(chunk);
+            return;
+          }
           streamingContentRef.current = streamingContentRef.current
               ? `${streamingContentRef.current}\n\n${chunk}` : chunk;
           setStreamingContent(streamingContentRef.current);
@@ -202,12 +214,13 @@ function ChatContent() {
           const finalContent = streamingContentRef.current;
           const meta = reportMetaRef.current;
           setIsStreaming(false);
+          setStreamingStatus("");
           setMessages((prev) => [
             ...prev,
             {
               id: (Date.now() + 1).toString(),
               role: "assistant",
-              content: finalContent || "Xin lỗi, hệ thống AI đang không thể tạo phản hồi. Vui lòng thử lại.",
+              content: finalContent || t("chat.fallbackReply"),
               createdAt: new Date().toISOString(),
               reportId: meta?.reportId,
               reportMeta: meta
@@ -226,6 +239,7 @@ function ChatContent() {
         },
         (err) => {
           setIsStreaming(false);
+          setStreamingStatus("");
           const partialContent = streamingContentRef.current; // FIX: chụp giá trị trước, lý do như onDone
           const meta = reportMetaRef.current;
           if (partialContent) {
@@ -252,7 +266,7 @@ function ChatContent() {
             setStreamingContent("");
           } else {
             setStreamingContent("");
-            toast.error("Kết nối AI bị gián đoạn. Vui lòng thử lại.");
+            toast.error(t("chat.errToast"));
           }
           reportMetaRef.current = null;
         },
@@ -278,8 +292,8 @@ function ChatContent() {
             <div className="px-4 py-4 border-b border-gray-100">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h2 className="text-sm font-bold text-gray-900">AI Assistant</h2>
-                  <p className="text-[11px] text-gray-400">Trợ lý thương mại quốc tế</p>
+                  <h2 className="text-sm font-bold text-gray-900">{t("chat.title")}</h2>
+                  <p className="text-[11px] text-gray-400">{t("chat.subtitle")}</p>
                 </div>
                 <div className="pulse-dot" />
               </div>
@@ -288,12 +302,12 @@ function ChatContent() {
                   className="w-full flex items-center justify-center gap-2 px-3 py-2 gradient-brand text-white text-xs font-semibold rounded-xl hover:opacity-90 transition-opacity"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Cuộc hội thoại mới
+                {t("chat.newConversation")}
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto scrollbar-thin px-2 py-3">
-              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold px-2 mb-2">Lịch sử</p>
+              <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold px-2 mb-2">{t("chat.history")}</p>
               {isLoadingSessions ? (
                   <div className="space-y-2 px-2">
                     {[...Array(4)].map((_, i) => <div key={i} className="h-9 shimmer rounded-xl" />)}
@@ -301,7 +315,7 @@ function ChatContent() {
               ) : sessions.length === 0 ? (
                   <div className="text-center py-8">
                     <MessageSquare className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-                    <p className="text-xs text-gray-400">Chưa có hội thoại nào</p>
+                    <p className="text-xs text-gray-400">{t("chat.noConversations")}</p>
                   </div>
               ) : (
                   <div className="space-y-0.5">
@@ -337,22 +351,22 @@ function ChatContent() {
                 <Bot className="w-4.5 h-4.5 text-[#00D26A]" />
               </div>
               <div>
-                <p className="font-bold text-gray-900 text-sm">MarketScout AI</p>
+                <p className="font-bold text-gray-900 text-sm">{t("chat.ai")}</p>
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#00D26A]" />
-                  <span className="text-[11px] text-gray-400">Synced · 190+ quốc gia · 8-pillar analysis</span>
+                  <span className="text-[11px] text-gray-400">{t("chat.headerStatus")}</span>
                 </div>
               </div>
               <div className="ml-auto flex items-center gap-2">
                 {reportId && (
                     <div className="flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-xs px-3 py-1.5 rounded-full border border-emerald-200 font-medium">
                       <FileText className="w-3 h-3" />
-                      Báo cáo đã đính kèm
+                      {t("chat.reportAttached")}
                     </div>
                 )}
                 <span className="text-[11px] text-gray-400 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
                 <Sparkles className="w-3 h-3 inline-block mr-1 text-[#00D26A]" />
-                Powered by Gemini
+                {t("chat.poweredBy")}
               </span>
               </div>
             </div>
@@ -364,21 +378,21 @@ function ChatContent() {
                     <div className="w-20 h-20 rounded-full bg-[#0D2218] flex items-center justify-center mb-5 shadow-lg">
                       <Bot className="w-10 h-10 text-[#00D26A]" />
                     </div>
-                    <h3 className="text-xl font-extrabold text-gray-900 mb-2">Xin chào! Tôi là MarketScout AI</h3>
+                    <h3 className="text-xl font-extrabold text-gray-900 mb-2">{t("chat.greetingTitle")}</h3>
                     <p className="text-gray-500 text-sm max-w-md mb-8">
-                      Tôi có thể giúp bạn tìm kiếm đối tác, thẩm định doanh nghiệp, và tư vấn thương mại quốc tế.
+                      {t("chat.greetingSubtitle")}
                     </p>
                     <div className="grid grid-cols-2 gap-3 max-w-lg w-full">
-                      {SUGGESTED_PROMPTS.map(({ icon: Icon, label, prompt }) => (
+                      {SUGGESTED_PROMPTS.map(({ icon: Icon, labelKey, textKey }) => (
                           <button
-                              key={label}
-                              onClick={() => { setInput(prompt); inputRef.current?.focus(); }}
+                              key={labelKey}
+                              onClick={() => { setInput(t(textKey)); inputRef.current?.focus(); }}
                               className="flex items-start gap-2.5 text-left p-3.5 bg-white border border-gray-200 rounded-xl hover:border-[#00D26A] hover:bg-[#E6F9F0] transition-all group shadow-sm"
                           >
                             <div className="w-6 h-6 bg-[#E6F9F0] rounded-lg flex items-center justify-center shrink-0 group-hover:bg-white transition-colors">
                               <Icon className="w-3.5 h-3.5 text-[#00D26A]" />
                             </div>
-                            <span className="text-xs font-semibold text-gray-700 group-hover:text-[#00843F]">{label}</span>
+                            <span className="text-xs font-semibold text-gray-700 group-hover:text-[#00843F]">{t(labelKey)}</span>
                           </button>
                       ))}
                     </div>
@@ -395,14 +409,21 @@ function ChatContent() {
                       <Bot className="w-4 h-4 text-[#00D26A]" />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider px-1">MarketScout AI</p>
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider px-1">{t("chat.ai")}</p>
                       <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100 max-w-[75%]">
                         {streamingContent ? (
                             <p className="text-sm text-gray-800 leading-relaxed" style={{ whiteSpace: "pre-wrap" }}>
                               {streamingContent}
                               <span className="inline-block w-0.5 h-4 bg-[#00D26A] ml-0.5 animate-pulse" />
                             </p>
-                        ) : <TypingDots />}
+                        ) : (
+                            <div className="flex items-center gap-2.5">
+                              <TypingDots />
+                              {streamingStatus && (
+                                  <span className="text-xs text-gray-400 italic">{streamingStatus}</span>
+                              )}
+                            </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -423,7 +444,7 @@ function ChatContent() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
                   }}
-                  placeholder="Hỏi về đối tác, thị trường, rủi ro thương mại... (Enter để gửi)"
+                  placeholder={t("chat.inputPlaceholder")}
                   disabled={isStreaming}
                   rows={1}
                   style={{ resize: "none", overflow: "hidden", minHeight: "36px" }}
@@ -438,7 +459,7 @@ function ChatContent() {
                 </button>
               </div>
               <p className="text-[11px] text-gray-400 text-center mt-2">
-                🔒 Nội dung mang tính tham khảo. MarketScout AI không thay thế tư vấn pháp lý chuyên nghiệp.
+                {t("chat.disclaimer")}
               </p>
             </div>
           </div>

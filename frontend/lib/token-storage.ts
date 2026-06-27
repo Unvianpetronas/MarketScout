@@ -30,6 +30,10 @@ export function setAccessToken(token: string) {
   activeStore().setItem(ACCESS_KEY, token);
 }
 
+export function setRefreshToken(token: string) {
+  activeStore().setItem(REFRESH_KEY, token);
+}
+
 export function clearTokens() {
   localStorage.removeItem(ACCESS_KEY);
   localStorage.removeItem(REFRESH_KEY);

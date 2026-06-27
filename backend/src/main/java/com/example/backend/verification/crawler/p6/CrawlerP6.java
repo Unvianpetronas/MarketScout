@@ -13,27 +13,48 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Pillar 6 — sanctions screening via the OpenSanctions matching API.
+ *
+ * The free tier allows only 50 requests/day, so this crawler is built to be
+ * stingy:
+ *   • Daily-budget guard — a Redis counter ({@code p6:budget:yyyy-MM-dd}) caps
+ *     the number of API queries per day. Over budget → SKIP (never a false
+ *     hard-stop). A 429 burns the counter for the rest of the day.
+ *   • Two-way cache — every successful result is cached for a day, both
+ *     "on a list" and "clear", so a repeat lookup costs 0 requests.
+ *   • Real batch — {@link #batchCheck} packs N companies into ONE HTTP request
+ *     instead of N round-trips.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CrawlerP6 {
 
-    // OpenSanctions hosted API — https://api.opensanctions.org
     private static final String OPENSANCTIONS_API_URL = "https://api.opensanctions.org/match/sanctions";
+    private static final double MATCH_THRESHOLD = 0.7;
 
     @Value("${app.opensanctions.api-key:}")
     private String apiKey;
 
+    @Value("${app.opensanctions.daily-budget:45}")
+    private int dailyBudget;
+
     private final RestTemplate restTemplate;
     private final CacheService cacheService;
 
-    // ── Public entry point ────────────────────────────────────────────
+    private record QueryItem(String key, String name, String country) {}
+
+    // ── Single lookup ──────────────────────────────────────────────────
 
     public P6Data fetch(CompanyInput input) {
         String key = buildKey(input.getName(), input.getCountry());
@@ -44,165 +65,184 @@ public class CrawlerP6 {
             return cached.get();
         }
 
-        try {
-            P6Data result = checkSanctions(input.getName(), input.getCountry());
-            if (result.isFound()) {
-                // Cache 1 ngày — data sanctions cập nhật thường xuyên
-                cacheService.set(key, result, Duration.ofDays(1),
-                        (short) 6, "opensanctions_api", input.getCountry());
-            }
-            return result;
-        } catch (Exception e) {
-            log.warn("P6 check failed for {}: {}", input.getName(), e.getMessage());
-            // Fallback an toàn — không crash pipeline
-            return P6Data.builder()
-                    .state(PillarData.DataState.SKIP)
-                    .companyName(input.getName())
-                    .errorMsg("OpenSanctions API không phản hồi — bỏ qua kiểm tra trừng phạt")
-                    .fetchedAt(LocalDateTime.now())
-                    .sanctioned(false)
-                    .build();
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("P6: OPENSANCTIONS_API_KEY chưa set — bỏ qua kiểm tra trừng phạt cho {}", input.getName());
+            return skip(input.getName(), "Chưa cấu hình OPENSANCTIONS_API_KEY");
         }
+
+        if (reserveBudget(1) < 1) {
+            log.warn("P6: đã đạt trần {} request/ngày — SKIP {}", dailyBudget, input.getName());
+            return skip(input.getName(), "Đã đạt trần OpenSanctions trong ngày");
+        }
+
+        Map<String, P6Data> res = callOpenSanctions(List.of(new QueryItem(key, input.getName(), input.getCountry())));
+        P6Data data = res.get(key);
+        if (data == null) {
+            return skip(input.getName(), "OpenSanctions không phản hồi — bỏ qua kiểm tra trừng phạt");
+        }
+        cacheService.set(key, data, Duration.ofDays(1), (short) 6, "opensanctions_api", input.getCountry());
+        return data;
     }
+
+    // ── Batch lookup (find-partners) ───────────────────────────────────
 
     public List<LeadResult> batchCheck(List<LeadResult> leads) {
-        List<LeadResult> result = new ArrayList<>();
+        if (leads == null || leads.isEmpty()) return leads;
+
+        Map<String, P6Data> resolved = new HashMap<>();      // cache key → result (cached or fresh)
+        LinkedHashMap<String, QueryItem> toFetch = new LinkedHashMap<>(); // unique uncached, dedupe by key
+
         for (LeadResult lead : leads) {
-            CompanyInput input = CompanyInput.builder()
-                    .companyName(lead.getCompanyName())
-                    .country(lead.getCountry())
-                    .build();
-            P6Data p6 = fetch(input);
-            if (p6.isSanctioned()) {
-                lead.setSanctionHit(true);
-                lead.setSanctionNote("LOẠI — khớp danh sách trừng phạt (" + p6.getSanctionSource() + ")");
+            String key = buildKey(lead.getCompanyName(), lead.getCountry());
+            if (resolved.containsKey(key) || toFetch.containsKey(key)) continue;
+            Optional<P6Data> cached = cacheService.get(key, P6Data.class);
+            if (cached.isPresent()) {
+                resolved.put(key, cached.get());
+            } else {
+                toFetch.put(key, new QueryItem(key, lead.getCompanyName(), lead.getCountry()));
             }
-            result.add(lead);
         }
-        return result;
+
+        int allowed = 0;
+        if (!toFetch.isEmpty() && apiKey != null && !apiKey.isBlank()) {
+            allowed = reserveBudget(toFetch.size());
+            if (allowed > 0) {
+                List<QueryItem> batch = new ArrayList<>(toFetch.values()).subList(0, allowed);
+                Map<String, P6Data> fresh = callOpenSanctions(batch);
+                for (Map.Entry<String, P6Data> e : fresh.entrySet()) {
+                    cacheService.set(e.getKey(), e.getValue(), Duration.ofDays(1),
+                            (short) 6, "opensanctions_api", null);
+                    resolved.put(e.getKey(), e.getValue());
+                }
+            }
+        }
+        // Leads beyond `allowed`, or skipped because the key wasn't fetched, stay
+        // un-flagged (SKIP-safe) — we never block a lead we couldn't actually check.
+        log.info("P6 batchCheck: checked {}/{} (cache+api), budget reserved {}",
+                resolved.size(), leads.size(), allowed);
+
+        for (LeadResult lead : leads) {
+            P6Data data = resolved.get(buildKey(lead.getCompanyName(), lead.getCountry()));
+            if (data != null && data.isSanctioned()) {
+                lead.setSanctionHit(true);
+                lead.setSanctionNote("LOẠI — khớp danh sách trừng phạt (" + data.getSanctionSource() + ")");
+            }
+        }
+        return leads;
     }
 
-    // ── Core API call ─────────────────────────────────────────────────
+    // ── Daily budget guard ─────────────────────────────────────────────
 
-    /**
-     * Gọi OpenSanctions hosted API /match/sanctions endpoint.
-     *
-     * Endpoint này match một entity với toàn bộ sanctions dataset.
-     * Score > 0.7 → coi là match, trigger HARD STOP.
-     *
-     * Docs: https://api.opensanctions.org/
-     * Free trial: 50 requests/ngày trong 30 ngày.
-     */
+    private String budgetKey() {
+        return "p6:budget:" + LocalDate.now();
+    }
+
+    /** Reserves up to {@code needed} queries against today's budget; returns how many were granted. */
+    private int reserveBudget(int needed) {
+        long before = cacheService.getCounter(budgetKey());
+        long remaining = dailyBudget - before;
+        if (remaining <= 0) return 0;
+        int allowed = (int) Math.min(needed, remaining);
+        cacheService.incrementCounter(budgetKey(), Duration.ofDays(1), allowed);
+        return allowed;
+    }
+
+    /** Burns the budget for the rest of the day so subsequent calls SKIP immediately. */
+    private void markBudgetExhausted() {
+        cacheService.setCounter(budgetKey(), dailyBudget + 1L, Duration.ofDays(1));
+    }
+
+    // ── Core API call (one HTTP request for N queries) ─────────────────
+
     @SuppressWarnings("unchecked")
-    private P6Data checkSanctions(String companyName, String country) {
-        // Nếu không có API key → SKIP ngay, không gọi API
-        if (apiKey == null || apiKey.isBlank()) {
-            log.warn("P6: OPENSANCTIONS_API_KEY chưa được set — bỏ qua kiểm tra trừng phạt cho {}", companyName);
-            return P6Data.builder()
-                    .state(PillarData.DataState.SKIP)
-                    .companyName(companyName)
-                    .errorMsg("Chưa cấu hình OPENSANCTIONS_API_KEY")
-                    .sanctioned(false)
-                    .fetchedAt(LocalDateTime.now())
-                    .build();
+    private Map<String, P6Data> callOpenSanctions(List<QueryItem> items) {
+        Map<String, P6Data> out = new HashMap<>();
+        if (items.isEmpty()) return out;
+
+        Map<String, Object> queries = new LinkedHashMap<>();
+        for (int i = 0; i < items.size(); i++) {
+            QueryItem it = items.get(i);
+            Map<String, Object> props = new HashMap<>();
+            props.put("name", List.of(it.name()));
+            if (it.country() != null && !it.country().isBlank()) {
+                props.put("country", List.of(it.country()));
+            }
+            queries.put("q" + i, Map.of("schema", "Company", "properties", props));
         }
 
-        // Build request body theo format OpenSanctions matching API
-        Map<String, Object> properties = new java.util.HashMap<>();
-        properties.put("name", List.of(companyName));
-        if (country != null && !country.isBlank()) {
-            properties.put("country", List.of(country));
-        }
-
-        Map<String, Object> query = Map.of(
-                "schema", "Company",
-                "properties", properties
-        );
-
-        Map<String, Object> body = Map.of(
-                "queries", Map.of("q1", query)
-        );
-
+        Map<String, Object> body = Map.of("queries", queries);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("Authorization", "ApiKey " + apiKey);
 
         try {
             ResponseEntity<Map> resp = restTemplate.exchange(
-                    OPENSANCTIONS_API_URL,
-                    HttpMethod.POST,
-                    new HttpEntity<>(body, headers),
-                    Map.class
-            );
+                    OPENSANCTIONS_API_URL, HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
 
-            if (resp.getBody() == null) {
-                return notSanctioned(companyName, "Empty response");
+            Map<String, Object> responses = resp.getBody() == null ? null
+                    : (Map<String, Object>) resp.getBody().get("responses");
+            if (responses == null) {
+                log.warn("P6: OpenSanctions response missing 'responses' field");
+                return out;
             }
-
-            // Parse response: responses.q1.results[]
-            Map<String, Object> responses = (Map<String, Object>) resp.getBody().get("responses");
-            if (responses == null) return notSanctioned(companyName, "No responses field");
-
-            Map<String, Object> q1 = (Map<String, Object>) responses.get("q1");
-            if (q1 == null) return notSanctioned(companyName, "No q1 result");
-
-            List<Map<String, Object>> results = (List<Map<String, Object>>) q1.get("results");
-            if (results == null || results.isEmpty()) {
-                return notSanctioned(companyName, "No matches found");
+            for (int i = 0; i < items.size(); i++) {
+                QueryItem it = items.get(i);
+                out.put(it.key(), parseOne(it.name(), (Map<String, Object>) responses.get("q" + i)));
             }
-
-            // Kiểm tra từng result — score > 0.7 là match đáng tin
-            for (Map<String, Object> r : results) {
-                Double score = r.get("score") instanceof Number
-                        ? ((Number) r.get("score")).doubleValue()
-                        : null;
-
-                if (score != null && score > 0.7) {
-                    List<String> datasets = (List<String>) r.getOrDefault("datasets", List.of());
-                    String source = datasets.isEmpty() ? "unknown" : datasets.get(0);
-                    String matchedEntityId = (String) r.getOrDefault("id", null);
-                    String matchedEntityName = extractMatchedEntityName(r);
-
-                    log.warn("SANCTIONS HIT: '{}' — score={} source={} matchedEntity='{}' entityId={}",
-                            companyName, score, source, matchedEntityName, matchedEntityId);
-
-                    return P6Data.builder()
-                            .state(PillarData.DataState.FOUND)
-                            .companyName(companyName)
-                            .sanctioned(true)
-                            .sanctionSource(source)
-                            .matchedEntityName(matchedEntityName)
-                            .matchedEntityId(matchedEntityId)
-                            .matchScore(score)
-                            .rawText(String.format("Sanction match score=%.3f | source=%s | matched='%s' | id=%s",
-                                    score, source, matchedEntityName, matchedEntityId))
-                            .dataSource("opensanctions_api")
-                            .fetchedAt(LocalDateTime.now())
-                            .build();
-                }
-            }
-
-            return notSanctioned(companyName, "No high-confidence match (best score below 0.7)");
-
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             int status = e.getStatusCode().value();
             if (status == 401) {
                 log.error("P6: OpenSanctions API key không hợp lệ");
             } else if (status == 429) {
-                log.warn("P6: OpenSanctions rate limit — đã hết 50 requests hôm nay");
+                log.warn("P6: OpenSanctions rate limit (429) — đốt budget tới cuối ngày");
+                markBudgetExhausted();
+            } else {
+                log.warn("P6: OpenSanctions HTTP {}: {}", status, e.getMessage());
             }
-            // Cả 2 trường hợp đều fallback SKIP, không crash
-            return P6Data.builder()
-                    .state(PillarData.DataState.SKIP)
-                    .companyName(companyName)
-                    .errorMsg("OpenSanctions HTTP " + status + ": " + e.getMessage())
-                    .sanctioned(false)
-                    .fetchedAt(LocalDateTime.now())
-                    .build();
+            // Return whatever parsed (nothing) → callers treat missing as SKIP-safe.
+        } catch (Exception e) {
+            log.warn("P6: OpenSanctions call failed: {}", e.getMessage());
         }
+        return out;
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────
+    @SuppressWarnings("unchecked")
+    private P6Data parseOne(String companyName, Map<String, Object> q) {
+        if (q == null) return notSanctioned(companyName, "No result for query");
+        List<Map<String, Object>> results = (List<Map<String, Object>>) q.get("results");
+        if (results == null || results.isEmpty()) {
+            return notSanctioned(companyName, "No matches found");
+        }
+        for (Map<String, Object> r : results) {
+            Double score = r.get("score") instanceof Number ? ((Number) r.get("score")).doubleValue() : null;
+            if (score != null && score > MATCH_THRESHOLD) {
+                List<String> datasets = (List<String>) r.getOrDefault("datasets", List.of());
+                String source = datasets.isEmpty() ? "unknown" : datasets.get(0);
+                String matchedId = (String) r.getOrDefault("id", null);
+                String matchedName = extractMatchedEntityName(r);
+
+                log.warn("SANCTIONS HIT: '{}' — score={} source={} matchedEntity='{}' entityId={}",
+                        companyName, score, source, matchedName, matchedId);
+
+                return P6Data.builder()
+                        .state(PillarData.DataState.FOUND)
+                        .companyName(companyName)
+                        .sanctioned(true)
+                        .sanctionSource(source)
+                        .matchedEntityName(matchedName)
+                        .matchedEntityId(matchedId)
+                        .matchScore(score)
+                        .rawText(String.format("Sanction match score=%.3f | source=%s | matched='%s' | id=%s",
+                                score, source, matchedName, matchedId))
+                        .dataSource("opensanctions_api")
+                        .fetchedAt(LocalDateTime.now())
+                        .build();
+            }
+        }
+        return notSanctioned(companyName, "No high-confidence match (best score below " + MATCH_THRESHOLD + ")");
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────
 
     private P6Data notSanctioned(String name, String detail) {
         return P6Data.builder()
@@ -215,20 +255,24 @@ public class CrawlerP6 {
                 .build();
     }
 
-    /**
-     * Trích xuất tên entity từ OpenSanctions result để lưu audit trail.
-     * OpenSanctions trả về properties.name[] hoặc caption ở top level.
-     */
+    private P6Data skip(String name, String reason) {
+        return P6Data.builder()
+                .state(PillarData.DataState.SKIP)
+                .companyName(name)
+                .errorMsg(reason)
+                .sanctioned(false)
+                .fetchedAt(LocalDateTime.now())
+                .build();
+    }
+
     @SuppressWarnings("unchecked")
     private String extractMatchedEntityName(Map<String, Object> result) {
         try {
-            // Thử lấy từ properties.name[]
             Map<String, Object> properties = (Map<String, Object>) result.get("properties");
             if (properties != null) {
                 List<String> names = (List<String>) properties.get("name");
                 if (names != null && !names.isEmpty()) return names.get(0);
             }
-            // Fallback sang caption (display name trong OpenSanctions)
             Object caption = result.get("caption");
             return caption instanceof String ? (String) caption : null;
         } catch (Exception e) {
@@ -237,7 +281,7 @@ public class CrawlerP6 {
     }
 
     private String buildKey(String name, String country) {
-        String n = name != null ? name.toLowerCase().replaceAll("\\s+", "_") : "unknown";
+        String n = name != null ? name.toLowerCase().trim().replaceAll("\\s+", "_") : "unknown";
         String c = country != null ? country.toLowerCase() : "xx";
         return "p6:" + n + ":" + c;
     }

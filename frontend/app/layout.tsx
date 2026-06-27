@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Source_Serif_4, Inter, Sora } from "next/font/google
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/providers/auth-provider";
+import { LanguageProvider } from "@/providers/language-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
@@ -51,8 +52,10 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
       <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
         <AuthProvider>
-          {children}
-          <Toaster position="top-right" />
+          <LanguageProvider>
+            {children}
+            <Toaster position="top-right" />
+          </LanguageProvider>
         </AuthProvider>
       </ThemeProvider>
       </body>
