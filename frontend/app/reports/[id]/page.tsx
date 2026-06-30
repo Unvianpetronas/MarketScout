@@ -5,13 +5,14 @@ import Link from "next/link";
 import {
   ArrowLeft, AlertTriangle, Shield, RefreshCw, Globe, ExternalLink,
   CheckCircle2, XCircle, Clock, Download, MessageSquare,
-  Building2, FileText, TrendingUp, Info, Star
+  Building2, FileText, TrendingUp, Info, Star,
+  Sparkles, ListChecks, Send, FileSearch
 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
-import { getReport } from "@/services/report.service";
-import { VerificationReport, PillarResult } from "@/types/report";
+import { getReport, getReportRecommendations } from "@/services/report.service";
+import { VerificationReport, PillarResult, ReportRecommendations } from "@/types/report";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -154,11 +155,92 @@ function PillarCard({ pillar }: { pillar: PillarResult }) {
   );
 }
 
+function RecGroup({ title, icon: Icon, items, color, bg }: {
+  title: string; icon: React.ElementType; items?: string[]; color: string; bg: string;
+}) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: bg }}>
+          <Icon className="w-4 h-4" style={{ color }} />
+        </div>
+        <p className="text-sm font-bold text-gray-900">{title}</p>
+      </div>
+      <ul className="space-y-2">
+        {items.map((it, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+            <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{ backgroundColor: color }} />
+            <span>{it}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function AiRecommendations({ recs, loading }: { recs: ReportRecommendations | null; loading: boolean }) {
+  const hasContent = recs && (
+    (recs.actionItems?.length ?? 0) > 0 ||
+    (recs.infoToProvide?.length ?? 0) > 0 ||
+    (recs.infoToVerify?.length ?? 0) > 0 ||
+    !!recs.summary
+  );
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="w-8 h-8 bg-[#E6F9F0] rounded-xl flex items-center justify-center">
+          <Sparkles className="w-4 h-4 text-[#00843F]" />
+        </div>
+        <h3 className="text-sm font-bold text-gray-900">Khuyến nghị từ AI</h3>
+        <span className="text-[10px] font-bold text-[#00843F] bg-[#E6F9F0] px-2 py-0.5 rounded-full uppercase tracking-wider">
+          AI
+        </span>
+      </div>
+      <p className="text-xs text-gray-400 mb-4 ml-10">
+        Các bước nên làm, thông tin cần bổ sung và cần xác minh — ngoài phần Deal Safety.
+      </p>
+
+      {loading ? (
+        <div className="flex items-center gap-3 text-sm text-gray-400 p-4 bg-gray-50 rounded-xl">
+          <div className="w-4 h-4 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin" />
+          AI đang phân tích và soạn khuyến nghị...
+        </div>
+      ) : !hasContent ? (
+        <div className="flex items-center gap-3 text-sm text-gray-400 p-4 bg-gray-50 rounded-xl">
+          <Info className="w-4 h-4 shrink-0" />
+          Chưa tạo được khuyến nghị cho báo cáo này.
+        </div>
+      ) : (
+        <>
+          {recs?.summary && (
+            <div className="flex items-start gap-3 p-4 bg-[#F0FAF4] border border-emerald-100 rounded-xl mb-4">
+              <Sparkles className="w-5 h-5 text-[#00843F] shrink-0 mt-0.5" />
+              <p className="text-sm text-emerald-800 font-medium">{recs.summary}</p>
+            </div>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <RecGroup title="Nên làm gì" icon={ListChecks} items={recs?.actionItems}
+              color="#00843F" bg="#E6F9F0" />
+            <RecGroup title="Cần cung cấp thêm" icon={Send} items={recs?.infoToProvide}
+              color="#2563EB" bg="#EFF4FF" />
+            <RecGroup title="Cần xác minh" icon={FileSearch} items={recs?.infoToVerify}
+              color="#9333EA" bg="#F6EEFE" />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function ReportDetailPage({ params }: Props) {
   const { id } = use(params);
   const [report, setReport] = useState<VerificationReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRescan, setIsRescan] = useState(false);
+  const [recs, setRecs] = useState<ReportRecommendations | null>(null);
+  const [recsLoading, setRecsLoading] = useState(false);
 
   useEffect(() => {
     getReport(id)
@@ -166,6 +248,16 @@ export default function ReportDetailPage({ params }: Props) {
       .catch(() => toast.error("Không tải được báo cáo."))
       .finally(() => setIsLoading(false));
   }, [id]);
+
+  // Generate AI next-step recommendations once the report has loaded.
+  useEffect(() => {
+    if (!report || report.status === "PROCESSING") return;
+    setRecsLoading(true);
+    getReportRecommendations(id)
+      .then(setRecs)
+      .catch(() => setRecs(null))
+      .finally(() => setRecsLoading(false));
+  }, [report, id]);
 
   const handleRescan = async () => {
     setIsRescan(true);
@@ -384,6 +476,9 @@ export default function ReportDetailPage({ params }: Props) {
                     </div>
                   )}
                 </div>
+
+                {/* ── AI Recommendations ── */}
+                <AiRecommendations recs={recs} loading={recsLoading} />
 
                 {/* ── AI CTA ── */}
                 <div className="bg-gradient-to-r from-[#0A1A12] to-[#0D2218] rounded-2xl p-6 flex items-center justify-between">

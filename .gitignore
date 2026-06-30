@@ -59,5 +59,9 @@ marketscout-system-design-guide.txt
 quota-service-explanation.txt
 auth-explanation.txt
 *.sql
+# Exception: this schema script must ship in the jar (loaded via
+# spring.sql.init.schema-locations=classpath:db/payment_tables.sql).
+# Without it, the backend crashes on startup → Railway health check fails.
+!backend/src/main/resources/db/payment_tables.sql
 *.txt
 *.md
