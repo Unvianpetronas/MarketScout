@@ -3,6 +3,7 @@ import {
   VerificationReport,
   ReportListItem,
   ReportStatusResponse,
+  ReportRecommendations,
 } from "@/types/report";
 
 export const getReports = async (): Promise<ReportListItem[]> => {
@@ -17,6 +18,12 @@ export const getReport = async (id: string): Promise<VerificationReport> => {
 
 export const getReportStatus = async (id: string): Promise<ReportStatusResponse> => {
   const response = await api.get<ReportStatusResponse>(`/reports/${id}/status`);
+  return response.data;
+};
+
+// AI next-step recommendations (what to do / provide / verify) for a report.
+export const getReportRecommendations = async (id: string): Promise<ReportRecommendations> => {
+  const response = await api.get<ReportRecommendations>(`/reports/${id}/recommendations`);
   return response.data;
 };
 

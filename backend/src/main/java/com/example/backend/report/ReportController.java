@@ -26,6 +26,7 @@ public class ReportController {
     private final ReportRepository reportRepository;
     private final PillarResultRepository pillarResultRepository;
     private final QuickScanService quickScanService;
+    private final ReportRecommendationService recommendationService;
     private final JwtService jwtService;
     private final ObjectMapper objectMapper;
 
@@ -62,6 +63,22 @@ public class ReportController {
             .id(report.getId()).status(report.getStatus())
             .overallScore(report.getOverallScore()).riskLevel(report.getRiskLevel())
             .hardStop(report.getHardStop()).build());
+    }
+
+    // AI next-step recommendations (what to do / provide / verify) for a report.
+    @GetMapping("/{id}/recommendations")
+    public ResponseEntity<String> getRecommendations(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable UUID id) {
+        UUID userId = extractUserId(authHeader);
+        Report report = reportRepository.findById(id)
+            .filter(r -> r.getUser().getId().equals(userId))
+            .orElseThrow(() -> new AppException(AppException.ErrorCode.REPORT_NOT_FOUND));
+        List<PillarResult> pillars = pillarResultRepository.findByReportIdOrderByPillarNoAsc(id);
+        String json = recommendationService.generate(report, pillars);
+        return ResponseEntity.ok()
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .body(json);
     }
 
     // Trigger quick scan for a lead from a Find Partners session
