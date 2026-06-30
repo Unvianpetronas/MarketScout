@@ -40,6 +40,14 @@ export interface VerificationReport {
   updatedAt?: string;
 }
 
+// AI next-step recommendations for a report (what to do / provide / verify).
+export interface ReportRecommendations {
+  summary?: string;
+  actionItems?: string[];
+  infoToProvide?: string[];
+  infoToVerify?: string[];
+}
+
 export interface ReportListItem {
   id: string;
   entityName: string;

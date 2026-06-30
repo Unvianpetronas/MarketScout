@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   MessageSquare, Search, Shield, Settings, Plus, ChevronLeft, ChevronRight,
-  LogOut, FileText, Globe, Star, LayoutDashboard, Home
+  LogOut, FileText, Globe, Star, LayoutDashboard, Home, BookOpen
 } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
@@ -17,6 +17,7 @@ const NAV_ITEMS: { id: string; labelKey: string; icon: React.ElementType; href: 
   { id: "verify", labelKey: "nav.verify", icon: Shield, href: "/verify" },
   { id: "reports", labelKey: "nav.reports", icon: FileText, href: "/reports" },
   { id: "intelligence", labelKey: "nav.intelligence", icon: Globe, href: "/intelligence" },
+  { id: "methodology", labelKey: "nav.methodology", icon: BookOpen, href: "/methodology" },
 ];
 
 const BOTTOM_ITEMS: { id: string; labelKey: string; icon: React.ElementType; href: string; highlight?: boolean }[] = [
