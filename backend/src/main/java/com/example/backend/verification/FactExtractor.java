@@ -149,14 +149,16 @@ public class FactExtractor {
                     .build());
             }
 
-            // P7
+            // P7 — deal parameters are structured USER input (ground truth), NOT
+            // crawled text for Gemini to interpret. Map straight from P7Data so the
+            // fact-extraction LLM can never drop or alter them (Gemini doesn't even
+            // receive them). Same rationale as P6's sanction flag above.
             if (p7 != null && p7.isFound()) {
-                var p7n = node.path("p7");
                 f.setP7(FactJson.P7Facts.builder()
-                    .depositPercentage(intVal(p7n, "deposit_percentage"))
-                    .hasWrittenContract(boolVal(p7n, "has_written_contract"))
-                    .paymentMethodSafety(text(p7n, "payment_method_safety"))
-                    .dealValueUsd(doubleVal(p7n, "deal_value_usd"))
+                    .depositPercentage(p7.getDepositPercentage())
+                    .hasWrittenContract(p7.getHasWrittenContract())
+                    .paymentMethodSafety(p7.getPaymentMethodSafety())
+                    .dealValueUsd(p7.getDealValueUsd())
                     .build());
             }
 
