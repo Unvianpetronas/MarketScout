@@ -15,6 +15,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { getMyQuota } from "@/services/quota.service";
 import { QuotaStatus } from "@/types/quota";
 import { getReports } from "@/services/report.service";
+import { streamPipelineMessage } from "@/services/chat.service";
 import { ReportListItem } from "@/types/report";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -91,6 +92,7 @@ function VerifyContent() {
   const [country, setCountry] = useState(searchParams.get("country") || "");
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [verifyStatus, setVerifyStatus] = useState("");
   const [recentReports, setRecentReports] = useState<ReportListItem[]>([]);
   const [isLoadingReports, setIsLoadingReports] = useState(true);
   const [inputFocused, setInputFocused] = useState(false);
@@ -125,28 +127,88 @@ function VerifyContent() {
       return;
     }
 
-    // Route to AI chat with pre-filled message for verification
     const countryName = COUNTRIES.find((c) => c.code === country)?.name || country;
     const preMessage = countryName
       ? `Verify company "${q}" in ${countryName}. Run full background check and 8-pillar analysis.`
       : `Verify company "${q}". Run full background check and 8-pillar analysis.`;
 
     // Optional P7 deal parameters — only include what the user actually set.
-    const params = new URLSearchParams({ preMessage });
-    if (paymentSafety) params.set("dealPayment", paymentSafety);
-    if (depositSet) params.set("dealDeposit", String(deposit));
-    if (hasContract !== null) params.set("dealContract", String(hasContract));
-    if (dealValue.trim()) params.set("dealValue", dealValue.trim());
+    const deal: {
+      depositPercentage?: number; hasWrittenContract?: boolean;
+      paymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY"; dealValueUsd?: number;
+    } = {};
+    if (paymentSafety) deal.paymentMethodSafety = paymentSafety;
+    if (depositSet) deal.depositPercentage = deposit;
+    if (hasContract !== null) deal.hasWrittenContract = hasContract;
+    if (dealValue.trim()) deal.dealValueUsd = Number(dealValue.trim());
 
+    // Run the verification IN PLACE (no chat detour) so the deal params reach the
+    // pipeline directly and P7 is scored. Redirect to the report when it's ready.
     setIsSearching(true);
-    await new Promise((r) => setTimeout(r, 300));
-    router.push(`/chat?${params.toString()}`);
+    setVerifyStatus("Đang khởi tạo thẩm định...");
+    let navigated = false;
+
+    streamPipelineMessage(
+      { message: preMessage, sessionId: "", ...deal },
+      (chunk, status) => { if (status === "thinking" || !status) setVerifyStatus(chunk); },
+      () => {
+        // Finished with no report → ambiguous name / non-verify answer. Hand off to
+        // chat (carrying deal params) so the user can clarify.
+        if (navigated) return;
+        const params = new URLSearchParams({ preMessage });
+        if (deal.paymentMethodSafety) params.set("dealPayment", deal.paymentMethodSafety);
+        if (deal.depositPercentage != null) params.set("dealDeposit", String(deal.depositPercentage));
+        if (deal.hasWrittenContract != null) params.set("dealContract", String(deal.hasWrittenContract));
+        if (deal.dealValueUsd != null) params.set("dealValue", String(deal.dealValueUsd));
+        router.push(`/chat?${params.toString()}`);
+      },
+      () => { setIsSearching(false); setVerifyStatus(""); toast.error("Thẩm định thất bại. Vui lòng thử lại."); },
+      (meta) => {
+        if (meta.reportId && !navigated) {
+          navigated = true;
+          router.push(`/reports/${meta.reportId}`);
+        }
+      }
+    );
   };
 
   const userInitials = (user?.fullName || user?.email || "U").split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
 
   return (
     <AuthGuard>
+      {/* ── In-place verification progress overlay ── */}
+      {isSearching && (
+        <div className="fixed inset-0 z-50 bg-[#0A1A12]/60 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-5 relative">
+              <div className="absolute inset-0 rounded-full border-4 border-[#00D26A]/15" />
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#00D26A] animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Shield className="w-6 h-6 text-[#00D26A]" />
+              </div>
+            </div>
+            <h3 className="text-lg font-extrabold text-gray-900 mb-1.5">
+              Đang thẩm định {query.trim() || "doanh nghiệp"}
+            </h3>
+            <p className="text-sm text-gray-500 min-h-[20px] mb-5">
+              {verifyStatus || "Đang phân tích 8 trụ cột..."}
+            </p>
+            <div className="flex items-center justify-center gap-1.5 mb-5">
+              {[0, 150, 300].map((d) => (
+                <span key={d} className="w-2 h-2 rounded-full bg-[#00D26A]"
+                  style={{ animation: `bounce 1.2s ${d}ms ease-in-out infinite` }} />
+              ))}
+            </div>
+            {(paymentSafety || depositSet || hasContract !== null || dealValue) && (
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#7C3AED] bg-[#F3EEFF] px-3 py-1.5 rounded-full mb-4">
+                <FileSignature className="w-3 h-3" /> Có chấm điểm Trụ cột 7
+              </div>
+            )}
+            <p className="text-[11px] text-gray-400">Quá trình có thể mất 30–60 giây — vui lòng không đóng trang.</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex h-screen overflow-hidden bg-[#FAFBFA]">
         <Sidebar active="verify" />
         <div className="flex-1 overflow-y-auto scrollbar-thin">
