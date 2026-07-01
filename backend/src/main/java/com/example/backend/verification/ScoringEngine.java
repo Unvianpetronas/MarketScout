@@ -62,6 +62,7 @@ public class ScoringEngine {
     private final CrawlerP6 crawlerP6;
     private final CrawlerP8 crawlerP8;
     private final DealSafetyAgent dealSafetyAgent;
+    private final com.example.backend.report.ReportRecommendationService recommendationService;
     private final FactExtractor factExtractor;
     private final ScoringRubricLoader rubricLoader;
     private final ReportRepository reportRepository;
@@ -99,9 +100,12 @@ public class ScoringEngine {
 
             savePillarResults(reportId, result.getPillars(), report);
 
-            // Trigger deal safety async — skip entirely on hard-stop to save a Gemini call.
+            // Trigger deal safety + AI recommendations async — both skipped on
+            // hard-stop (a sanctioned entity needs no deal advice). Generated here,
+            // right after pillars are persisted, so they reflect the final scores.
             if (!result.isHardStop()) {
                 dealSafetyAgent.analyzeAsync(reportId, result);
+                recommendationService.generateAndSaveAsync(reportId);
             }
 
             if (sseCallback != null) {
@@ -173,8 +177,7 @@ public class ScoringEngine {
         P4Data p4 = getOrSkip(p4f, input, "P4");
         P5Data p5 = getOrSkip(p5f, input, "P5");
         P8Data p8 = getOrSkip(p8f, input, "P8");
-        P7Data p7 = P7Data.builder().state(PillarData.DataState.SKIP).companyName(input.getName())
-            .errorMsg("Chưa có thông tin giao dịch từ user").fetchedAt(java.time.LocalDateTime.now()).build();
+        P7Data p7 = buildP7(input);
 
         emit(sseCallback, "scoring", "thinking", "Đang phân tích và tính điểm...");
 
@@ -225,6 +228,33 @@ public class ScoringEngine {
             } catch (Exception ignored) {}
             pillarResultRepository.save(pr);
         }
+    }
+
+    /**
+     * P7 — Deal Structure Risk. Built directly from the deal parameters the user
+     * supplied with the request (deterministic, no Gemini, no fabrication). When
+     * no deal parameters are present the pillar is SKIP/N/A and the rubric simply
+     * excludes it from the weighted overall score.
+     */
+    private P7Data buildP7(CompanyInput input) {
+        if (!input.hasDealParams()) {
+            return P7Data.builder()
+                .state(PillarData.DataState.SKIP)
+                .companyName(input.getName())
+                .errorMsg("Chưa có thông tin giao dịch từ user")
+                .fetchedAt(java.time.LocalDateTime.now())
+                .build();
+        }
+        return P7Data.builder()
+            .state(PillarData.DataState.FOUND)
+            .companyName(input.getName())
+            .depositPercentage(input.getDepositPercentage())
+            .hasWrittenContract(input.getHasWrittenContract())
+            .paymentMethodSafety(input.getPaymentMethodSafety())
+            .dealValueUsd(input.getDealValueUsd())
+            .dataSource("user_input")
+            .fetchedAt(java.time.LocalDateTime.now())
+            .build();
     }
 
     private <T extends PillarData> T getOrSkip(CompletableFuture<T> future, CompanyInput input, String label) {

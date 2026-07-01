@@ -24,31 +24,38 @@ import { LinkedinIcon, XIcon, FacebookIcon, GithubIcon } from "@/components/icon
 
 const TEAM = [
   {
-    name: "Mai Vy Nguyen",
-    role: "Co-Founder & Chief Compliance",
-    bio: "Former senior customs attorney, specialized in cross-border maritime and logistic integrity.",
-    initials: "MVN",
+    name: "Trương Quốc Tuấn",
+    role: "Founder & Fullstack Engineer",
+    bio: "Kiến trúc sư hệ thống và kỹ sư fullstack của MarketScout. Dẫn dắt toàn bộ quá trình thiết kế, phát triển và triển khai nền tảng thẩm định đối tác B2B.",
+    initials: "TQT",
     gradient: "from-emerald-400 to-teal-500",
   },
   {
-    name: "Quoc Huy Pham",
-    role: "Lead AI Architect",
-    bio: "Pioneered multi-layered NLP parsing models for complex tax and registry archives.",
-    initials: "QHP",
+    name: "Lê Vương Định",
+    role: "Backend & Frontend Engineer",
+    bio: "Phát triển các API cốt lõi và giao diện người dùng. Chuyên về tích hợp dữ liệu thương mại quốc tế và pipeline xử lý thẩm định doanh nghiệp.",
+    initials: "LVD",
     gradient: "from-blue-400 to-indigo-500",
   },
   {
-    name: "Lan Anh Tran",
-    role: "Director of Product Logistics",
-    bio: "Specialist in Supply Chain tracking, ensuring deep-tier physical verification frameworks.",
-    initials: "LAT",
+    name: "Nguyễn Đăng Mạnh",
+    role: "UI/UX Designer",
+    bio: "Thiết kế trải nghiệm người dùng cho nền tảng MarketScout. Đảm bảo giao diện trực quan, chuyên nghiệp và phù hợp với tiêu chuẩn B2B enterprise.",
+    initials: "NDM",
+    gradient: "from-violet-400 to-purple-500",
+  },
+  {
+    name: "Nguyễn Trường Huy",
+    role: "QA & Testing Engineer",
+    bio: "Đảm bảo chất lượng sản phẩm qua kiểm thử hệ thống toàn diện. Xây dựng bộ test case và quy trình QA cho các module thẩm định 8 trụ cột.",
+    initials: "NTH",
     gradient: "from-amber-400 to-orange-500",
   },
   {
-    name: "Khang Minh Duong",
-    role: "Head of Global Strategy",
-    bio: "Devised scaling strategies across bilateral B2B relations between SEA and western hubs.",
-    initials: "KMD",
+    name: "Nguyễn Anh Minh",
+    role: "Marketing Strategist",
+    bio: "Xây dựng chiến lược thương hiệu và tiếp thị cho MarketScout. Kết nối sản phẩm với cộng đồng doanh nghiệp xuất nhập khẩu tại thị trường Đông Nam Á.",
+    initials: "NAM",
     gradient: "from-rose-400 to-pink-500",
   },
 ];
@@ -271,7 +278,7 @@ export default function LandingPage() {
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">Architects Profile</h2>
           <p className="text-gray-500">The compliance officers, architects, and strategists behind MarketScout&apos;s Deep Verify™ engine.</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
           {TEAM.map((member) => (
             <div
               key={member.name}
@@ -541,7 +548,7 @@ export default function LandingPage() {
                 <li><Link href="#team" className="hover:text-white transition-colors">Our Mission &amp; Vision</Link></li>
                 <li><Link href="#team" className="hover:text-white transition-colors">Architects Profile</Link></li>
                 <li><Link href="#" className="hover:text-white transition-colors">Vietnamese Logistics Core</Link></li>
-                <li><Link href="#" className="hover:text-white transition-colors">Support Portal</Link></li>
+                <li><Link href="/support-desk" className="hover:text-white transition-colors">Support Portal</Link></li>
               </ul>
             </div>
 
@@ -573,9 +580,9 @@ export default function LandingPage() {
               </p>
             </div>
             <div className="flex items-center gap-4 shrink-0 text-xs">
-              <Link href="#" className="hover:text-white transition-colors">Terms of Service</Link>
-              <Link href="#" className="hover:text-white transition-colors">Privacy Policy</Link>
-              <Link href="#" className="hover:text-white transition-colors">Support Desk</Link>
+              <Link href="/terms-of-service" className="hover:text-white transition-colors">Terms of Service</Link>
+              <Link href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link>
+              <Link href="/support-desk" className="hover:text-white transition-colors">Support Desk</Link>
             </div>
           </div>
         </div>

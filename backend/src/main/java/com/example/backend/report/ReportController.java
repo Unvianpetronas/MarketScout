@@ -74,8 +74,17 @@ public class ReportController {
         Report report = reportRepository.findById(id)
             .filter(r -> r.getUser().getId().equals(userId))
             .orElseThrow(() -> new AppException(AppException.ErrorCode.REPORT_NOT_FOUND));
-        List<PillarResult> pillars = pillarResultRepository.findByReportIdOrderByPillarNoAsc(id);
-        String json = recommendationService.generate(report, pillars);
+
+        // Prefer the version persisted at scoring time — stable, instant, no extra
+        // Gemini call. Only generate (and cache) on-demand for older reports that
+        // predate persistence or whose generation failed.
+        String json = report.getAiRecommendations();
+        if (json == null || json.isBlank()) {
+            List<PillarResult> pillars = pillarResultRepository.findByReportIdOrderByPillarNoAsc(id);
+            json = recommendationService.generate(report, pillars);
+            report.setAiRecommendations(json);
+            reportRepository.save(report);
+        }
         return ResponseEntity.ok()
             .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
             .body(json);
