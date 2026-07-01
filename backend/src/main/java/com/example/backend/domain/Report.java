@@ -51,6 +51,12 @@ public class Report {
     @Column(name = "raw_data", columnDefinition = "text")
     private String rawData;
 
+    // AI next-step recommendations (JSON: summary/actionItems/infoToProvide/infoToVerify).
+    // Generated ONCE right after scoring and persisted here — re-opening the report
+    // reads from DB instead of calling Gemini again (stable + instant + no extra cost).
+    @Column(name = "ai_recommendations", columnDefinition = "text")
+    private String aiRecommendations;
+
     // v3: status of the report pipeline
     // PENDING | QUICK_SCANNING | DEEP_SCANNING | DONE | HARD_STOP | FAILED
     @Size(max = 20)

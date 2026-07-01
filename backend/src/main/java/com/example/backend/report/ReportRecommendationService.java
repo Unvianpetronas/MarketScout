@@ -1,15 +1,19 @@
 package com.example.backend.report;
 
 import com.example.backend.domain.PillarResult;
+import com.example.backend.domain.PillarResultRepository;
 import com.example.backend.domain.Report;
+import com.example.backend.domain.ReportRepository;
 import com.example.backend.shared.gemini.GeminiService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Generates AI-driven, customer-facing next-step recommendations for a finished
@@ -58,6 +62,30 @@ public class ReportRecommendationService {
 
     private final GeminiService geminiService;
     private final ObjectMapper objectMapper;
+    private final ReportRepository reportRepository;
+    private final PillarResultRepository pillarResultRepository;
+
+    /**
+     * Generate the recommendations ONCE and persist them on the report, off the
+     * scoring thread. Called from the pipeline right after pillars are saved so
+     * the recommendation reflects the exact final scores. Idempotent-ish: safe to
+     * call again; it just overwrites with a fresh generation.
+     */
+    @Async("scoringExecutor")
+    public void generateAndSaveAsync(UUID reportId) {
+        try {
+            Report report = reportRepository.findById(reportId).orElse(null);
+            if (report == null) return;
+            List<PillarResult> pillars = pillarResultRepository.findByReportIdOrderByPillarNoAsc(reportId);
+            String json = generate(report, pillars);
+            report.setAiRecommendations(json);
+            reportRepository.save(report);
+            log.info("ReportRecommendationService persisted recommendations for report {}", reportId);
+        } catch (Exception e) {
+            log.warn("ReportRecommendationService generateAndSaveAsync failed for report {}: {}",
+                reportId, e.getMessage());
+        }
+    }
 
     /** Returns a JSON string matching the schema in {@link #SYSTEM_PROMPT}. */
     public String generate(Report report, List<PillarResult> pillars) {

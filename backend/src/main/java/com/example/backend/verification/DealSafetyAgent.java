@@ -1,8 +1,5 @@
 package com.example.backend.verification;
 
-import com.example.backend.shared.model.crawler.P7Data;
-import com.example.backend.shared.model.crawler.PillarData;
-import com.example.backend.shared.model.input.CompanyInput;
 import com.example.backend.shared.model.scoring.ScoringResult;
 import com.example.backend.domain.ReportRepository;
 import com.example.backend.shared.gemini.GeminiService;
@@ -54,31 +51,6 @@ public class DealSafetyAgent {
         } catch (Exception e) {
             log.warn("DealSafetyAgent Gemini call failed: {}", e.getMessage());
             return buildFallbackAnalysis(result);
-        }
-    }
-
-    public P7Data analyzeDeal(CompanyInput input, String dealParams) {
-        String prompt = "Công ty: " + input.getName() + "\nThông tin giao dịch:\n" + dealParams;
-        try {
-            String analysis = geminiService.callWithSystemPrompt(SYSTEM_PROMPT, prompt);
-            String paymentSafety = analysis.toLowerCase().contains("rủi ro cao") ? "RISKY"
-                : analysis.toLowerCase().contains("an toàn") ? "SAFE" : "MODERATE";
-            return P7Data.builder()
-                .state(PillarData.DataState.FOUND)
-                .companyName(input.getName())
-                .paymentMethodSafety(paymentSafety)
-                .dealAnalysisSummary(analysis)
-                .rawText("Deal analysis: " + dealParams + "\n\nAnalysis: " + analysis)
-                .dataSource("gemini_deal_safety")
-                .fetchedAt(java.time.LocalDateTime.now())
-                .build();
-        } catch (Exception e) {
-            return P7Data.builder()
-                .state(PillarData.DataState.SKIP)
-                .companyName(input.getName())
-                .errorMsg("Deal safety analysis failed: " + e.getMessage())
-                .fetchedAt(java.time.LocalDateTime.now())
-                .build();
         }
     }
 

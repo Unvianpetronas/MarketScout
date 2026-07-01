@@ -2,10 +2,11 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 import { User } from "@/types/user";
 import { LoginRequest } from "@/types/auth";
 import { login as loginApi, logout as logoutApi, getMe } from "@/services/auth.service";
-import { setTokens, getAccessToken, clearTokens } from "@/lib/token-storage";
+import { setTokens, getAccessToken, getRefreshToken, setAccessToken, setRefreshToken, clearTokens } from "@/lib/token-storage";
 
 interface AuthContextType {
   user: User | null;
@@ -42,6 +43,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [refreshUser]);
+
+  // Proactively refresh the access token before it expires.
+  // Checks every 4 minutes and refreshes if the token expires within 2 minutes.
+  // This prevents auto-logout caused by short-lived tokens (e.g. 5-minute JWT).
+  useEffect(() => {
+    const INTERVAL_MS = 4 * 60 * 1000;
+    const THRESHOLD_MS = 2 * 60 * 1000;
+
+    const silentRefresh = async () => {
+      const token = getAccessToken();
+      if (!token) return;
+      try {
+        const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+        const payload = JSON.parse(atob(base64));
+        const expiresInMs = payload.exp * 1000 - Date.now();
+        if (expiresInMs > THRESHOLD_MS) return;
+        const rt = getRefreshToken();
+        if (!rt) return;
+        const { data } = await axios.post(
+          `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
+          { refreshToken: rt }
+        );
+        setAccessToken(data.token);
+        if (data.refreshToken) setRefreshToken(data.refreshToken);
+      } catch {
+        // Silent fail — the 401 interceptor handles the next API call
+      }
+    };
+
+    const id = setInterval(silentRefresh, INTERVAL_MS);
+    return () => clearInterval(id);
+  }, []);
 
   const login = async (data: LoginRequest, rememberMe = false) => {
     const response = await loginApi(data);
