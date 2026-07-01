@@ -119,6 +119,14 @@ function ChatContent() {
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Optional P7 deal parameters passed from /verify via URL. Consumed once, on the
+  // first send (the verification message), then cleared.
+  const dealParamsRef = useRef<{
+    depositPercentage?: number;
+    hasWrittenContract?: boolean;
+    paymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY";
+    dealValueUsd?: number;
+  } | null>(null);
 
   const userInitials = (user?.fullName || "U")
       .split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
@@ -145,6 +153,20 @@ function ChatContent() {
     const preMessage = searchParams.get("preMessage");
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing input from a URL param
     if (preMessage) setInput(decodeURIComponent(preMessage));
+
+    // Deal parameters from /verify → carried until the first send.
+    const payment = searchParams.get("dealPayment");
+    const deposit = searchParams.get("dealDeposit");
+    const contract = searchParams.get("dealContract");
+    const value = searchParams.get("dealValue");
+    if (payment || deposit || contract || value) {
+      dealParamsRef.current = {
+        paymentMethodSafety: (payment as "SAFE" | "MODERATE" | "RISKY") || undefined,
+        depositPercentage: deposit ? Number(deposit) : undefined,
+        hasWrittenContract: contract ? contract === "true" : undefined,
+        dealValueUsd: value ? Number(value) : undefined,
+      };
+    }
   }, [searchParams]);
 
   const handleNewSession = async () => {
@@ -204,8 +226,11 @@ function ChatContent() {
     reportMetaRef.current = null;
 
 
+    const dealParams = dealParamsRef.current;
+    dealParamsRef.current = null; // consume once — only the verify message carries them
+
     streamPipelineMessage(
-        { message: sentInput, sessionId: session.id, reportId },
+        { message: sentInput, sessionId: session.id, reportId, ...(dealParams ?? {}) },
         (chunk, status) => {
           // "thinking" events are progress only — show them as a transient status
           // line, never fold them into the final answer bubble.
