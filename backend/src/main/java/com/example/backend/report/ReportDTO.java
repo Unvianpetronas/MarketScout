@@ -93,11 +93,18 @@ public class ReportDTO {
         private String sessionId;
         private UUID reportId;   // nullable — null = global chatbox, set = viewing specific report
 
-        // P7 — Deal Structure Risk (optional). When present on a VERIFY_PARTNER
-        // request, the P7 pillar is scored; otherwise P7 stays N/A.
+        // Self-reported "Thông tin giao dịch" from the pre-scan form (optional).
+        // Written straight to Report.selfReport* columns — reference only, NEVER
+        // fed into scoring (see CompanyInput's note on why).
         private Integer depositPercentage;
         private Boolean hasWrittenContract;
         private String  paymentMethodSafety; // SAFE | MODERATE | RISKY
         private Double  dealValueUsd;
+
+        // A contract already uploaded/picked in the library (before this report even
+        // exists — see ContractPickerModal on the pre-scan page). If set, it's
+        // linked + cross-checked against the newly created report right before
+        // scoring runs, so P7 is scored for real on the very first pass.
+        private UUID contractId;
     }
 }

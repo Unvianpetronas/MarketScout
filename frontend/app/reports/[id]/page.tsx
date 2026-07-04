@@ -13,7 +13,7 @@ import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
 import { ContractPickerModal } from "@/components/contract/ContractPickerModal";
 import { getReport, getReportRecommendations, patchDealInfo } from "@/services/report.service";
-import { getContract, unlinkContract } from "@/services/contract.service";
+import { getContract, unlinkContract, listContractLinks } from "@/services/contract.service";
 import { VerificationReport, PillarResult, ReportRecommendations } from "@/types/report";
 import { LinkResponse, ContractSummary } from "@/types/contract";
 
@@ -264,6 +264,26 @@ function TransactionInfoCard({
   }, [report.p7VerifiedContractId]);
 
   const verifiedFileName = verifiedContract && verifiedContract.id === report.p7VerifiedContractId ? verifiedContract.fileName : null;
+
+  // A contract can be attached from the pre-scan form (/verify) too, before this
+  // component ever mounts — if it mismatched there, nothing else would surface
+  // that. Without this, "no contract attached" and "attached but mismatched"
+  // look identical (P7 = N/A either way), which is confusing.
+  useEffect(() => {
+    if (report.p7VerifiedContractId) return;
+    let cancelled = false;
+    listContractLinks(report.id).then((links) => {
+      if (cancelled || links.length === 0) return;
+      const latest = links[0];
+      if (latest.verificationStatus === "MISMATCH") {
+        setStatusMessage({
+          type: "mismatch",
+          text: `⚠ Hợp đồng "${latest.fileName}" không khớp với ${report.entityName} — dữ liệu chỉ mang tính tham khảo, không ảnh hưởng điểm`,
+        });
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [report.id, report.p7VerifiedContractId, report.entityName]);
 
   const saveSelfReport = async (hasWrittenContract: boolean | null) => {
     setSaving(true);

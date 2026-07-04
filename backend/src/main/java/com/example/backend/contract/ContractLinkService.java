@@ -38,6 +38,35 @@ public class ContractLinkService {
 
     @Transactional
     public ContractDTO.LinkResponse link(UUID reportId, UUID contractId, UUID userId) {
+        AssessmentContractLink link = performCrossCheckAndLink(reportId, contractId, userId);
+        var recompute = scoringEngine.recomputeP7(reportId);
+        log.info("Contract linked — report={} contract={} status={}", reportId, contractId, link.getVerificationStatus());
+
+        return ContractDTO.LinkResponse.builder()
+                .contractId(contractId).reportId(reportId)
+                .verificationStatus(link.getVerificationStatus())
+                .matchDetails(parseOverrides(link.getMatchDetails()))
+                .newOverallScore(recompute.overallScore())
+                .newP7Score(recompute.p7Score())
+                .build();
+    }
+
+    /**
+     * Same cross-check as {@link #link}, but for a report that hasn't been
+     * scored yet at all (no PillarResult rows exist) — used when a contract is
+     * picked on the pre-scan form, before the pipeline has ever run. Skips
+     * recomputeP7 (nothing to recompute) — the upcoming first pipeline run
+     * already resolves the just-linked contract via ContractP7Mapper, so P7
+     * is scored for real on that very first pass.
+     */
+    @Transactional
+    public void linkBeforeScoring(UUID reportId, UUID contractId, UUID userId) {
+        AssessmentContractLink link = performCrossCheckAndLink(reportId, contractId, userId);
+        log.info("Contract pre-linked before first scan — report={} contract={} status={}",
+                reportId, contractId, link.getVerificationStatus());
+    }
+
+    private AssessmentContractLink performCrossCheckAndLink(UUID reportId, UUID contractId, UUID userId) {
         Report report = requireOwnedReport(reportId, userId);
         Contract contract = contractService.requireOwned(contractId, userId);
 
@@ -51,25 +80,26 @@ public class ContractLinkService {
         link.setMatchDetails(toJson(check.matchDetails()));
         link.setVerifiedAt(check.matched() ? Instant.now() : null);
         if (link.getFieldOverrides() == null) link.setFieldOverrides("{}");
-        linkRepository.save(link);
+        link = linkRepository.save(link);
 
         report.setP7VerifiedContract(check.matched() ? contract : null);
         reportRepository.save(report);
-
-        var recompute = scoringEngine.recomputeP7(reportId);
-        log.info("Contract linked — report={} contract={} status={}", reportId, contractId, link.getVerificationStatus());
-
-        return ContractDTO.LinkResponse.builder()
-                .contractId(contractId).reportId(reportId)
-                .verificationStatus(link.getVerificationStatus())
-                .matchDetails(check.matchDetails())
-                .newOverallScore(recompute.overallScore())
-                .newP7Score(recompute.p7Score())
-                .build();
+        return link;
     }
+
+    // Only these fields are ever read for scoring (see ContractP7Mapper) — reject
+    // anything else so field_overrides can't accumulate arbitrary junk, and so a
+    // null/blank field name (which Jackson would refuse to serialize as a Map
+    // key, throwing on every future read of this link) can never be persisted.
+    private static final java.util.Set<String> OVERRIDABLE_FIELDS = java.util.Set.of(
+            "incoterms", "depositPercent", "paymentMethod", "hasArbitrationClause",
+            "signatoryName", "signatoryTaxId");
 
     @Transactional
     public ContractDTO.LinkResponse updateFieldOverride(UUID reportId, UUID contractId, String field, Object value, UUID userId) {
+        if (field == null || field.isBlank() || !OVERRIDABLE_FIELDS.contains(field)) {
+            throw new AppException(AppException.ErrorCode.BAD_REQUEST, "Tên trường không hợp lệ.");
+        }
         requireOwnedReport(reportId, userId);
         contractService.requireOwned(contractId, userId);
         AssessmentContractLink link = requireLink(reportId, contractId);
@@ -94,6 +124,26 @@ public class ContractLinkService {
                 .newOverallScore(recompute.overallScore())
                 .newP7Score(recompute.p7Score())
                 .build();
+    }
+
+    /**
+     * All contract links ever attempted for this report, most recent first —
+     * including MISMATCH ones. Lets the report page tell "no contract was ever
+     * attached" apart from "a contract was attached but didn't match", which
+     * otherwise look identical (P7 = N/A either way).
+     */
+    @Transactional(readOnly = true)
+    public java.util.List<ContractDTO.LinkSummary> listLinks(UUID reportId, UUID userId) {
+        requireOwnedReport(reportId, userId);
+        return linkRepository.findByReport_Id(reportId).stream()
+                .sorted((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()))
+                .map(link -> ContractDTO.LinkSummary.builder()
+                        .contractId(link.getContract().getId())
+                        .fileName(link.getContract().getFileName())
+                        .verificationStatus(link.getVerificationStatus())
+                        .createdAt(link.getCreatedAt())
+                        .build())
+                .toList();
     }
 
     @Transactional
@@ -132,9 +182,16 @@ public class ContractLinkService {
             taxIdMatch = reportTaxId.equals(contractTaxId);
             matchedAgainst = "P1_TAX_ID";
         } else if (extractedName != null && report.getEntityName() != null) {
+            // No tax ID on one/both sides — this is the ONLY signal for every
+            // non-Vietnamese report (report.taxId is only ever populated for
+            // MST_VN registrations; international companies always land here).
+            // A naive substring check would let a short/generic normalized name
+            // "match" almost anything, so require a minimum meaningful length
+            // before allowing containment, not just any raw substring hit.
             String a = normalizeName(extractedName);
             String b = normalizeName(report.getEntityName());
-            nameMatch = !a.isBlank() && !b.isBlank() && (a.contains(b) || b.contains(a));
+            int minLen = Math.min(a.length(), b.length());
+            nameMatch = !a.isBlank() && !b.isBlank() && minLen >= 6 && (a.equals(b) || a.contains(b) || b.contains(a));
             matchedAgainst = "P1_NAME_FALLBACK";
         }
 
