@@ -6,12 +6,13 @@ import {
   Search, Globe, CheckCircle2, Clock, XCircle, Zap, Shield,
   HelpCircle, ChevronRight, AlertTriangle, Building2, ExternalLink,
   MapPin, Star, ChevronDown, ShieldCheck, ShieldAlert, Percent,
-  FileSignature, DollarSign, Sparkles
+  FileSignature, DollarSign, Sparkles, FileText, X as XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
+import { ContractPickerModal } from "@/components/contract/ContractPickerModal";
 import { getMyQuota } from "@/services/quota.service";
 import { QuotaStatus } from "@/types/quota";
 import { getReports } from "@/services/report.service";
@@ -98,15 +99,22 @@ function VerifyContent() {
   const [inputFocused, setInputFocused] = useState(false);
 
   // ── P7 — Deal Structure Risk (optional) ──────────────────────────────────
+  // Self-report fields below are reference-only (never scored — see
+  // CompanyInput's note on the backend). Only pickedContract (a real, uploaded
+  // contract) can actually move the P7 score, via cross-check after the
+  // report is created.
   const [showDeal, setShowDeal] = useState(false);
   const [paymentSafety, setPaymentSafety] = useState<"" | "SAFE" | "MODERATE" | "RISKY">("");
   const [deposit, setDeposit] = useState(30);
   const [depositSet, setDepositSet] = useState(false);
   const [hasContract, setHasContract] = useState<null | boolean>(null);
   const [dealValue, setDealValue] = useState("");
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [pickedContract, setPickedContract] = useState<{ id: string; fileName: string } | null>(null);
 
   const dealFilledCount =
-    (paymentSafety ? 1 : 0) + (depositSet ? 1 : 0) + (hasContract !== null ? 1 : 0) + (dealValue ? 1 : 0);
+    (paymentSafety ? 1 : 0) + (depositSet ? 1 : 0) + (hasContract !== null ? 1 : 0)
+    + (dealValue ? 1 : 0) + (pickedContract ? 1 : 0);
 
   useEffect(() => {
     getMyQuota().then(setQuota).catch(() => null);
@@ -132,15 +140,19 @@ function VerifyContent() {
       ? `Verify company "${q}" in ${countryName}. Run full background check and 8-pillar analysis.`
       : `Verify company "${q}". Run full background check and 8-pillar analysis.`;
 
-    // Optional P7 deal parameters — only include what the user actually set.
+    // Self-report deal fields — reference only, saved to Report.selfReport*,
+    // never scored. contractId is the only thing that can actually move P7 —
+    // it gets cross-checked against the new report right after it's created.
     const deal: {
       depositPercentage?: number; hasWrittenContract?: boolean;
       paymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY"; dealValueUsd?: number;
+      contractId?: string;
     } = {};
     if (paymentSafety) deal.paymentMethodSafety = paymentSafety;
     if (depositSet) deal.depositPercentage = deposit;
     if (hasContract !== null) deal.hasWrittenContract = hasContract;
     if (dealValue.trim()) deal.dealValueUsd = Number(dealValue.trim());
+    if (pickedContract) deal.contractId = pickedContract.id;
 
     // Run the verification IN PLACE (no chat detour) so the deal params reach the
     // pipeline directly and P7 is scored. Redirect to the report when it's ready.
@@ -199,14 +211,25 @@ function VerifyContent() {
                   style={{ animation: `bounce 1.2s ${d}ms ease-in-out infinite` }} />
               ))}
             </div>
-            {(paymentSafety || depositSet || hasContract !== null || dealValue) && (
+            {pickedContract && (
               <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#7C3AED] bg-[#F3EEFF] px-3 py-1.5 rounded-full mb-4">
-                <FileSignature className="w-3 h-3" /> Có chấm điểm Trụ cột 7
+                <FileSignature className="w-3 h-3" /> Đang đối chiếu hợp đồng cho Trụ cột 7
               </div>
             )}
             <p className="text-[11px] text-gray-400">Quá trình có thể mất 30–60 giây — vui lòng không đóng trang.</p>
           </div>
         </div>
+      )}
+
+      {showContractModal && (
+        <ContractPickerModal
+          onClose={() => setShowContractModal(false)}
+          onSelected={(contractId, fileName) => {
+            setPickedContract({ id: contractId, fileName });
+            setHasContract(true);
+            setShowContractModal(false);
+          }}
+        />
       )}
 
       <div className="flex h-screen overflow-hidden bg-[#FAFBFA]">
@@ -388,43 +411,69 @@ function VerifyContent() {
                       </div>
                     </div>
 
-                    {/* Written contract toggle */}
-                    <div className="flex items-center justify-between gap-4 bg-gray-50 rounded-xl px-4 py-3">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <FileSignature className="w-4 h-4 text-gray-400 shrink-0" />
-                        <div>
-                          <p className="text-xs font-bold text-gray-700">Đã có hợp đồng thành văn?</p>
-                          <p className="text-[11px] text-gray-400">Hợp đồng đầy đủ điều khoản, đã ký kết</p>
+                    {/* Written contract — pick/upload a real contract, or self-report only */}
+                    <div className="bg-gray-50 rounded-xl px-4 py-3">
+                      {pickedContract ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <FileText className="w-4 h-4 text-[#00843F] shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-gray-700 truncate">{pickedContract.fileName}</p>
+                              <p className="text-[11px] text-emerald-600">
+                                Sẽ được đối chiếu với đối tác sau khi thẩm định xong
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button type="button" onClick={() => setShowContractModal(true)}
+                              className="text-xs font-semibold text-gray-500 hover:text-gray-700">
+                              Đổi
+                            </button>
+                            <button type="button" onClick={() => setPickedContract(null)}
+                              className="text-gray-300 hover:text-gray-500">
+                              <XIcon className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex gap-1.5 shrink-0">
-                        {([
-                          { v: true, label: "Có" },
-                          { v: false, label: "Chưa" },
-                        ] as const).map(({ v, label }) => {
-                          const active = hasContract === v;
-                          return (
+                      ) : (
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <FileSignature className="w-4 h-4 text-gray-400 shrink-0" />
+                            <div>
+                              <p className="text-xs font-bold text-gray-700">Đã có hợp đồng thành văn?</p>
+                              <p className="text-[11px] text-gray-400">Chỉ hợp đồng thật, đã tải lên và khớp đối tác mới được tính điểm</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-1.5 shrink-0">
                             <button
-                              key={label}
                               type="button"
-                              onClick={() => setHasContract(active ? null : v)}
+                              onClick={() => setShowContractModal(true)}
+                              className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all border bg-white text-gray-400 border-gray-200 hover:border-[#00D26A] hover:text-[#00843F]"
+                            >
+                              Có
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setHasContract(hasContract === false ? null : false)}
                               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all border ${
-                                active
-                                  ? v ? "bg-[#E6F9F0] text-[#00843F] border-[#00D26A]" : "bg-amber-50 text-amber-700 border-amber-300"
+                                hasContract === false
+                                  ? "bg-amber-50 text-amber-700 border-amber-300"
                                   : "bg-white text-gray-400 border-gray-200 hover:border-gray-300"
                               }`}
                             >
-                              {label}
+                              Chưa
                             </button>
-                          );
-                        })}
-                      </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-start gap-2 text-[11px] text-gray-400 leading-relaxed">
                       <Sparkles className="w-3.5 h-3.5 text-[#7C3AED] shrink-0 mt-0.5" />
                       <span>
-                        Thông tin giao dịch giúp AI chấm điểm chính xác Trụ cột 7. Bỏ trống cũng không sao — trụ cột sẽ hiển thị <span className="font-semibold">N/A</span> và không ảnh hưởng điểm tổng.
+                        Các trường trên chỉ mang tính tham khảo. Riêng Trụ cột 7 chỉ thật sự được tính điểm khi có hợp đồng
+                        đã tải lên và <span className="font-semibold">khớp với đối tác đang thẩm định</span> — bỏ trống cũng
+                        không sao, trụ cột sẽ hiển thị <span className="font-semibold">N/A</span> và không ảnh hưởng điểm tổng.
                       </span>
                     </div>
                   </div>
@@ -437,7 +486,7 @@ function VerifyContent() {
                 <div>
                   <p className="text-sm font-semibold text-blue-800 mb-0.5">Quy trình thẩm định AI</p>
                   <p className="text-xs text-blue-600 leading-relaxed">
-                    Sau khi nhấn "Thẩm định", AI sẽ thu thập dữ liệu từ 50+ nguồn và phân tích 8 trụ cột: Pháp lý, Tài chính, Tuân thủ, Uy tín, Hoạt động, Nhân sự, Kỹ thuật số, và Thương mại quốc tế.
+                    Sau khi nhấn &quot;Thẩm định&quot;, AI sẽ thu thập dữ liệu từ 50+ nguồn và phân tích 8 trụ cột: Pháp lý, Tài chính, Tuân thủ, Uy tín, Hoạt động, Nhân sự, Kỹ thuật số, và Thương mại quốc tế.
                     Kết quả sẽ hiển thị trong vài phút.
                   </p>
                 </div>

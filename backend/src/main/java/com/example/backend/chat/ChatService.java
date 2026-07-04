@@ -13,6 +13,7 @@ import com.example.backend.shared.model.scoring.ScoringResult;
 import com.example.backend.partners.FindPartnersService;
 import com.example.backend.partners.QuickScanService;
 import com.example.backend.chat.IntentDetector;
+import com.example.backend.contract.ContractLinkService;
 import com.example.backend.verification.DealSafetyAgent;
 import com.example.backend.verification.ScoringEngine;
 import com.example.backend.shared.gemini.GeminiService;
@@ -51,6 +52,7 @@ public class ChatService {
     private final QuickScanService       quickScanService;
     private final ScoringEngine          scoringEngine;
     private final DealSafetyAgent        dealSafetyAgent;
+    private final ContractLinkService    contractLinkService;
     private final CompanyResolverService companyResolverService;
     private final ObjectMapper           objectMapper;
 
@@ -353,11 +355,6 @@ public class ChatService {
             .companyName(effectiveName)
             .country(country)
             .taxId(intent.getTaxId())
-            // P7 deal parameters (optional) — when present, the P7 pillar is scored.
-            .depositPercentage(req.getDepositPercentage())
-            .hasWrittenContract(req.getHasWrittenContract())
-            .paymentMethodSafety(req.getPaymentMethodSafety())
-            .dealValueUsd(req.getDealValueUsd())
             .build();
 
         // Create report record
@@ -374,6 +371,36 @@ public class ChatService {
         report.setUpdatedAt(Instant.now());
         report = reportRepo.save(report);
         final UUID reportId = report.getId();
+
+        // Self-reported "Thông tin giao dịch" from the pre-scan form — reference
+        // only, written straight to the report row, NEVER passed into CompanyInput/
+        // scoring (see CompanyInput's note on why self-report can't be trusted).
+        boolean hasSelfReport = req.getDepositPercentage() != null || req.getHasWrittenContract() != null
+            || (req.getPaymentMethodSafety() != null && !req.getPaymentMethodSafety().isBlank())
+            || req.getDealValueUsd() != null;
+        if (hasSelfReport) {
+            report.setSelfReportDepositPercentage(req.getDepositPercentage() != null
+                ? req.getDepositPercentage().shortValue() : null);
+            report.setSelfReportHasWrittenContract(req.getHasWrittenContract());
+            report.setSelfReportPaymentMethodSafety(req.getPaymentMethodSafety());
+            report.setSelfReportDealValueUsd(req.getDealValueUsd() != null
+                ? java.math.BigDecimal.valueOf(req.getDealValueUsd()) : null);
+            report = reportRepo.save(report);
+        }
+
+        // A contract already picked/uploaded in the library (before this report
+        // existed) — link + cross-check it now, right before scoring runs, so the
+        // very first pipeline pass already sees a real, verified P7 contract via
+        // ContractP7Mapper. Best-effort: a bad/foreign contractId must not block
+        // the verification itself.
+        if (req.getContractId() != null) {
+            try {
+                contractLinkService.linkBeforeScoring(reportId, req.getContractId(), userId);
+            } catch (Exception e) {
+                log.warn("Failed to pre-link contract {} to new report {}: {}",
+                    req.getContractId(), reportId, e.getMessage());
+            }
+        }
 
         sendEvent(emitter, AgentEvent.thinking("manager", "Bắt đầu thẩm định " + input.getCompanyName() + " | Report ID: " + reportId));
 

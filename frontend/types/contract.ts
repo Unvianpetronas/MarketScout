@@ -31,3 +31,12 @@ export interface LinkResponse {
   newOverallScore: number;
   newP7Score: number | null;
 }
+
+// One link attempt for a report — including MISMATCH ones, so the report page
+// can tell "no contract attached" apart from "attached but didn't match".
+export interface LinkSummary {
+  contractId: string;
+  fileName: string;
+  verificationStatus: VerificationStatus;
+  createdAt: string;
+}

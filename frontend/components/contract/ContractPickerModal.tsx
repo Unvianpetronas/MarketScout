@@ -11,9 +11,15 @@ import {
 import { ContractDetail, ContractSummary, ExtractedField, LinkResponse } from "@/types/contract";
 
 interface Props {
-  reportId: string;
+  // Omit reportId when picking a contract BEFORE a report exists (pre-scan form
+  // on /verify) — in that mode we only select a contract (no link/cross-check
+  // yet, since there's nothing to check against) and hand its id back via
+  // onSelected; the caller sends it along with the verify request and the
+  // backend links+cross-checks it right after the report is created.
+  reportId?: string;
   onClose: () => void;
-  onLinked: (result: LinkResponse, contract: ContractSummary) => void;
+  onLinked?: (result: LinkResponse, contract: ContractSummary) => void;
+  onSelected?: (contractId: string, fileName: string) => void;
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -31,7 +37,7 @@ function fieldValueToInput(v: ExtractedField["value"]): string {
   return String(v);
 }
 
-export function ContractPickerModal({ reportId, onClose, onLinked }: Props) {
+export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }: Props) {
   const [tab, setTab] = useState<"existing" | "upload">("existing");
 
   // ── Tab: existing ──
@@ -67,11 +73,16 @@ export function ContractPickerModal({ reportId, onClose, onLinked }: Props) {
   };
 
   const chooseExisting = async (contractId: string) => {
+    const contract = contracts?.find((c) => c.id === contractId);
+    if (!contract) return;
+    if (!reportId) {
+      onSelected?.(contractId, contract.fileName);
+      return;
+    }
     setLinkingId(contractId);
     try {
       const result = await linkContract(reportId, contractId);
-      const contract = contracts?.find((c) => c.id === contractId);
-      if (contract) onLinked(result, contract);
+      onLinked?.(result, contract);
     } catch {
       toast.error("Không thể liên kết hợp đồng này. Vui lòng thử lại.");
     } finally {
@@ -117,13 +128,17 @@ export function ContractPickerModal({ reportId, onClose, onLinked }: Props) {
 
   const confirmUse = async () => {
     if (!uploaded) return;
+    if (!reportId) {
+      onSelected?.(uploaded.id, uploaded.fileName);
+      return;
+    }
     setConfirming(true);
     try {
       let result = await linkContract(reportId, uploaded.id);
       for (const [field, value] of Object.entries(edited)) {
         result = await updateFieldOverride(reportId, uploaded.id, field, value);
       }
-      onLinked(result, uploaded);
+      onLinked?.(result, uploaded);
     } catch {
       toast.error("Không thể xác nhận hợp đồng này. Vui lòng thử lại.");
     } finally {
@@ -304,7 +319,8 @@ export function ContractPickerModal({ reportId, onClose, onLinked }: Props) {
                         <input
                           value={edited[field] ?? fieldValueToInput(data.value)}
                           onChange={(e) => setEdited((prev) => ({ ...prev, [field]: e.target.value }))}
-                          className="flex-1 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#00D26A]/30"
+                          disabled={!reportId}
+                          className="flex-1 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#00D26A]/30 disabled:bg-gray-50 disabled:text-gray-400"
                         />
                         {data.confidence != null && (
                           <span className="text-[11px] text-gray-400 shrink-0 w-10 text-right">
@@ -317,7 +333,9 @@ export function ContractPickerModal({ reportId, onClose, onLinked }: Props) {
                   <div className="flex items-start gap-2 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
                     <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-700">
-                      Sửa trường nào sẽ khiến trường đó không còn được tính là &quot;đã xác minh&quot;.
+                      {reportId
+                        ? "Sửa trường nào sẽ khiến trường đó không còn được tính là “đã xác minh”."
+                        : "Có thể chỉnh sửa các trường này trên trang báo cáo sau khi thẩm định xong."}
                     </p>
                   </div>
                   <div className="flex justify-end gap-2 mt-5">

@@ -10,4 +10,6 @@ public interface ContractRepository extends JpaRepository<Contract, UUID> {
     List<Contract> findByUser_IdOrderByUploadedAtDesc(UUID userId);
 
     List<Contract> findByUser_IdAndFileNameContainingIgnoreCaseOrderByUploadedAtDesc(UUID userId, String search);
+
+    long countByUser_Id(UUID userId);
 }

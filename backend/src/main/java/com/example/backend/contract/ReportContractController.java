@@ -17,6 +17,14 @@ public class ReportContractController {
     private final ContractLinkService contractLinkService;
     private final JwtService jwtService;
 
+    @GetMapping
+    public ResponseEntity<java.util.List<ContractDTO.LinkSummary>> listLinks(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable UUID reportId) {
+        UUID userId = extractUserId(authHeader);
+        return ResponseEntity.ok(contractLinkService.listLinks(reportId, userId));
+    }
+
     @PostMapping("/{contractId}/link")
     public ResponseEntity<ContractDTO.LinkResponse> link(
             @RequestHeader("Authorization") String authHeader,
