@@ -105,6 +105,26 @@ public class Report {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    // ── Self-reported "Thông tin giao dịch" (P7) — reference only, never
+    // read by scoring. Only a currently-VERIFIED linked contract feeds P7. ──
+    @Size(max = 10)
+    @Column(name = "self_report_payment_method_safety", length = 10)
+    private String selfReportPaymentMethodSafety;
+
+    @Column(name = "self_report_deposit_percentage")
+    private Short selfReportDepositPercentage;
+
+    @Column(name = "self_report_deal_value_usd")
+    private java.math.BigDecimal selfReportDealValueUsd;
+
+    @Column(name = "self_report_has_written_contract")
+    private Boolean selfReportHasWrittenContract;
+
+    /** The contract link currently authoritative for this report's P7 score, or null if unverified/unlinked. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "p7_verified_contract_id")
+    private Contract p7VerifiedContract;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) createdAt = Instant.now();

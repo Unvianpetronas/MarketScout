@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,4 +29,7 @@ public interface VietqrPaymentRepository extends JpaRepository<VietqrPayment, UU
 
     @Query("SELECT v FROM VietqrPayment v WHERE v.status = :status AND v.expiresAt < :now")
     List<VietqrPayment> findExpired(@Param("status") String status, @Param("now") Instant now);
+
+    /** Reconciliation poller: open (or recently expired) orders that may already be paid. */
+    List<VietqrPayment> findByStatusInAndCreatedAtAfter(Collection<String> statuses, Instant createdAfter);
 }

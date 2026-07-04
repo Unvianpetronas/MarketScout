@@ -131,6 +131,31 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
     return stopTimers;
   }, [order, status, stopTimers, t, refreshUser]);
 
+  // Late-payment grace: the backend honors transfers that land after QR expiry
+  // (and reconciles missed webhooks), so keep checking for a few minutes after
+  // the countdown ends instead of declaring the order dead immediately.
+  useEffect(() => {
+    if (!order || status !== "expired") return;
+    let attempts = 0;
+    const id = setInterval(async () => {
+      if (++attempts > 24) { clearInterval(id); return; } // ~4 minutes
+      try {
+        const s = await getTopupStatus(order.invoiceId);
+        if (s.status === "paid") {
+          clearInterval(id);
+          setStatus("paid");
+          setRedirectIn(6);
+          toast.success(t("checkout.paidToast"));
+          await refreshUser().catch(() => undefined);
+          await getMyQuota().catch(() => undefined);
+        }
+      } catch {
+        /* transient error — keep checking */
+      }
+    }, 10000);
+    return () => clearInterval(id);
+  }, [order, status, refreshUser, t]);
+
   // Once paid, count down and auto-redirect to the dashboard.
   useEffect(() => {
     if (status !== "paid") return;

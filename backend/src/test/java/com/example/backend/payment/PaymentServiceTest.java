@@ -135,7 +135,6 @@ class PaymentServiceTest {
         qr.setExpiresAt(Instant.now().plusSeconds(600));
         when(invoiceRepository.findById(INVOICE_ID)).thenReturn(Optional.of(invoice));
         when(vietqrRepository.findByInvoice_Id(INVOICE_ID)).thenReturn(Optional.of(qr));
-        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(owner));
 
         PaymentDTO.StatusResponse resp = service.getStatus(INVOICE_ID, USER_ID);
         assertThat(resp.getStatus()).isEqualTo("paid");
@@ -186,7 +185,7 @@ class PaymentServiceTest {
         verify(billingEventRepository).save(any(BillingEvent.class));
         verify(paymentEmailService).sendInvoiceEmail(
                 eq("buyer@example.com"), eq("Test Buyer"), eq("INV-1"),
-                eq(3), any(), eq(CODE), eq("999"), any());
+                isNull(), eq(3), any(), eq(CODE), eq("999"), any());
     }
 
     @Test
@@ -215,16 +214,50 @@ class PaymentServiceTest {
     }
 
     @Test
-    void webhook_expired_doesNotFulfill() {
+    void webhook_afterExpiry_stillHonoredBecauseMoneyArrived() {
         VietqrPayment qr = pendingQr(new BigDecimal("600000"));
         qr.setExpiresAt(Instant.now().minusSeconds(60));
         when(vietqrRepository.findByTransferContentForUpdate(CODE)).thenReturn(Optional.of(qr));
+        PaymentTransaction tx = new PaymentTransaction();
+        tx.setId(TX_ID);
+        tx.setStatus("expired");
+        when(transactionRepository.findByInvoice_Id(INVOICE_ID)).thenReturn(Optional.of(tx));
+        QuotaTopup topup = new QuotaTopup();
+        topup.setUser(qr.getInvoice().getUser());
+        topup.setQuotaAdded(3);
+        topup.setPriceVnd(new BigDecimal("600000"));
+        topup.setStatus("expired");
+        when(topupRepository.findByTransaction_Id(TX_ID)).thenReturn(Optional.of(topup));
 
         PaymentService.WebhookResult result =
                 service.processWebhook(webhook("in", "0123456789", CODE, new BigDecimal("600000")));
 
-        assertThat(result).isEqualTo(PaymentService.WebhookResult.EXPIRED);
-        verify(usersRepository, never()).addQuota(any(), anyInt());
+        assertThat(result).isEqualTo(PaymentService.WebhookResult.CONFIRMED);
+        assertThat(qr.getStatus()).isEqualTo("paid");
+        verify(usersRepository).addQuota(USER_ID, 3);
+    }
+
+    @Test
+    void webhook_overpayment_isAccepted() {
+        VietqrPayment qr = pendingQr(new BigDecimal("600000"));
+        when(vietqrRepository.findByTransferContentForUpdate(CODE)).thenReturn(Optional.of(qr));
+        PaymentTransaction tx = new PaymentTransaction();
+        tx.setId(TX_ID);
+        tx.setStatus("pending");
+        when(transactionRepository.findByInvoice_Id(INVOICE_ID)).thenReturn(Optional.of(tx));
+        QuotaTopup topup = new QuotaTopup();
+        topup.setUser(qr.getInvoice().getUser());
+        topup.setQuotaAdded(3);
+        topup.setPriceVnd(new BigDecimal("600000"));
+        topup.setStatus("pending");
+        when(topupRepository.findByTransaction_Id(TX_ID)).thenReturn(Optional.of(topup));
+
+        PaymentService.WebhookResult result =
+                service.processWebhook(webhook("in", "0123456789", CODE, new BigDecimal("650000")));
+
+        assertThat(result).isEqualTo(PaymentService.WebhookResult.CONFIRMED);
+        assertThat(qr.getInvoice().getAmountPaidVnd()).isEqualByComparingTo("650000");
+        verify(usersRepository).addQuota(USER_ID, 3);
     }
 
     @Test
@@ -320,6 +353,41 @@ class PaymentServiceTest {
         assertThat(userCap.getValue().getQuotaRemaining()).isEqualTo(15);
         verify(subscriptionRepository).save(any(Subscription.class));
         verify(usersRepository, never()).addQuota(any(), anyInt());
+        verify(paymentEmailService).sendInvoiceEmail(
+                eq("buyer@example.com"), eq("Test Buyer"), eq("INV-1"),
+                eq("starter"), eq(15), any(), eq(CODE), eq("999"), any());
+    }
+
+    @Test
+    void webhook_planPurchase_cancelsPreviousActiveSubscription() {
+        VietqrPayment qr = pendingQr(new BigDecimal("2000000"));
+        when(vietqrRepository.findByTransferContentForUpdate(CODE)).thenReturn(Optional.of(qr));
+        PaymentTransaction tx = new PaymentTransaction();
+        tx.setId(TX_ID);
+        tx.setStatus("pending");
+        when(transactionRepository.findByInvoice_Id(INVOICE_ID)).thenReturn(Optional.of(tx));
+        when(topupRepository.findByTransaction_Id(TX_ID)).thenReturn(Optional.empty());
+        Plan plan = new Plan();
+        plan.setId(2);
+        plan.setName("pro");
+        plan.setMonthlyQuota(50);
+        plan.setBillingCycle("monthly");
+        PlanPurchase pp = new PlanPurchase();
+        pp.setUser(qr.getInvoice().getUser());
+        pp.setPlan(plan);
+        pp.setPriceVnd(new BigDecimal("2000000"));
+        pp.setStatus("pending");
+        when(planPurchaseRepository.findByTransaction_Id(TX_ID)).thenReturn(Optional.of(pp));
+
+        Subscription oldSub = Subscription.builder().status("active").build();
+        when(subscriptionRepository.findByUser_IdAndStatus(USER_ID, "active"))
+                .thenReturn(java.util.List.of(oldSub));
+
+        service.processWebhook(webhook("in", "0123456789", CODE, new BigDecimal("2000000")));
+
+        assertThat(oldSub.getStatus()).isEqualTo("canceled");
+        assertThat(oldSub.getCancelAt()).isNotNull();
+        verify(subscriptionRepository).saveAll(java.util.List.of(oldSub));
     }
 
     // ── helpers ────────────────────────────────────────────────────────

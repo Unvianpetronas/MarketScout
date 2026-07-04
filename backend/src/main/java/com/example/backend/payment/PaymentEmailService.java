@@ -30,24 +30,47 @@ public class PaymentEmailService {
 
     private final MailService mailService;
 
+    /**
+     * @param planName plan bought with this payment, or {@code null} for a
+     *                 pay-as-you-go credit top-up — switches the email copy.
+     */
     @Async
     public void sendInvoiceEmail(String toEmail, String customerName, String invoiceNo,
-                                 int quantity, BigDecimal amountVnd, String transferContent,
-                                 String sepayRef, Instant paidAt) {
+                                 String planName, int quantity, BigDecimal amountVnd,
+                                 String transferContent, String sepayRef, Instant paidAt) {
         if (toEmail == null || toEmail.isBlank()) return;
         String subject = "Your MarketScout receipt — invoice " + invoiceNo;
-        String html = buildHtml(customerName, invoiceNo, quantity, amountVnd, transferContent, sepayRef, paidAt);
-        boolean ok = mailService.send(toEmail, subject, html);
-        log.info("Invoice email to {} for invoice {} — sent={}", toEmail, invoiceNo, ok);
+        try {
+            String html = buildHtml(customerName, invoiceNo, planName, quantity, amountVnd,
+                    transferContent, sepayRef, paidAt);
+            boolean ok = mailService.send(toEmail, subject, html);
+            log.info("Invoice email to {} for invoice {} — sent={}", toEmail, invoiceNo, ok);
+        } catch (Exception e) {
+            // @Async — an escaped exception would vanish into the void executor-side.
+            log.error("Failed to build/send invoice email to {} for invoice {}: {}",
+                    toEmail, invoiceNo, e.getMessage(), e);
+        }
     }
 
-    private String buildHtml(String customerName, String invoiceNo, int quantity, BigDecimal amountVnd,
-                             String transferContent, String sepayRef, Instant paidAt) {
+    private String buildHtml(String customerName, String invoiceNo, String planName, int quantity,
+                             BigDecimal amountVnd, String transferContent, String sepayRef, Instant paidAt) {
         String name = (customerName == null || customerName.isBlank()) ? "there" : customerName;
         String amount = VND.format(amountVnd) + " VND";
-        String unit = VND.format(amountVnd.divide(BigDecimal.valueOf(Math.max(quantity, 1)))) + " VND";
+        // Rounded division — a non-terminating quotient (e.g. 25000/3) must not throw.
+        String unit = VND.format(amountVnd.divide(
+                BigDecimal.valueOf(Math.max(quantity, 1)), 0, java.math.RoundingMode.HALF_UP)) + " VND";
         String paid = paidAt != null ? DATE.format(paidAt) : "";
         String ref = (sepayRef == null || sepayRef.isBlank()) ? "—" : sepayRef;
+        boolean isPlan = planName != null && !planName.isBlank();
+        String headline = isPlan
+                ? "Your <b>" + planName + "</b> plan is now active with " + quantity
+                    + " verification credits this cycle."
+                : "Your payment has been confirmed and your verification credits have been added to your account.";
+        String creditLine = isPlan
+                ? planName + " plan activated — " + quantity + " credits/month"
+                : "+" + quantity + " verification credit" + (quantity > 1 ? "s" : "") + " added";
+        String itemLabel = isPlan ? planName + " plan (monthly)" : "Verification credits";
+        String itemDetail = isPlan ? quantity + " credits included" : quantity + " × " + unit;
 
         return """
             <!DOCTYPE html>
@@ -61,11 +84,11 @@ public class PaymentEmailService {
                 <div style="padding:32px">
                   <h2 style="margin:0 0 4px;color:#0A0E1A">Thank you for your purchase, %s!</h2>
                   <p style="color:#555;font-size:14px;margin:0 0 24px">
-                    Your payment has been confirmed and your verification credits have been added to your account.
+                    %s
                   </p>
 
                   <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;margin-bottom:24px">
-                    <span style="color:#15803d;font-weight:bold;font-size:15px">+%d verification credit%s added</span>
+                    <span style="color:#15803d;font-weight:bold;font-size:15px">%s</span>
                   </div>
 
                   <table style="width:100%%;border-collapse:collapse;font-size:14px;color:#333">
@@ -79,8 +102,8 @@ public class PaymentEmailService {
 
                   <table style="width:100%%;border-collapse:collapse;font-size:14px;color:#333">
                     <tr>
-                      <td style="padding:8px 0">Verification credits</td>
-                      <td style="padding:8px 0;text-align:center;color:#888">%d × %s</td>
+                      <td style="padding:8px 0">%s</td>
+                      <td style="padding:8px 0;text-align:center;color:#888">%s</td>
                       <td style="padding:8px 0;text-align:right">%s</td>
                     </tr>
                     <tr>
@@ -103,9 +126,10 @@ public class PaymentEmailService {
             </html>
             """.formatted(
                 name,
-                quantity, quantity > 1 ? "s" : "",
+                headline,
+                creditLine,
                 invoiceNo, paid, ref, transferContent,
-                quantity, unit, amount,
+                itemLabel, itemDetail, amount,
                 amount
         );
     }

@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.net.URLEncoder;
@@ -210,8 +212,10 @@ public class PaymentService {
         VietqrPayment qr = vietqrRepository.findByInvoice_Id(invoiceId)
                 .orElseThrow(() -> new AppException(AppException.ErrorCode.RESOURCE_NOT_FOUND));
 
-        int quotaRemaining = usersRepository.findById(userId)
-                .map(Users::getQuotaRemaining).orElse(0);
+        // The invoice's owner is this user — read the balance off the already
+        // loaded association instead of a second user query per 4s poll.
+        Integer balance = invoice.getUser().getQuotaRemaining();
+        int quotaRemaining = balance != null ? balance : 0;
 
         return PaymentDTO.StatusResponse.builder()
                 .invoiceId(invoiceId)
@@ -260,6 +264,21 @@ public class PaymentService {
         String code = extractCode(p);
         if (code == null) return WebhookResult.IRRELEVANT;
 
+        String sepayRef = p.getId() != null ? String.valueOf(p.getId()) : null;
+        return confirmTransfer(code, p.getTransferAmount(), sepayRef, "webhook");
+    }
+
+    /**
+     * Confirms a matched incoming transfer and fulfills the order. Shared by the
+     * SePay webhook and the reconciliation poller, so a missed webhook can still
+     * be recovered from SePay's transaction list.
+     *
+     * The money has already left the buyer's account by the time we get here, so
+     * we are deliberately lenient: overpayment is accepted, and a transfer that
+     * lands after QR expiry is still honored (logged for visibility).
+     */
+    @Transactional
+    public WebhookResult confirmTransfer(String code, BigDecimal paidAmount, String sepayRef, String source) {
         Optional<VietqrPayment> opt = vietqrRepository.findByTransferContentForUpdate(code);
         if (opt.isEmpty()) return WebhookResult.IRRELEVANT;
         VietqrPayment qr = opt.get();
@@ -267,22 +286,23 @@ public class PaymentService {
         // Idempotency: a retry of an already-confirmed transfer must not re-credit.
         if (STATUS_PAID.equals(qr.getStatus())) return WebhookResult.DUPLICATE;
 
-        if (STATUS_EXPIRED.equals(qr.getStatus()) || qr.getExpiresAt().isBefore(Instant.now())) {
-            return WebhookResult.EXPIRED;
-        }
-        // Amount must match exactly.
-        if (p.getTransferAmount() == null
-                || qr.getExpectedAmountVnd().compareTo(p.getTransferAmount()) != 0) {
+        // Underpayment cannot fulfill; overpayment can (the buyer's money is in).
+        if (paidAmount == null || paidAmount.compareTo(qr.getExpectedAmountVnd()) < 0) {
+            log.warn("Payment amount mismatch — code={} expected={} received={} source={}",
+                    code, qr.getExpectedAmountVnd(), paidAmount, source);
             return WebhookResult.AMOUNT_MISMATCH;
         }
 
-        fulfill(qr, p);
+        if (STATUS_EXPIRED.equals(qr.getStatus()) || qr.getExpiresAt().isBefore(Instant.now())) {
+            log.warn("Late payment honored — code={} arrived after QR expiry (source={})", code, source);
+        }
+
+        fulfill(qr, paidAmount, sepayRef);
         return WebhookResult.CONFIRMED;
     }
 
-    private void fulfill(VietqrPayment qr, PaymentDTO.SepayWebhook p) {
+    private void fulfill(VietqrPayment qr, BigDecimal paidAmount, String sepayRef) {
         Instant now = Instant.now();
-        String sepayRef = p.getId() != null ? String.valueOf(p.getId()) : null;
 
         qr.setStatus(STATUS_PAID);
         qr.setMatchedRef(sepayRef);
@@ -291,7 +311,7 @@ public class PaymentService {
 
         Invoice invoice = qr.getInvoice();
         invoice.setStatus(STATUS_PAID);
-        invoice.setAmountPaidVnd(p.getTransferAmount());
+        invoice.setAmountPaidVnd(paidAmount);
         invoice.setPaidAt(now);
         invoiceRepository.save(invoice);
 
@@ -330,12 +350,15 @@ public class PaymentService {
         log.info("Quota granted — user={} credits={} invoice={} sepayRef={}",
                 user.getId(), topup.getQuotaAdded(), invoice.getId(), sepayRef);
 
-        // Thank-you + invoice email. Async + plain values so it never blocks or
-        // fails this confirmation transaction. Read entity fields while the
-        // session is still open here.
-        paymentEmailService.sendInvoiceEmail(
-                user.getEmail(), user.getFullName(), invoice.getInvoiceNo(),
-                topup.getQuotaAdded(), topup.getPriceVnd(), qr.getTransferContent(), sepayRef, now);
+        // Thank-you + invoice email. Plain values read while the session is open,
+        // dispatched only after this confirmation transaction commits, so a
+        // rollback can never send a false receipt.
+        String email = user.getEmail(), name = user.getFullName();
+        String invoiceNo = invoice.getInvoiceNo(), transferContent = qr.getTransferContent();
+        int credits = topup.getQuotaAdded();
+        BigDecimal price = topup.getPriceVnd();
+        runAfterCommit(() -> paymentEmailService.sendInvoiceEmail(
+                email, name, invoiceNo, null, credits, price, transferContent, sepayRef, now));
     }
 
     private void grantPlan(PlanPurchase pp, Invoice invoice, VietqrPayment qr, String sepayRef, Instant now) {
@@ -352,6 +375,14 @@ public class PaymentService {
         user.setCycleResetAt(now.plus(30, ChronoUnit.DAYS));
         usersRepository.save(user);
 
+        // A user has at most one active subscription — supersede any old ones.
+        List<Subscription> previous = subscriptionRepository.findByUser_IdAndStatus(user.getId(), "active");
+        for (Subscription old : previous) {
+            old.setStatus("canceled");
+            old.setCancelAt(now);
+        }
+        if (!previous.isEmpty()) subscriptionRepository.saveAll(previous);
+
         Subscription sub = Subscription.builder()
                 .user(user).plan(plan)
                 .status("active")
@@ -365,9 +396,27 @@ public class PaymentService {
         log.info("Plan assigned — user={} plan={} quota={} invoice={} sepayRef={}",
                 user.getId(), plan.getName(), plan.getMonthlyQuota(), invoice.getId(), sepayRef);
 
-        paymentEmailService.sendInvoiceEmail(
-                user.getEmail(), user.getFullName(), invoice.getInvoiceNo(),
-                plan.getMonthlyQuota(), pp.getPriceVnd(), qr.getTransferContent(), sepayRef, now);
+        String email = user.getEmail(), name = user.getFullName();
+        String invoiceNo = invoice.getInvoiceNo(), transferContent = qr.getTransferContent();
+        String planName = plan.getName();
+        int credits = plan.getMonthlyQuota();
+        BigDecimal price = pp.getPriceVnd();
+        runAfterCommit(() -> paymentEmailService.sendInvoiceEmail(
+                email, name, invoiceNo, planName, credits, price, transferContent, sepayRef, now));
+    }
+
+    /** Runs after the surrounding transaction commits; immediately when there is none (tests). */
+    private static void runAfterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    action.run();
+                }
+            });
+        } else {
+            action.run();
+        }
     }
 
     private void recordBillingEvent(Users user, String eventType, Invoice invoice,

@@ -11,9 +11,14 @@ import java.util.List;
 @Data
 public class ScoringRubric {
 
-    // Weights per pillar (must sum to 1.0)
-    private double w1 = 0.18, w2 = 0.10, w3 = 0.15, w4 = 0.12;
-    private double w5 = 0.12, w6 = 0.18, w7 = 0.08, w8 = 0.07;
+    // Weights per pillar (must sum to 1.0).
+    // w7 (Deal Structure Risk) is deliberately small — it only scores real data
+    // when a contract has been uploaded and cross-check-verified against the
+    // company being assessed (see ContractP7Mapper); self-reported P7 data never
+    // reaches this rubric at all. The 4 points freed up from w7's old 0.08 moved
+    // to w1 (Entity Validation) rather than being spread thin across everything.
+    private double w1 = 0.22, w2 = 0.10, w3 = 0.15, w4 = 0.12;
+    private double w5 = 0.12, w6 = 0.18, w7 = 0.04, w8 = 0.07;
 
     // P1 — Entity Validation
     public PillarScore scoreP1(FactJson.P1Facts f) {

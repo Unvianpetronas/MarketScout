@@ -149,6 +149,20 @@ export default function DashboardPage() {
       .then((r) => { setReports(r); setIsLoading(false); });
   }, []);
 
+  // Payment success toast after redirect from /checkout. window.location is
+  // read in an effect (client only) to avoid the useSearchParams Suspense rule.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("plan") === "success") {
+      toast.success(t("dash.planActivated"));
+      router.replace("/dashboard");
+    } else if (params.get("topup") === "success") {
+      toast.success(t("checkout.paidToast"));
+      router.replace("/dashboard");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleQuickVerify = (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickSearch.trim()) { toast.error(t("dash.errEnterName")); return; }
