@@ -1,5 +1,5 @@
 import { api } from "@/lib/api";
-import { ContractDetail, ContractSummary, LinkResponse } from "@/types/contract";
+import { ContractDetail, ContractSummary, LinkResponse, LinkSummary } from "@/types/contract";
 
 export const uploadContract = async (file: File): Promise<ContractSummary> => {
   const formData = new FormData();
@@ -29,6 +29,11 @@ export const deleteContract = async (id: string): Promise<void> => {
 
 export const renameContract = async (id: string, fileName: string): Promise<ContractSummary> => {
   const response = await api.patch<ContractSummary>(`/contracts/${id}`, { fileName });
+  return response.data;
+};
+
+export const listContractLinks = async (reportId: string): Promise<LinkSummary[]> => {
+  const response = await api.get<LinkSummary[]>(`/assessments/${reportId}/contracts`);
   return response.data;
 };
 

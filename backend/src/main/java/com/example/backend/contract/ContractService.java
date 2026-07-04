@@ -27,6 +27,11 @@ public class ContractService {
     private static final long MAX_FILE_BYTES = 10L * 1024 * 1024;
     private static final Set<String> ALLOWED_CONTENT_TYPES =
             Set.of("application/pdf", "image/jpeg", "image/png");
+    private static final int MAX_FILE_NAME_LENGTH = 255; // matches contracts.file_name column width
+    // A user's contract library is meant for reuse across assessments, not
+    // unbounded storage — each upload is a Gemini call + up to 10MB in Postgres,
+    // so an unlimited count is both a cost and a storage-bloat vector.
+    private static final long MAX_CONTRACTS_PER_USER = 100;
 
     private final ContractRepository contractRepository;
     private final UsersRepository usersRepository;
@@ -47,6 +52,12 @@ public class ContractService {
         Users user = usersRepository.findById(userId)
                 .orElseThrow(() -> new AppException(AppException.ErrorCode.USER_NOT_FOUND));
 
+        if (contractRepository.countByUser_Id(userId) >= MAX_CONTRACTS_PER_USER) {
+            throw new AppException(AppException.ErrorCode.BAD_REQUEST,
+                    "Thư viện hợp đồng đã đạt giới hạn " + MAX_CONTRACTS_PER_USER
+                            + " file. Vui lòng xoá bớt hợp đồng cũ trước khi tải lên thêm.");
+        }
+
         byte[] bytes;
         try {
             bytes = file.getBytes();
@@ -54,9 +65,19 @@ public class ContractService {
             throw new AppException(AppException.ErrorCode.BAD_REQUEST, "Không đọc được file đã tải lên.");
         }
 
+        // The client-supplied Content-Type header is trivially spoofable (e.g. via
+        // curl/Postman) — verify the actual file bytes match a real PDF/JPEG/PNG
+        // signature so an arbitrary file can't ride in under a fake header.
+        if (!matchesFileSignature(bytes, contentType)) {
+            throw new AppException(AppException.ErrorCode.BAD_REQUEST,
+                    "Nội dung file không khớp định dạng khai báo. Vui lòng tải lên đúng file PDF, JPG hoặc PNG.");
+        }
+
         Contract contract = new Contract();
         contract.setUser(user);
-        contract.setFileName(file.getOriginalFilename() != null ? file.getOriginalFilename() : "contract");
+        String fileName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "contract";
+        if (fileName.length() > MAX_FILE_NAME_LENGTH) fileName = fileName.substring(0, MAX_FILE_NAME_LENGTH);
+        contract.setFileName(fileName);
         contract.setFileSizeBytes(file.getSize());
         contract.setContentType(contentType);
         contract.setFileData(bytes);
@@ -121,7 +142,7 @@ public class ContractService {
         if (newFileName == null || newFileName.isBlank()) {
             throw new AppException(AppException.ErrorCode.BAD_REQUEST, "Tên hợp đồng không được để trống.");
         }
-        if (newFileName.length() > 255) {
+        if (newFileName.length() > MAX_FILE_NAME_LENGTH) {
             throw new AppException(AppException.ErrorCode.BAD_REQUEST, "Tên hợp đồng tối đa 255 ký tự.");
         }
         Contract contract = requireOwned(contractId, userId);
@@ -153,6 +174,29 @@ public class ContractService {
                 .extractionStatus(c.getExtractionStatus())
                 .extractedData(parseExtractedData(c.getExtractedData()))
                 .build();
+    }
+
+    /**
+     * The declared Content-Type is client-supplied and easily spoofed — check
+     * the actual leading bytes against the well-known signature for the format
+     * it claims to be, so a renamed/relabeled arbitrary file is rejected.
+     */
+    private static boolean matchesFileSignature(byte[] bytes, String contentType) {
+        if (bytes == null) return false;
+        return switch (contentType) {
+            case "application/pdf" -> startsWith(bytes, 0x25, 0x50, 0x44, 0x46); // "%PDF"
+            case "image/jpeg" -> startsWith(bytes, 0xFF, 0xD8, 0xFF);
+            case "image/png" -> startsWith(bytes, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A);
+            default -> false;
+        };
+    }
+
+    private static boolean startsWith(byte[] bytes, int... signature) {
+        if (bytes.length < signature.length) return false;
+        for (int i = 0; i < signature.length; i++) {
+            if ((bytes[i] & 0xFF) != signature[i]) return false;
+        }
+        return true;
     }
 
     @SuppressWarnings("unchecked")

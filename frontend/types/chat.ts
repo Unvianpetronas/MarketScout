@@ -42,12 +42,15 @@ export interface SseMessageRequest {
   message: string;
   sessionId: string;
   reportId?: string;
-  // P7 — Deal Structure Risk (optional). When present on a verify request the
-  // P7 pillar is scored; otherwise it stays N/A.
+  // Self-reported "Thông tin giao dịch" (optional) — reference only, saved to
+  // Report.selfReport* columns, never scored. Only contractId below (a
+  // library contract picked/uploaded before the report exists) can move the
+  // real P7 score, via cross-check right after the report is created.
   depositPercentage?: number;
   hasWrittenContract?: boolean;
   paymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY";
   dealValueUsd?: number;
+  contractId?: string;
 }
 
 // Used by per-session REST endpoint POST /chat/sessions/{id}/messages

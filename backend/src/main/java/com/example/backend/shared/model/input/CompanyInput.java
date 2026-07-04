@@ -15,22 +15,12 @@ public class CompanyInput {
     private String country;
     private String website;
 
-    // ── P7 — Deal Structure Risk (optional, user-supplied) ──────────────────
-    // P7 scores the structure of THIS deal, not the company. It can only be
-    // computed from facts the user provides about their intended transaction.
-    // When all of these are null the pillar stays N/A (SKIP) — scoring deal risk
-    // with no deal data would be fabrication, so N/A is the correct outcome.
-    private Integer depositPercentage;       // % paid upfront (e.g. 30)
-    private Boolean hasWrittenContract;      // signed written contract in place?
-    private String  paymentMethodSafety;     // SAFE | MODERATE | RISKY
-    private Double  dealValueUsd;            // headline deal value in USD
-
-    /** True when the user supplied at least one deal parameter → P7 is scorable. */
-    public boolean hasDealParams() {
-        return depositPercentage != null || hasWrittenContract != null
-            || (paymentMethodSafety != null && !paymentMethodSafety.isBlank())
-            || dealValueUsd != null;
-    }
+    // NOTE: P7 (Deal Structure Risk) deliberately has NO fields here. Self-reported
+    // deal info (deposit %, payment method, etc.) is never verifiable at this stage
+    // and must never influence scoring — see Report.selfReport* columns, which are
+    // reference-only and read by nothing but the UI. Only a contract that has been
+    // uploaded, AI-extracted, and cross-checked against this company (via
+    // ContractLinkService, see ContractP7Mapper) can move the real P7 score.
 
     public boolean isVietnam() {
         return "VN".equalsIgnoreCase(country);

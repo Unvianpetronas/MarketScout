@@ -59,6 +59,15 @@ public class ContractDTO {
         private Object value;
     }
 
+    /** One link attempt for a report — including MISMATCH ones, for the "why is P7 N/A" UX. */
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class LinkSummary {
+        private UUID contractId;
+        private String fileName;
+        private String verificationStatus; // PENDING | VERIFIED | MISMATCH | MANUALLY_EDITED
+        private Instant createdAt;
+    }
+
     @Data @NoArgsConstructor @AllArgsConstructor
     public static class RenameRequest {
         private String fileName;
