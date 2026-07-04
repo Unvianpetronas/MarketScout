@@ -31,7 +31,7 @@ public class ScoringRubricLoader {
             }
         }
         rubric = new ScoringRubric();
-        log.info("ScoringRubric loaded with default weights: P1=18%, P2=10%, P3=15%, P4=12%, P5=12%, P6=18%, P7=8%, P8=7%");
+        log.info("ScoringRubric loaded with default weights: P1=22%, P2=10%, P3=15%, P4=12%, P5=12%, P6=18%, P7=4%, P8=7%");
     }
 
     public ScoringRubric getRubric() {

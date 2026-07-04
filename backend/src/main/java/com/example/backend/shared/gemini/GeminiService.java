@@ -92,6 +92,48 @@ public class GeminiService {
         return callWithSystemPromptAndConfig(systemPrompt, userMessage, 0.0, 4096);
     }
 
+    /**
+     * Single-turn call that attaches a file (PDF/image) as inline base64 data
+     * alongside the text prompt. Used by ContractExtractor — Gemini's inline-data
+     * limit is ~20MB, comfortably above the 10MB contract upload cap, so the
+     * Files API is unnecessary here.
+     */
+    @SuppressWarnings("unchecked")
+    public String callWithSystemPromptMultimodal(String systemPrompt, String userText, byte[] fileBytes, String mimeType) {
+        List<Map<String, Object>> contents = List.of(
+            Map.of("role", "user", "parts", List.of(
+                Map.of("text", userText),
+                Map.of("inlineData", Map.of(
+                    "mimeType", mimeType,
+                    "data", java.util.Base64.getEncoder().encodeToString(fileBytes)
+                ))
+            ))
+        );
+        Map<String, Object> body = Map.of(
+            "systemInstruction", Map.of("parts", List.of(Map.of("text", systemPrompt))),
+            "contents", contents,
+            "generationConfig", Map.of("temperature", 0.0, "maxOutputTokens", 4096)
+        );
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        String url = geminiUrl() + "?key=" + apiKey;
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(
+                url, HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+            if (response.getBody() == null) throw new RuntimeException("Gemini returned empty body");
+            List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.getBody().get("candidates");
+            Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
+            List<Map<String, Object>> parts = (List<Map<String, Object>>) content.get("parts");
+            return (String) parts.get(0).get("text");
+        } catch (HttpClientErrorException e) {
+            log.error("Gemini API error {}: {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new RuntimeException("Gemini API error: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("Gemini unexpected error: {}", e.getMessage(), e);
+            throw new RuntimeException("Unable to connect to AI.");
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private String callWithSystemPromptAndConfig(String systemPrompt, String userMessage, double temp, int maxTokens) {
         List<Map<String, Object>> contents = List.of(

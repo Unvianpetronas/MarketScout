@@ -81,6 +81,30 @@ public class ReportController {
             .body(json);
     }
 
+    /**
+     * PATCH /api/v1/reports/{id}/deal-info
+     * Self-reported "Thông tin giao dịch" — always reference-only (weight=0).
+     * Never touches PillarResult/scoring; only an upload-and-cross-check-verified
+     * contract (see the contract package) can move the P7 score.
+     */
+    @PatchMapping("/{id}/deal-info")
+    public ResponseEntity<ReportDTO.ReportDetail> updateDealInfo(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable UUID id,
+            @RequestBody ReportDTO.SelfReportDealInfoRequest request) {
+        UUID userId = extractUserId(authHeader);
+        Report report = reportRepository.findById(id)
+            .filter(r -> r.getUser().getId().equals(userId))
+            .orElseThrow(() -> new AppException(AppException.ErrorCode.REPORT_NOT_FOUND));
+        report.setSelfReportPaymentMethodSafety(request.getPaymentMethodSafety());
+        report.setSelfReportDepositPercentage(request.getDepositPercentage());
+        report.setSelfReportDealValueUsd(request.getDealValueUsd());
+        report.setSelfReportHasWrittenContract(request.getHasWrittenContract());
+        reportRepository.save(report);
+        List<PillarResult> pillars = pillarResultRepository.findByReportIdOrderByPillarNoAsc(id);
+        return ResponseEntity.ok(toDetail(report, pillars));
+    }
+
     // Trigger quick scan for a lead from a Find Partners session
     @PostMapping("/quick-scan")
     public ResponseEntity<ReportDTO.ReportSummary> triggerQuickScan(
@@ -117,6 +141,11 @@ public class ReportController {
             .createdAt(r.getCreatedAt()).updatedAt(r.getUpdatedAt())
             .pillars(pillars.stream().map(this::toPillarDTO).toList())
             .dealSafetyAnalysis(r.getRawData())
+            .selfReportPaymentMethodSafety(r.getSelfReportPaymentMethodSafety())
+            .selfReportDepositPercentage(r.getSelfReportDepositPercentage())
+            .selfReportDealValueUsd(r.getSelfReportDealValueUsd())
+            .selfReportHasWrittenContract(r.getSelfReportHasWrittenContract())
+            .p7VerifiedContractId(r.getP7VerifiedContract() != null ? r.getP7VerifiedContract().getId() : null)
             .build();
     }
 

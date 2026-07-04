@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +46,23 @@ public class ReportDTO {
         private Instant updatedAt;
         private List<PillarResultDTO> pillars;
         private String dealSafetyAnalysis;
+
+        // Self-reported "Thông tin giao dịch" — reference only, never fed to
+        // scoring. Only a link-verified uploaded contract can move P7's score.
+        private String selfReportPaymentMethodSafety;
+        private Short selfReportDepositPercentage;
+        private BigDecimal selfReportDealValueUsd;
+        private Boolean selfReportHasWrittenContract;
+        private UUID p7VerifiedContractId;
+    }
+
+    // ── Self-reported deal info (manual entry, always weight=0) ────────────
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class SelfReportDealInfoRequest {
+        private String paymentMethodSafety; // SAFE | MODERATE | RISKY
+        private Short depositPercentage;
+        private BigDecimal dealValueUsd;
+        private Boolean hasWrittenContract;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor

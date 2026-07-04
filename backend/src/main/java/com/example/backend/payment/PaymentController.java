@@ -69,11 +69,23 @@ public class PaymentController {
             @RequestBody PaymentDTO.SepayWebhook payload) {
 
         if (!paymentService.isValidApiKey(authHeader)) {
+            // Without this log a mis-keyed webhook fails invisibly while the
+            // buyer's money is already in the account.
+            log.warn("SePay webhook REJECTED (401) — Authorization header {}. sepayRef={} content={}",
+                    authHeader == null ? "missing" : "did not match SEPAY_API_KEY",
+                    payload != null ? payload.getId() : null,
+                    payload != null ? payload.getContent() : null);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("success", false, "message", "Invalid API key"));
         }
         PaymentService.WebhookResult result = paymentService.processWebhook(payload);
-        log.info("SePay webhook processed — sepayRef={} result={}", payload.getId(), result);
+        if (result == PaymentService.WebhookResult.CONFIRMED
+                || result == PaymentService.WebhookResult.DUPLICATE) {
+            log.info("SePay webhook processed — sepayRef={} result={}", payload.getId(), result);
+        } else {
+            log.warn("SePay webhook NOT fulfilled — sepayRef={} result={} content={} amount={}",
+                    payload.getId(), result, payload.getContent(), payload.getTransferAmount());
+        }
         return ResponseEntity.ok(Map.of("success", true));
     }
 

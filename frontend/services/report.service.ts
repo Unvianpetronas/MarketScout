@@ -4,6 +4,7 @@ import {
   ReportListItem,
   ReportStatusResponse,
   ReportRecommendations,
+  SelfReportDealInfoRequest,
 } from "@/types/report";
 
 export const getReports = async (): Promise<ReportListItem[]> => {
@@ -24,6 +25,15 @@ export const getReportStatus = async (id: string): Promise<ReportStatusResponse>
 // AI next-step recommendations (what to do / provide / verify) for a report.
 export const getReportRecommendations = async (id: string): Promise<ReportRecommendations> => {
   const response = await api.get<ReportRecommendations>(`/reports/${id}/recommendations`);
+  return response.data;
+};
+
+// Self-reported deal info — always reference-only, never affects scoring.
+export const patchDealInfo = async (
+  reportId: string,
+  body: SelfReportDealInfoRequest
+): Promise<VerificationReport> => {
+  const response = await api.patch<VerificationReport>(`/reports/${reportId}/deal-info`, body);
   return response.data;
 };
 

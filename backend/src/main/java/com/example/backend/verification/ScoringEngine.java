@@ -21,6 +21,7 @@ import com.example.backend.domain.PillarResult;
 import com.example.backend.domain.PillarResultRepository;
 import com.example.backend.domain.ReportRepository;
 import com.example.backend.domain.UsersRepository;
+import com.example.backend.contract.ContractP7Mapper;
 import com.example.backend.quota.QuotaService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -68,6 +69,7 @@ public class ScoringEngine {
     private final PillarResultRepository pillarResultRepository;
     private final UsersRepository usersRepository;
     private final QuotaService quotaService;
+    private final ContractP7Mapper contractP7Mapper;
     private final ObjectMapper objectMapper;
 
     @Async("scoringExecutor")
@@ -80,7 +82,7 @@ public class ScoringEngine {
             report.setUpdatedAt(Instant.now());
             reportRepository.save(report);
 
-            ScoringResult result = runPipeline(input, reportId, sseCallback);
+            ScoringResult result = runPipeline(input, reportId, report, sseCallback);
 
             // Persist
             report.setOverallScore(result.isHardStop() ? (short) 0 : (short) Math.round(result.getOverallScore()));
@@ -135,7 +137,7 @@ public class ScoringEngine {
         }
     }
 
-    private ScoringResult runPipeline(CompanyInput input, UUID reportId,
+    private ScoringResult runPipeline(CompanyInput input, UUID reportId, Report report,
                                        Consumer<String> sseCallback) {
         emit(sseCallback, "crawler", "thinking", "Đang kiểm tra danh sách trừng phạt...");
 
@@ -173,6 +175,10 @@ public class ScoringEngine {
         P4Data p4 = getOrSkip(p4f, input, "P4");
         P5Data p5 = getOrSkip(p5f, input, "P5");
         P8Data p8 = getOrSkip(p8f, input, "P8");
+        // P7 has no crawler — a user has never provided transaction data at all on
+        // a first scan, so this stays SKIP here. If a contract is later uploaded and
+        // link-verified against this report, recomputeP7() replaces just this pillar
+        // without re-running the rest of the pipeline (and without a second quota hit).
         P7Data p7 = P7Data.builder().state(PillarData.DataState.SKIP).companyName(input.getName())
             .errorMsg("Chưa có thông tin giao dịch từ user").fetchedAt(java.time.LocalDateTime.now()).build();
 
@@ -181,8 +187,12 @@ public class ScoringEngine {
         // Step 3: Extract facts
         FactJson facts = factExtractor.extract(p1, p2, p3, p4, p5, p6, p7, p8);
 
-        // Step 4: Score each pillar
+        // Step 4: Score each pillar. P7 comes from a link-verified contract when
+        // one exists (rare on a first scan — see recomputeP7 for the usual path)
+        // rather than facts.getP7(), which is always null (SKIP) today since no
+        // crawler ever populates P7Data.
         var rubric = rubricLoader.getRubric();
+        FactJson.P7Facts p7Facts = contractP7Mapper.resolve(report);
         List<PillarScore> pillars = List.of(
             rubric.scoreP1(facts.getP1()),
             rubric.scoreP2(facts.getP2()),
@@ -190,7 +200,7 @@ public class ScoringEngine {
             rubric.scoreP4(facts.getP4()),
             rubric.scoreP5(facts.getP5()),
             rubric.scoreP6(facts.getP6()),
-            rubric.scoreP7(facts.getP7()),
+            rubric.scoreP7(p7Facts != null ? p7Facts : facts.getP7()),
             rubric.scoreP8(facts.getP8())
         );
 
@@ -225,6 +235,68 @@ public class ScoringEngine {
             } catch (Exception ignored) {}
             pillarResultRepository.save(pr);
         }
+    }
+
+    public record RecomputeResult(double overallScore, Integer p7Score) {}
+
+    /**
+     * Re-scores P7 only and recomputes the overall score from the report's
+     * existing PillarResult rows — no crawler re-invocation, no quota deduction.
+     * Called by ContractLinkService after a link/override/unlink changes what
+     * P7 data (if any) this report's contract makes available.
+     */
+    @Transactional
+    public RecomputeResult recomputeP7(UUID reportId) {
+        Report report = reportRepository.findById(reportId)
+            .orElseThrow(() -> new RuntimeException("Report not found: " + reportId));
+        List<PillarResult> existing = pillarResultRepository.findByReportIdOrderByPillarNoAsc(reportId);
+
+        var rubric = rubricLoader.getRubric();
+        PillarScore p7Score = rubric.scoreP7(contractP7Mapper.resolve(report));
+
+        List<PillarScore> pillars = new ArrayList<>();
+        boolean hadP7Row = false;
+        for (PillarResult pr : existing) {
+            if (pr.getPillarNo() == 7) {
+                pillars.add(p7Score);
+                hadP7Row = true;
+            } else {
+                pillars.add(toPillarScore(pr));
+            }
+        }
+        if (!hadP7Row) pillars.add(p7Score);
+
+        double overall = rubric.calcOverallScore(pillars);
+        String riskLevel = rubric.getRiskLevel(overall);
+
+        report.setOverallScore((short) Math.round(overall));
+        report.setRiskLevel(riskLevel);
+        report.setUpdatedAt(Instant.now());
+        reportRepository.save(report);
+        savePillarResults(reportId, pillars, report);
+
+        log.info("recomputeP7 — report={} p7Score={} newOverall={}", reportId, p7Score.getScore(), overall);
+        return new RecomputeResult(overall, p7Score.getScore());
+    }
+
+    private PillarScore toPillarScore(PillarResult pr) {
+        List<Evidence> evidences = List.of();
+        try {
+            if (pr.getEvidences() != null) {
+                evidences = objectMapper.readValue(pr.getEvidences(),
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, Evidence.class));
+            }
+        } catch (Exception ignored) {}
+        return PillarScore.builder()
+            .pillarNo(pr.getPillarNo())
+            .pillarName(pr.getPillarName())
+            .score(pr.getScore() != null ? pr.getScore().intValue() : null)
+            .status(pr.getStatus())
+            .confidence(pr.getConfidence())
+            .evidences(evidences)
+            .findings(pr.getFindings())
+            .sourcesUsed(pr.getSourcesUsed())
+            .build();
     }
 
     private <T extends PillarData> T getOrSkip(CompletableFuture<T> future, CompanyInput input, String label) {

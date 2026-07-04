@@ -38,6 +38,21 @@ export interface VerificationReport {
   dealSafetyAnalysis?: string;  // raw JSON string from backend
   createdAt?: string;
   updatedAt?: string;
+
+  // Self-reported "Thông tin giao dịch" — reference only, never scored.
+  selfReportPaymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY" | null;
+  selfReportDepositPercentage?: number | null;
+  selfReportDealValueUsd?: number | null;
+  selfReportHasWrittenContract?: boolean | null;
+  // Set only when a contract has been uploaded and cross-check-verified — this is what actually moves P7's score.
+  p7VerifiedContractId?: string | null;
+}
+
+export interface SelfReportDealInfoRequest {
+  paymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY" | null;
+  depositPercentage?: number | null;
+  dealValueUsd?: number | null;
+  hasWrittenContract?: boolean | null;
 }
 
 // AI next-step recommendations for a report (what to do / provide / verify).

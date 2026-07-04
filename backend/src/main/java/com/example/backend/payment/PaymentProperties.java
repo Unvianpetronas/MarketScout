@@ -35,4 +35,17 @@ public class PaymentProperties {
 
     /** SePay dynamic-QR image endpoint. */
     private String sepayQrBaseUrl = "https://qr.sepay.vn/img";
+
+    /**
+     * SePay "userapi" Bearer token used by the reconciliation poller to list
+     * incoming transactions. Optional — when blank, reconciliation is disabled
+     * and only the webhook confirms payments.
+     */
+    private String sepayApiToken;
+
+    /** SePay transaction-list endpoint polled by the reconciler. */
+    private String sepayTxListUrl = "https://my.sepay.vn/userapi/transactions/list";
+
+    /** How far back the reconciler looks for unconfirmed-but-paid orders. */
+    private int reconcileLookbackHours = 24;
 }
