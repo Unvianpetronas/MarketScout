@@ -2,6 +2,7 @@ package com.example.backend.verification;
 
 import com.example.backend.shared.model.crawler.*;
 import com.example.backend.shared.model.scoring.FactJson;
+import com.example.backend.shared.gemini.GeminiJsonUtil;
 import com.example.backend.shared.gemini.GeminiService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +48,7 @@ public class FactExtractor {
         try {
             String prompt = String.format(USER_PROMPT_TEMPLATE, rawContext);
             String raw = geminiService.callWithSystemPromptLowTemp(SYSTEM_PROMPT, prompt);
-            String json = extractJson(raw);
+            String json = GeminiJsonUtil.extractJson(raw);
             return parseFactJson(json, p1, p2, p3, p4, p5, p6, p7, p8);
         } catch (Exception e) {
             log.warn("FactExtractor Gemini call failed, using structural fallback: {}", e.getMessage());
@@ -224,12 +225,6 @@ public class FactExtractor {
                 .hasPhysicalEvidence(p8.getHasPhysicalEvidence()).employeeCountRange(p8.getEmployeeCountRange()).build());
         }
         return f;
-    }
-
-    private String extractJson(String raw) {
-        int start = raw.indexOf('{');
-        int end = raw.lastIndexOf('}');
-        return (start != -1 && end > start) ? raw.substring(start, end + 1) : raw;
     }
 
     private String text(com.fasterxml.jackson.databind.JsonNode node, String field) {

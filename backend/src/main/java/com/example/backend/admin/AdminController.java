@@ -356,7 +356,7 @@ public class AdminController {
             log.setPayload(payload);
             auditLogRepository.save(log);
         } catch (Exception e) {
-            log.warn("Failed to write audit log for action={}", action);
+            log.warn("Failed to write audit log for action={}: {}", action, e.getMessage());
         }
     }
 

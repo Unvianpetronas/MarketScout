@@ -11,8 +11,11 @@ import {
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
-import { getReport, getReportRecommendations } from "@/services/report.service";
+import { ContractPickerModal } from "@/components/contract/ContractPickerModal";
+import { getReport, getReportRecommendations, patchDealInfo } from "@/services/report.service";
+import { getContract, unlinkContract } from "@/services/contract.service";
 import { VerificationReport, PillarResult, ReportRecommendations } from "@/types/report";
+import { LinkResponse, ContractSummary } from "@/types/contract";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -229,6 +232,169 @@ function AiRecommendations({ recs, loading }: { recs: ReportRecommendations | nu
               color="#9333EA" bg="#F6EEFE" />
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+type PaymentMethodSafety = "SAFE" | "MODERATE" | "RISKY";
+
+function TransactionInfoCard({
+  report, onReportUpdate,
+}: { report: VerificationReport; onReportUpdate: (r: VerificationReport) => void }) {
+  const [showModal, setShowModal] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: "verified" | "mismatch"; text: string } | null>(null);
+  // Keyed by contract id so a stale filename can never render for a moment
+  // after unlink/relink — the effect only ever writes via its .then(), the
+  // id-equality check below is what actually gates what's shown.
+  const [verifiedContract, setVerifiedContract] = useState<{ id: string; fileName: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    paymentMethodSafety: report.selfReportPaymentMethodSafety ?? "",
+    depositPercentage: report.selfReportDepositPercentage?.toString() ?? "",
+    dealValueUsd: report.selfReportDealValueUsd?.toString() ?? "",
+  });
+
+  useEffect(() => {
+    const id = report.p7VerifiedContractId;
+    if (!id) return;
+    let cancelled = false;
+    getContract(id).then((c) => { if (!cancelled) setVerifiedContract({ id, fileName: c.fileName }); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [report.p7VerifiedContractId]);
+
+  const verifiedFileName = verifiedContract && verifiedContract.id === report.p7VerifiedContractId ? verifiedContract.fileName : null;
+
+  const saveSelfReport = async (hasWrittenContract: boolean | null) => {
+    setSaving(true);
+    try {
+      const updated = await patchDealInfo(report.id, {
+        paymentMethodSafety: (form.paymentMethodSafety || null) as PaymentMethodSafety | null,
+        depositPercentage: form.depositPercentage ? Number(form.depositPercentage) : null,
+        dealValueUsd: form.dealValueUsd ? Number(form.dealValueUsd) : null,
+        hasWrittenContract,
+      });
+      onReportUpdate(updated);
+      toast.success("Đã lưu thông tin giao dịch.");
+    } catch {
+      toast.error("Không thể lưu thông tin giao dịch.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLinked = async (result: LinkResponse, contract: ContractSummary) => {
+    setShowModal(false);
+    setStatusMessage(
+      result.verificationStatus === "VERIFIED"
+        ? { type: "verified", text: `✓ Đã xác minh qua ${contract.fileName}` }
+        : {
+            type: "mismatch",
+            text: `⚠ Hợp đồng không khớp với ${report.entityName} — dữ liệu chỉ mang tính tham khảo, không ảnh hưởng điểm`,
+          }
+    );
+    try {
+      onReportUpdate(await getReport(report.id));
+    } catch { /* status message above already communicates the outcome */ }
+  };
+
+  const handleUnlink = async () => {
+    if (!report.p7VerifiedContractId) return;
+    try {
+      await unlinkContract(report.id, report.p7VerifiedContractId);
+      setStatusMessage(null);
+      onReportUpdate(await getReport(report.id));
+    } catch {
+      toast.error("Không thể bỏ liên kết hợp đồng.");
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+      <div className="flex items-center gap-2 mb-1">
+        <div className="w-8 h-8 bg-purple-50 rounded-xl flex items-center justify-center">
+          <FileText className="w-4 h-4 text-purple-500" />
+        </div>
+        <h3 className="text-sm font-bold text-gray-900">Thông tin giao dịch</h3>
+      </div>
+      <p className="text-xs text-gray-400 mb-4 ml-10">
+        Tự khai báo — chỉ tính điểm khi có hợp đồng thật đã tải lên và khớp với đối tác đang thẩm định.
+      </p>
+
+      {(verifiedFileName || statusMessage) && (
+        <div className={`flex items-center justify-between gap-2 mb-4 px-4 py-2.5 rounded-xl text-sm ${
+          verifiedFileName ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+            : statusMessage?.type === "verified" ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+            : "bg-amber-50 text-amber-700 border border-amber-200"
+        }`}>
+          <span>{verifiedFileName ? `✓ Đã xác minh qua ${verifiedFileName}` : statusMessage?.text}</span>
+          {verifiedFileName && (
+            <button onClick={handleUnlink} className="text-xs underline shrink-0">Bỏ liên kết</button>
+          )}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Phương thức thanh toán</label>
+          <select
+            value={form.paymentMethodSafety}
+            onChange={(e) => setForm((f) => ({ ...f, paymentMethodSafety: e.target.value }))}
+            className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5"
+          >
+            <option value="">— Chọn —</option>
+            <option value="SAFE">An toàn (L/C, escrow)</option>
+            <option value="MODERATE">Trung bình (T/T một phần)</option>
+            <option value="RISKY">Rủi ro cao (trả trước 100%)</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Đặt cọc trước (%)</label>
+          <input
+            type="number" min={0} max={100}
+            value={form.depositPercentage}
+            onChange={(e) => setForm((f) => ({ ...f, depositPercentage: e.target.value }))}
+            className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 block mb-1">Giá trị giao dịch (USD)</label>
+          <input
+            type="number" min={0}
+            value={form.dealValueUsd}
+            onChange={(e) => setForm((f) => ({ ...f, dealValueUsd: e.target.value }))}
+            className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">Đã có hợp đồng thành văn?</span>
+          <button
+            onClick={() => setShowModal(true)}
+            className="px-3 py-1 text-xs font-semibold rounded-full bg-[#E6F9F0] text-[#00843F]"
+          >Có</button>
+          <button
+            onClick={() => saveSelfReport(false)}
+            className="px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-500"
+          >Không</button>
+        </div>
+        <button
+          onClick={() => saveSelfReport(report.selfReportHasWrittenContract ?? null)}
+          disabled={saving}
+          className="px-3 py-1.5 text-xs font-bold text-white rounded-lg bg-gray-800 disabled:opacity-60"
+        >
+          {saving ? "Đang lưu..." : "Lưu"}
+        </button>
+      </div>
+
+      {showModal && (
+        <ContractPickerModal
+          reportId={report.id}
+          onClose={() => setShowModal(false)}
+          onLinked={handleLinked}
+        />
       )}
     </div>
   );
@@ -453,6 +619,9 @@ export default function ReportDetailPage({ params }: Props) {
                     )}
                   </div>
                 </div>
+
+                {/* ── Transaction Info (P7 self-report + contract verification) ── */}
+                <TransactionInfoCard report={report} onReportUpdate={setReport} />
 
                 {/* ── 8-Pillar Grid ── */}
                 <div>
