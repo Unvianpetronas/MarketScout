@@ -42,6 +42,12 @@ export interface SseMessageRequest {
   message: string;
   sessionId: string;
   reportId?: string;
+  // P7 — Deal Structure Risk (optional). When present on a verify request the
+  // P7 pillar is scored; otherwise it stays N/A.
+  depositPercentage?: number;
+  hasWrittenContract?: boolean;
+  paymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY";
+  dealValueUsd?: number;
 }
 
 // Used by per-session REST endpoint POST /chat/sessions/{id}/messages

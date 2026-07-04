@@ -105,6 +105,40 @@ class CrawlerP6Test {
         verify(cacheService).incrementCounter(anyString(), any(Duration.class), eq(2L));
     }
 
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void fetch_weakFuzzyMatch_belowThreshold_notFlagged() {
+        // A 0.78 partial match (e.g. a big legit company name grazing an unrelated
+        // sanctioned name) must NOT hard-stop — it is below the confident cutoff.
+        when(cacheService.get(anyString(), eq(P6Data.class))).thenReturn(Optional.empty());
+        when(cacheService.getCounter(anyString())).thenReturn(0L);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(Map.class)))
+                .thenReturn((ResponseEntity) ResponseEntity.ok(matchBody("q0", 0.78)));
+
+        P6Data result = crawler.fetch(CompanyInput.builder().companyName("Alibaba Group Holding Limited").country("CN").build());
+
+        assertThat(result.isSanctioned()).isFalse();
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void fetch_highScoreButApiMatchFalse_notFlagged() {
+        // OpenSanctions' own `match=false` is authoritative even when the raw
+        // score is high — this is a non-confident match, so no hard stop.
+        when(cacheService.get(anyString(), eq(P6Data.class))).thenReturn(Optional.empty());
+        when(cacheService.getCounter(anyString())).thenReturn(0L);
+        Map<String, Object> result0 = Map.of(
+                "score", 0.9, "match", false,
+                "datasets", List.of("ofac_sdn"), "id", "X-1", "caption", "Someone Else");
+        Map<String, Object> body = Map.of("responses", Map.of("q0", Map.of("results", List.of(result0))));
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.POST), any(), eq(Map.class)))
+                .thenReturn((ResponseEntity) ResponseEntity.ok(body));
+
+        P6Data result = crawler.fetch(CompanyInput.builder().companyName("Alibaba Group Holding Limited").country("CN").build());
+
+        assertThat(result.isSanctioned()).isFalse();
+    }
+
     // ── helpers ────────────────────────────────────────────────────────
 
     private Map<String, Object> matchBody(String qid, double score) {

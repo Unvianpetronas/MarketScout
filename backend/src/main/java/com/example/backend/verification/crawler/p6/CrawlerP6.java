@@ -41,7 +41,12 @@ import java.util.Optional;
 public class CrawlerP6 {
 
     private static final String OPENSANCTIONS_API_URL = "https://api.opensanctions.org/match/sanctions";
-    private static final double MATCH_THRESHOLD = 0.7;
+    // Only a CONFIDENT match triggers a HARD STOP. OpenSanctions scores 0.70–0.85
+    // are "weak/possible" partial matches that need human review, not automatic
+    // blocks — treating them as hits produced false positives (e.g. a big legit
+    // company name fuzzy-grazing an unrelated sanctioned name). We now require a
+    // high raw score AND honour OpenSanctions' own calibrated `match` decision.
+    private static final double MATCH_THRESHOLD = 0.85;
 
     @Value("${app.opensanctions.api-key:}")
     private String apiKey;
@@ -215,7 +220,17 @@ public class CrawlerP6 {
         }
         for (Map<String, Object> r : results) {
             Double score = r.get("score") instanceof Number ? ((Number) r.get("score")).doubleValue() : null;
-            if (score != null && score > MATCH_THRESHOLD) {
+
+            // Honour OpenSanctions' own calibrated decision when present: `match`
+            // is true only for confident hits. When the field is absent (older
+            // API / test fixtures) fall back to the high raw-score threshold.
+            Object matchObj = r.get("match");
+            boolean matchFlagPresent = matchObj instanceof Boolean;
+            boolean apiMatch = Boolean.TRUE.equals(matchObj);
+            boolean scoreOk = score != null && score >= MATCH_THRESHOLD;
+            boolean isHit = scoreOk && (!matchFlagPresent || apiMatch);
+
+            if (isHit) {
                 List<String> datasets = (List<String>) r.getOrDefault("datasets", List.of());
                 String source = datasets.isEmpty() ? "unknown" : datasets.get(0);
                 String matchedId = (String) r.getOrDefault("id", null);

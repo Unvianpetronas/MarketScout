@@ -5,7 +5,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import {
   Search, Globe, CheckCircle2, Clock, XCircle, Zap, Shield,
   HelpCircle, ChevronRight, AlertTriangle, Building2, ExternalLink,
-  MapPin, Star
+  MapPin, Star, ChevronDown, ShieldCheck, ShieldAlert, Percent,
+  FileSignature, DollarSign, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -14,6 +15,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { getMyQuota } from "@/services/quota.service";
 import { QuotaStatus } from "@/types/quota";
 import { getReports } from "@/services/report.service";
+import { streamPipelineMessage } from "@/services/chat.service";
 import { ReportListItem } from "@/types/report";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -90,9 +92,21 @@ function VerifyContent() {
   const [country, setCountry] = useState(searchParams.get("country") || "");
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [verifyStatus, setVerifyStatus] = useState("");
   const [recentReports, setRecentReports] = useState<ReportListItem[]>([]);
   const [isLoadingReports, setIsLoadingReports] = useState(true);
   const [inputFocused, setInputFocused] = useState(false);
+
+  // ── P7 — Deal Structure Risk (optional) ──────────────────────────────────
+  const [showDeal, setShowDeal] = useState(false);
+  const [paymentSafety, setPaymentSafety] = useState<"" | "SAFE" | "MODERATE" | "RISKY">("");
+  const [deposit, setDeposit] = useState(30);
+  const [depositSet, setDepositSet] = useState(false);
+  const [hasContract, setHasContract] = useState<null | boolean>(null);
+  const [dealValue, setDealValue] = useState("");
+
+  const dealFilledCount =
+    (paymentSafety ? 1 : 0) + (depositSet ? 1 : 0) + (hasContract !== null ? 1 : 0) + (dealValue ? 1 : 0);
 
   useEffect(() => {
     getMyQuota().then(setQuota).catch(() => null);
@@ -113,21 +127,88 @@ function VerifyContent() {
       return;
     }
 
-    // Route to AI chat with pre-filled message for verification
     const countryName = COUNTRIES.find((c) => c.code === country)?.name || country;
     const preMessage = countryName
       ? `Verify company "${q}" in ${countryName}. Run full background check and 8-pillar analysis.`
       : `Verify company "${q}". Run full background check and 8-pillar analysis.`;
 
+    // Optional P7 deal parameters — only include what the user actually set.
+    const deal: {
+      depositPercentage?: number; hasWrittenContract?: boolean;
+      paymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY"; dealValueUsd?: number;
+    } = {};
+    if (paymentSafety) deal.paymentMethodSafety = paymentSafety;
+    if (depositSet) deal.depositPercentage = deposit;
+    if (hasContract !== null) deal.hasWrittenContract = hasContract;
+    if (dealValue.trim()) deal.dealValueUsd = Number(dealValue.trim());
+
+    // Run the verification IN PLACE (no chat detour) so the deal params reach the
+    // pipeline directly and P7 is scored. Redirect to the report when it's ready.
     setIsSearching(true);
-    await new Promise((r) => setTimeout(r, 300));
-    router.push(`/chat?preMessage=${encodeURIComponent(preMessage)}`);
+    setVerifyStatus("Đang khởi tạo thẩm định...");
+    let navigated = false;
+
+    streamPipelineMessage(
+      { message: preMessage, sessionId: "", ...deal },
+      (chunk, status) => { if (status === "thinking" || !status) setVerifyStatus(chunk); },
+      () => {
+        // Finished with no report → ambiguous name / non-verify answer. Hand off to
+        // chat (carrying deal params) so the user can clarify.
+        if (navigated) return;
+        const params = new URLSearchParams({ preMessage });
+        if (deal.paymentMethodSafety) params.set("dealPayment", deal.paymentMethodSafety);
+        if (deal.depositPercentage != null) params.set("dealDeposit", String(deal.depositPercentage));
+        if (deal.hasWrittenContract != null) params.set("dealContract", String(deal.hasWrittenContract));
+        if (deal.dealValueUsd != null) params.set("dealValue", String(deal.dealValueUsd));
+        router.push(`/chat?${params.toString()}`);
+      },
+      () => { setIsSearching(false); setVerifyStatus(""); toast.error("Thẩm định thất bại. Vui lòng thử lại."); },
+      (meta) => {
+        if (meta.reportId && !navigated) {
+          navigated = true;
+          router.push(`/reports/${meta.reportId}`);
+        }
+      }
+    );
   };
 
   const userInitials = (user?.fullName || user?.email || "U").split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
 
   return (
     <AuthGuard>
+      {/* ── In-place verification progress overlay ── */}
+      {isSearching && (
+        <div className="fixed inset-0 z-50 bg-[#0A1A12]/60 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center">
+            <div className="w-16 h-16 mx-auto mb-5 relative">
+              <div className="absolute inset-0 rounded-full border-4 border-[#00D26A]/15" />
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#00D26A] animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Shield className="w-6 h-6 text-[#00D26A]" />
+              </div>
+            </div>
+            <h3 className="text-lg font-extrabold text-gray-900 mb-1.5">
+              Đang thẩm định {query.trim() || "doanh nghiệp"}
+            </h3>
+            <p className="text-sm text-gray-500 min-h-[20px] mb-5">
+              {verifyStatus || "Đang phân tích 8 trụ cột..."}
+            </p>
+            <div className="flex items-center justify-center gap-1.5 mb-5">
+              {[0, 150, 300].map((d) => (
+                <span key={d} className="w-2 h-2 rounded-full bg-[#00D26A]"
+                  style={{ animation: `bounce 1.2s ${d}ms ease-in-out infinite` }} />
+              ))}
+            </div>
+            {(paymentSafety || depositSet || hasContract !== null || dealValue) && (
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#7C3AED] bg-[#F3EEFF] px-3 py-1.5 rounded-full mb-4">
+                <FileSignature className="w-3 h-3" /> Có chấm điểm Trụ cột 7
+              </div>
+            )}
+            <p className="text-[11px] text-gray-400">Quá trình có thể mất 30–60 giây — vui lòng không đóng trang.</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex h-screen overflow-hidden bg-[#FAFBFA]">
         <Sidebar active="verify" />
         <div className="flex-1 overflow-y-auto scrollbar-thin">
@@ -202,6 +283,152 @@ function VerifyContent() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* ── Deal Structure (P7) — optional ── */}
+              <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowDeal((v) => !v)}
+                  className="w-full flex items-center gap-3 px-6 py-4 text-left hover:bg-gray-50/60 transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-[#F3EEFF] flex items-center justify-center shrink-0">
+                    <FileSignature className="w-4.5 h-4.5 text-[#7C3AED]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-gray-900">Thông tin giao dịch</p>
+                      <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full uppercase tracking-wide">Tuỳ chọn</span>
+                      {dealFilledCount > 0 && (
+                        <span className="text-[10px] font-bold text-[#7C3AED] bg-[#F3EEFF] px-1.5 py-0.5 rounded-full">
+                          {dealFilledCount} mục
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Cung cấp để chấm điểm <span className="font-semibold text-gray-500">Trụ cột 7 — Rủi ro cấu trúc giao dịch</span>
+                    </p>
+                  </div>
+                  <ChevronDown className={`w-5 h-5 text-gray-300 shrink-0 transition-transform ${showDeal ? "rotate-180" : ""}`} />
+                </button>
+
+                {showDeal && (
+                  <div className="px-6 pb-6 pt-1 space-y-6 border-t border-gray-50 animate-fade-in">
+                    {/* Payment method safety */}
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 mb-2.5 block">
+                        Phương thức thanh toán
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        {([
+                          { v: "SAFE", label: "An toàn", sub: "L/C, Escrow / Ký quỹ", Icon: ShieldCheck, color: "#00A859", bg: "#E6F9F0", ring: "#00D26A" },
+                          { v: "MODERATE", label: "Trung bình", sub: "T/T sau B/L, CAD", Icon: Shield, color: "#D97706", bg: "#FFF8E7", ring: "#F59E0B" },
+                          { v: "RISKY", label: "Rủi ro", sub: "Trả trước 100%", Icon: ShieldAlert, color: "#DC2626", bg: "#FFF1F0", ring: "#EF4444" },
+                        ] as const).map(({ v, label, sub, Icon, color, bg, ring }) => {
+                          const active = paymentSafety === v;
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => setPaymentSafety(active ? "" : v)}
+                              className={`text-left p-3.5 rounded-xl border-2 transition-all ${
+                                active ? "shadow-sm" : "border-gray-100 hover:border-gray-200"
+                              }`}
+                              style={active ? { borderColor: ring, backgroundColor: bg } : undefined}
+                            >
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: bg }}>
+                                  <Icon className="w-4 h-4" style={{ color }} />
+                                </div>
+                                {active && <CheckCircle2 className="w-4 h-4" style={{ color: ring }} />}
+                              </div>
+                              <p className="text-sm font-bold text-gray-900">{label}</p>
+                              <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Deposit slider */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2.5">
+                          <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                            <Percent className="w-3.5 h-3.5 text-gray-400" /> Đặt cọc trước
+                          </label>
+                          <span className={`text-sm font-extrabold ${depositSet ? "text-[#00843F]" : "text-gray-300"}`}>
+                            {depositSet ? `${deposit}%` : "—"}
+                          </span>
+                        </div>
+                        <input
+                          type="range" min={0} max={100} step={5} value={deposit}
+                          onChange={(e) => { setDeposit(Number(e.target.value)); setDepositSet(true); }}
+                          className="w-full accent-[#00D26A] cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[10px] text-gray-300 font-medium mt-1">
+                          <span>0%</span><span>Cọc thấp = an toàn hơn</span><span>100%</span>
+                        </div>
+                      </div>
+
+                      {/* Deal value */}
+                      <div>
+                        <label className="text-xs font-bold text-gray-700 mb-2.5 flex items-center gap-1.5">
+                          <DollarSign className="w-3.5 h-3.5 text-gray-400" /> Giá trị giao dịch <span className="text-gray-300 font-medium">(USD)</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">$</span>
+                          <input
+                            type="number" min={0} inputMode="numeric" value={dealValue}
+                            onChange={(e) => setDealValue(e.target.value)}
+                            placeholder="Ví dụ: 50000"
+                            className="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#00D26A] focus:bg-white transition-all font-medium"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Written contract toggle */}
+                    <div className="flex items-center justify-between gap-4 bg-gray-50 rounded-xl px-4 py-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <FileSignature className="w-4 h-4 text-gray-400 shrink-0" />
+                        <div>
+                          <p className="text-xs font-bold text-gray-700">Đã có hợp đồng thành văn?</p>
+                          <p className="text-[11px] text-gray-400">Hợp đồng đầy đủ điều khoản, đã ký kết</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        {([
+                          { v: true, label: "Có" },
+                          { v: false, label: "Chưa" },
+                        ] as const).map(({ v, label }) => {
+                          const active = hasContract === v;
+                          return (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={() => setHasContract(active ? null : v)}
+                              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                                active
+                                  ? v ? "bg-[#E6F9F0] text-[#00843F] border-[#00D26A]" : "bg-amber-50 text-amber-700 border-amber-300"
+                                  : "bg-white text-gray-400 border-gray-200 hover:border-gray-300"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 text-[11px] text-gray-400 leading-relaxed">
+                      <Sparkles className="w-3.5 h-3.5 text-[#7C3AED] shrink-0 mt-0.5" />
+                      <span>
+                        Thông tin giao dịch giúp AI chấm điểm chính xác Trụ cột 7. Bỏ trống cũng không sao — trụ cột sẽ hiển thị <span className="font-semibold">N/A</span> và không ảnh hưởng điểm tổng.
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* ── Info Banner ── */}

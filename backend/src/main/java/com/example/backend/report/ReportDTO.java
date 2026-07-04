@@ -92,5 +92,12 @@ public class ReportDTO {
         private String message;
         private String sessionId;
         private UUID reportId;   // nullable — null = global chatbox, set = viewing specific report
+
+        // P7 — Deal Structure Risk (optional). When present on a VERIFY_PARTNER
+        // request, the P7 pillar is scored; otherwise P7 stays N/A.
+        private Integer depositPercentage;
+        private Boolean hasWrittenContract;
+        private String  paymentMethodSafety; // SAFE | MODERATE | RISKY
+        private Double  dealValueUsd;
     }
 }

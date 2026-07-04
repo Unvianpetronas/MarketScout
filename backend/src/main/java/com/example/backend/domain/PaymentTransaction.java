@@ -26,10 +26,6 @@ public class PaymentTransaction {
     @JoinColumn(name = "invoice_id", nullable = false)
     private Invoice invoice;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "payment_method_id")
-    private PaymentMethod paymentMethod;
-
     @Size(max = 20)
     @NotNull
     @Column(name = "provider", nullable = false, length = 20)

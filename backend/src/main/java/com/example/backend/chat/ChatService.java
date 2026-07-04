@@ -32,6 +32,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -53,6 +55,7 @@ public class ChatService {
     private final ObjectMapper           objectMapper;
 
     private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
+    private final ScheduledExecutorService heartbeatExecutor = Executors.newScheduledThreadPool(4);
 
     // ── MarketScout Pipeline (6-intent SSE) ──────────────────────────────────
 
@@ -350,6 +353,11 @@ public class ChatService {
             .companyName(effectiveName)
             .country(country)
             .taxId(intent.getTaxId())
+            // P7 deal parameters (optional) — when present, the P7 pillar is scored.
+            .depositPercentage(req.getDepositPercentage())
+            .hasWrittenContract(req.getHasWrittenContract())
+            .paymentMethodSafety(req.getPaymentMethodSafety())
+            .dealValueUsd(req.getDealValueUsd())
             .build();
 
         // Create report record
@@ -377,9 +385,25 @@ public class ChatService {
             }
         });
 
+        // Send ": heartbeat" SSE comments every 10 seconds while the scoring pipeline runs.
+        // These are ignored by clients but prevent proxy/browser connection timeouts.
+        var heartbeat = heartbeatExecutor.scheduleAtFixedRate(() -> {
+            if (future.isDone()) return;
+            try {
+                emitter.send(SseEmitter.event().comment("heartbeat"));
+            } catch (Exception e) {
+                log.debug("Heartbeat send failed (client likely disconnected): {}", e.getMessage());
+            }
+        }, 10, 10, TimeUnit.SECONDS);
+
         // Block until the scoring pipeline finishes. Safe here: handleVerify already
         // runs on sseExecutor (a background pool), never a servlet request thread.
-        ScoringResult result = future.join();
+        ScoringResult result;
+        try {
+            result = future.join();
+        } finally {
+            heartbeat.cancel(false);
+        }
 
         String message;
         java.util.Map<String, Object> data;

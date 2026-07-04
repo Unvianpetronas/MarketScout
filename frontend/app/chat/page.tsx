@@ -18,6 +18,7 @@ import {
 import { ChatSession, ChatMessage } from "@/types/chat";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
+import { parseResult, VerifyResultCard } from "@/components/chat/verify-result-card";
 
 const SUGGESTED_PROMPTS = [
   { icon: Search, labelKey: "chat.prompt.findExport", textKey: "chat.promptText.findExport" },
@@ -43,6 +44,10 @@ function TypingDots() {
 function MessageBubble({ msg, userInitials }: { msg: ChatMessage; userInitials: string }) {
   const { t } = useLanguage();
   const isUser = msg.role === "user";
+  // Assistant verification/lookup results are stored as a pipe-delimited line.
+  // Detect that format and render a rich card instead of raw text.
+  const result = !isUser ? parseResult(msg.content) : null;
+
   return (
       <div className={`flex gap-3 animate-fade-in-up ${isUser ? "flex-row-reverse" : ""}`}>
         {/* Avatar */}
@@ -55,18 +60,24 @@ function MessageBubble({ msg, userInitials }: { msg: ChatMessage; userInitials: 
           }
         </div>
 
-        <div className={`max-w-[75%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1`}>
+        <div className={`max-w-[80%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1`}>
           <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider px-1">
             {isUser ? t("chat.you") : t("chat.ai")}
           </p>
-          <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
-              isUser
-                  ? "bg-[#0D2218] text-white rounded-tr-sm"
-                  : "bg-white text-gray-800 rounded-tl-sm border border-gray-100"
-          }`}>
-            <p style={{ whiteSpace: "pre-wrap" }}>{msg.content}</p>
-          </div>
-          {!isUser && msg.reportId && (
+
+          {result ? (
+              <VerifyResultCard result={result} />
+          ) : (
+              <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
+                  isUser
+                      ? "bg-[#0D2218] text-white rounded-tr-sm"
+                      : "bg-white text-gray-800 rounded-tl-sm border border-gray-100"
+              }`}>
+                <p style={{ whiteSpace: "pre-wrap" }}>{msg.content}</p>
+              </div>
+          )}
+
+          {!isUser && !result && msg.reportId && (
               <Link
                   href={`/reports/${msg.reportId}`}
                   className="flex items-center gap-1 text-[11px] font-semibold text-[#00843F] hover:underline px-1"
@@ -108,6 +119,14 @@ function ChatContent() {
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Optional P7 deal parameters passed from /verify via URL. Consumed once, on the
+  // first send (the verification message), then cleared.
+  const dealParamsRef = useRef<{
+    depositPercentage?: number;
+    hasWrittenContract?: boolean;
+    paymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY";
+    dealValueUsd?: number;
+  } | null>(null);
 
   const userInitials = (user?.fullName || "U")
       .split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
@@ -134,6 +153,20 @@ function ChatContent() {
     const preMessage = searchParams.get("preMessage");
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing input from a URL param
     if (preMessage) setInput(decodeURIComponent(preMessage));
+
+    // Deal parameters from /verify → carried until the first send.
+    const payment = searchParams.get("dealPayment");
+    const deposit = searchParams.get("dealDeposit");
+    const contract = searchParams.get("dealContract");
+    const value = searchParams.get("dealValue");
+    if (payment || deposit || contract || value) {
+      dealParamsRef.current = {
+        paymentMethodSafety: (payment as "SAFE" | "MODERATE" | "RISKY") || undefined,
+        depositPercentage: deposit ? Number(deposit) : undefined,
+        hasWrittenContract: contract ? contract === "true" : undefined,
+        dealValueUsd: value ? Number(value) : undefined,
+      };
+    }
   }, [searchParams]);
 
   const handleNewSession = async () => {
@@ -193,8 +226,11 @@ function ChatContent() {
     reportMetaRef.current = null;
 
 
+    const dealParams = dealParamsRef.current;
+    dealParamsRef.current = null; // consume once — only the verify message carries them
+
     streamPipelineMessage(
-        { message: sentInput, sessionId: session.id, reportId },
+        { message: sentInput, sessionId: session.id, reportId, ...(dealParams ?? {}) },
         (chunk, status) => {
           // "thinking" events are progress only — show them as a transient status
           // line, never fold them into the final answer bubble.
@@ -403,31 +439,38 @@ function ChatContent() {
                   <MessageBubble key={msg.id} msg={msg} userInitials={userInitials} />
               ))}
 
-              {isStreaming && (
+              {isStreaming && (() => {
+                const streamResult = streamingContent ? parseResult(streamingContent) : null;
+                return (
                   <div className="flex gap-3 animate-fade-in">
                     <div className="w-8 h-8 rounded-full bg-[#0D2218] flex items-center justify-center shrink-0">
                       <Bot className="w-4 h-4 text-[#00D26A]" />
                     </div>
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-1 max-w-[80%]">
                       <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider px-1">{t("chat.ai")}</p>
-                      <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100 max-w-[75%]">
-                        {streamingContent ? (
-                            <p className="text-sm text-gray-800 leading-relaxed" style={{ whiteSpace: "pre-wrap" }}>
-                              {streamingContent}
-                              <span className="inline-block w-0.5 h-4 bg-[#00D26A] ml-0.5 animate-pulse" />
-                            </p>
-                        ) : (
-                            <div className="flex items-center gap-2.5">
-                              <TypingDots />
-                              {streamingStatus && (
-                                  <span className="text-xs text-gray-400 italic">{streamingStatus}</span>
-                              )}
-                            </div>
-                        )}
-                      </div>
+                      {streamResult ? (
+                          <VerifyResultCard result={streamResult} />
+                      ) : (
+                          <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100">
+                            {streamingContent ? (
+                                <p className="text-sm text-gray-800 leading-relaxed" style={{ whiteSpace: "pre-wrap" }}>
+                                  {streamingContent}
+                                  <span className="inline-block w-0.5 h-4 bg-[#00D26A] ml-0.5 animate-pulse" />
+                                </p>
+                            ) : (
+                                <div className="flex items-center gap-2.5">
+                                  <TypingDots />
+                                  {streamingStatus && (
+                                      <span className="text-xs text-gray-400 italic">{streamingStatus}</span>
+                                  )}
+                                </div>
+                            )}
+                          </div>
+                      )}
                     </div>
                   </div>
-              )}
+                );
+              })()}
 
               <div ref={messagesEndRef} />
             </div>

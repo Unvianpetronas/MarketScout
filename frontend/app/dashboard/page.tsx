@@ -357,7 +357,7 @@ export default function DashboardPage() {
                               <ScoreCircle score={report.overallScore} />
                             </td>
                             <td className="px-6 py-3.5">
-                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${getRiskBadge(report.riskLevel)}`}>
+                              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${getRiskBadge(report.riskLevel)}`}>
                                 {report.riskLevel === "LOW" ? t("risk.low") :
                                   report.riskLevel === "MEDIUM" ? t("risk.medium") :
                                   report.riskLevel === "HIGH" ? t("risk.high") : report.riskLevel || "—"}

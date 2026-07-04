@@ -63,6 +63,7 @@ public class ScoringEngine {
     private final CrawlerP6 crawlerP6;
     private final CrawlerP8 crawlerP8;
     private final DealSafetyAgent dealSafetyAgent;
+    private final com.example.backend.report.ReportRecommendationService recommendationService;
     private final FactExtractor factExtractor;
     private final ScoringRubricLoader rubricLoader;
     private final ReportRepository reportRepository;
@@ -101,9 +102,12 @@ public class ScoringEngine {
 
             savePillarResults(reportId, result.getPillars(), report);
 
-            // Trigger deal safety async — skip entirely on hard-stop to save a Gemini call.
+            // Trigger deal safety + AI recommendations async — both skipped on
+            // hard-stop (a sanctioned entity needs no deal advice). Generated here,
+            // right after pillars are persisted, so they reflect the final scores.
             if (!result.isHardStop()) {
                 dealSafetyAgent.analyzeAsync(reportId, result);
+                recommendationService.generateAndSaveAsync(reportId);
             }
 
             if (sseCallback != null) {
