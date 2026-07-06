@@ -259,18 +259,23 @@ public class PaymentService {
             return WebhookResult.IRRELEVANT;
         }
         // Must land on our configured receiving account. Some banks (e.g. BIDV)
-        // route through an alphanumeric virtual account (VA) rather than the
-        // physical account number, so this is compared case/whitespace-insensitive
-        // rather than digits-only — stripping to digits would mangle a VA like
-        // "96247MARKETSCOUT" down to "96247" and silently break matching.
+        // route collection through an alphanumeric virtual account (VA) — for
+        // those, SePay reports the VA in `subAccount` and the underlying physical
+        // account (shared by every VA on that bank connection) in `accountNumber`.
+        // So a configured VA must be checked against subAccount, not accountNumber.
+        // Compared case/whitespace-insensitive rather than digits-only — stripping
+        // to digits would mangle a VA like "96247MARKETSCOUT" down to "96247".
         if (props.getAccountNo() == null || props.getAccountNo().isBlank()) {
             log.error("SePay webhook ignored — app.payment.account-no is not configured, "
                     + "so no incoming transfer can ever be matched. Set SEPAY_ACCOUNT_NO. sepayRef={}", p.getId());
             return WebhookResult.IRRELEVANT;
         }
-        if (!java.util.Objects.equals(normalizeAccountId(props.getAccountNo()), normalizeAccountId(p.getAccountNumber()))) {
-            log.warn("SePay webhook ignored — account number mismatch: configured={} received={} sepayRef={}",
-                    props.getAccountNo(), p.getAccountNumber(), p.getId());
+        String configuredAccount = normalizeAccountId(props.getAccountNo());
+        boolean accountMatches = configuredAccount.equals(normalizeAccountId(p.getAccountNumber()))
+                || configuredAccount.equals(normalizeAccountId(p.getSubAccount()));
+        if (!accountMatches) {
+            log.warn("SePay webhook ignored — account mismatch: configured={} received accountNumber={} subAccount={} sepayRef={}",
+                    props.getAccountNo(), p.getAccountNumber(), p.getSubAccount(), p.getId());
             return WebhookResult.IRRELEVANT;
         }
         String code = extractCode(p);
