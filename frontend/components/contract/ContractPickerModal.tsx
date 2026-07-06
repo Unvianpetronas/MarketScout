@@ -27,8 +27,10 @@ const FIELD_LABELS: Record<string, string> = {
   depositPercent: "Đặt cọc trước",
   paymentMethod: "Phương thức TT",
   hasArbitrationClause: "Điều khoản trọng tài",
-  signatoryName: "Bên ký kết",
-  signatoryTaxId: "MST bên ký kết",
+  partyAName: "Bên A",
+  partyATaxId: "MST Bên A",
+  partyBName: "Bên B",
+  partyBTaxId: "MST Bên B",
 };
 
 function fieldValueToInput(v: ExtractedField["value"]): string {
@@ -152,10 +154,10 @@ export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }:
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-purple-50 rounded-xl flex items-center justify-center">
               <FileText className="w-4 h-4 text-purple-500" />
@@ -167,7 +169,7 @@ export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }:
           </button>
         </div>
 
-        <div className="flex gap-1 px-6 pt-4">
+        <div className="shrink-0 flex gap-1 px-6 pt-4">
           {(["existing", "upload"] as const).map((t) => (
             <button
               key={t}
@@ -181,7 +183,7 @@ export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }:
           ))}
         </div>
 
-        <div className="p-6 pt-4">
+        <div className="flex-1 overflow-y-auto p-6 pt-4">
           {tab === "existing" ? (
             <div>
               <div className="relative mb-4">
@@ -338,23 +340,27 @@ export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }:
                         : "Có thể chỉnh sửa các trường này trên trang báo cáo sau khi thẩm định xong."}
                     </p>
                   </div>
-                  <div className="flex justify-end gap-2 mt-5">
-                    <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700">
-                      Huỷ
-                    </button>
-                    <button
-                      onClick={confirmUse}
-                      disabled={confirming}
-                      className="px-4 py-2 text-sm font-bold text-white rounded-xl bg-gradient-to-r from-[#00D26A] to-[#00843F] disabled:opacity-60"
-                    >
-                      {confirming ? "Đang xác nhận..." : "Xác nhận & Dùng →"}
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
           )}
         </div>
+
+        {/* Always-visible footer — never require scrolling the content area to reach it */}
+        {tab === "upload" && uploaded && extractionDone && (
+          <div className="shrink-0 flex justify-end gap-2 px-6 py-4 border-t border-gray-100">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700">
+              Huỷ
+            </button>
+            <button
+              onClick={confirmUse}
+              disabled={confirming}
+              className="px-4 py-2 text-sm font-bold text-white rounded-xl bg-gradient-to-r from-[#00D26A] to-[#00843F] disabled:opacity-60"
+            >
+              {confirming ? "Đang xác nhận..." : "Xác nhận & Dùng →"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
