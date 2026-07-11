@@ -1,6 +1,8 @@
 package com.example.backend.report;
 
 import com.example.backend.shared.model.scoring.Evidence;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -89,9 +91,16 @@ public class ReportDTO {
     // Chat pipeline message request (replaces simple content-only request)
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class ChatMessageRequest {
+        @NotBlank
+        @Size(max = 2000, message = "Tin nhắn tối đa 2000 ký tự")
         private String message;
         private String sessionId;
         private UUID reportId;   // nullable — null = global chatbox, set = viewing specific report
+
+        // true = this call is the user's confirmation for a pending VERIFY_PARTNER /
+        // COMPARE_PARTNERS request (see ChatService's confirm-before-run gate) —
+        // skips intent detection and resumes the pending scan instead.
+        private Boolean confirmVerify;
 
         // Self-reported "Thông tin giao dịch" from the pre-scan form (optional).
         // Written straight to Report.selfReport* columns — reference only, NEVER
@@ -106,5 +115,10 @@ public class ReportDTO {
         // linked + cross-checked against the newly created report right before
         // scoring runs, so P7 is scored for real on the very first pass.
         private UUID contractId;
+
+        // Optional — lets the pre-scan form (/verify) supply a known company
+        // website so P2's RDAP lookup has something to check. When absent,
+        // CrawlerP2 best-effort auto-discovers a candidate domain via search.
+        private String website;
     }
 }

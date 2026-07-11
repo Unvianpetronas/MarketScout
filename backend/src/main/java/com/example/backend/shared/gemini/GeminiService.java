@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
@@ -81,6 +82,26 @@ public class GeminiService {
     public record GeminiMessage(String role, String text) {}
 
     /**
+     * One retry with a short backoff, only for transient failures (429 rate-limit
+     * or 5xx). Client errors (400/401/403/404) fail immediately — retrying a bad
+     * request/invalid key never succeeds.
+     */
+    @SuppressWarnings("unchecked")
+    private ResponseEntity<Map> executeWithRetry(String url, HttpEntity<Map<String, Object>> request) {
+        try {
+            return restTemplate.exchange(url, HttpMethod.POST, request, Map.class);
+        } catch (HttpClientErrorException.TooManyRequests | HttpServerErrorException e) {
+            log.warn("Gemini call failed ({}) — retrying once after backoff", e.getStatusCode());
+            try {
+                Thread.sleep(1500);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+            return restTemplate.exchange(url, HttpMethod.POST, request, Map.class);
+        }
+    }
+
+    /**
      * Single-turn call with a custom system prompt.
      * Used by: IntentDetector, FactExtractor, DealSafetyAgent
      */
@@ -118,8 +139,7 @@ public class GeminiService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         String url = geminiUrl() + "?key=" + apiKey;
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
-                url, HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+            ResponseEntity<Map> response = executeWithRetry(url, new HttpEntity<>(body, headers));
             if (response.getBody() == null) throw new RuntimeException("Gemini returned empty body");
             List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.getBody().get("candidates");
             Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
@@ -148,8 +168,7 @@ public class GeminiService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         String url = geminiUrl() + "?key=" + apiKey;
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
-                url, HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+            ResponseEntity<Map> response = executeWithRetry(url, new HttpEntity<>(body, headers));
             if (response.getBody() == null) throw new RuntimeException("Gemini returned empty body");
             List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.getBody().get("candidates");
             Map<String, Object> content = (Map<String, Object>) candidates.get(0).get("content");
@@ -195,7 +214,7 @@ public class GeminiService {
         String url = geminiUrl() + "?key=" + apiKey;
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, request, Map.class);
+            ResponseEntity<Map> response = executeWithRetry(url, request);
 
             if (response.getBody() == null) {
                 throw new RuntimeException("Gemini API returned empty body");

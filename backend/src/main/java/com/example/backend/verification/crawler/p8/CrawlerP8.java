@@ -107,6 +107,14 @@ public class CrawlerP8 {
         // Step 2: Gemini Vision — detect stock image (thay TinEye)
         Boolean isStockImage = detectStockImageWithGemini(domain, input.getName());
 
+        // Neither Tavily nor Gemini Vision produced any signal — asserting
+        // "no physical evidence found" here would present an unchecked company
+        // as if its physical presence had actually been verified.
+        if (tavilyResults.isEmpty() && isStockImage == null) {
+            return P8Data.builder().state(PillarData.DataState.SKIP).companyName(input.getName())
+                .errorMsg("Không tìm được bằng chứng vật lý từ Tavily hoặc Gemini Vision").fetchedAt(LocalDateTime.now()).build();
+        }
+
         String rawText = String.format(
                 "Company: %s | Domain: %s | HasPhysicalEvidence: %b | HasVerifiedLocation: %b"
                         + " | StockImage: %s | Employees: %s | Source: gemini_vision+tavily",

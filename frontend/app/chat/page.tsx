@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   Send, Plus, Trash2, FileText, Loader2, MessageSquare,
   RefreshCw, Sparkles, Search, Shield, TrendingUp, Globe,
-  ChevronRight, X, Bot, User
+  ChevronRight, X, Bot, User, FileSignature
 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
@@ -19,6 +19,7 @@ import { ChatSession, ChatMessage } from "@/types/chat";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
 import { parseResult, VerifyResultCard } from "@/components/chat/verify-result-card";
+import { ContractPickerModal } from "@/components/contract/ContractPickerModal";
 
 const SUGGESTED_PROMPTS = [
   { icon: Search, labelKey: "chat.prompt.findExport", textKey: "chat.promptText.findExport" },
@@ -41,7 +42,10 @@ function TypingDots() {
   );
 }
 
-function MessageBubble({ msg, userInitials }: { msg: ChatMessage; userInitials: string }) {
+function MessageBubble({ msg, userInitials, isLatest, onConfirmVerify, onAttachContract, attachedContractName }: {
+  msg: ChatMessage; userInitials: string; isLatest?: boolean; onConfirmVerify?: () => void;
+  onAttachContract?: () => void; attachedContractName?: string | null;
+}) {
   const { t } = useLanguage();
   const isUser = msg.role === "user";
   // Assistant verification/lookup results are stored as a pipe-delimited line.
@@ -85,6 +89,32 @@ function MessageBubble({ msg, userInitials }: { msg: ChatMessage; userInitials: 
                 {t("chat.viewReport")} <ChevronRight className="w-3 h-3" />
               </Link>
           )}
+
+          {!isUser && isLatest && msg.pendingConfirm && onConfirmVerify && (
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <button
+                    onClick={onConfirmVerify}
+                    className="px-3 py-1.5 gradient-brand text-white text-xs font-semibold rounded-lg hover:opacity-90"
+                >
+                  {t("chat.confirmVerify")}
+                </button>
+                {onAttachContract && (
+                    attachedContractName ? (
+                        <span className="flex items-center gap-1 text-[11px] font-semibold text-[#7C3AED] bg-[#F3EEFF] px-2.5 py-1 rounded-lg">
+                          <FileSignature className="w-3 h-3" /> {attachedContractName}
+                        </span>
+                    ) : (
+                        <button
+                            onClick={onAttachContract}
+                            className="flex items-center gap-1 px-3 py-1.5 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg hover:bg-gray-50"
+                        >
+                          <FileSignature className="w-3 h-3" /> {t("chat.attachContract")}
+                        </button>
+                    )
+                )}
+                <span className="text-[11px] text-gray-400">{t("chat.confirmVerifyHint")}</span>
+              </div>
+          )}
           {!isUser && (
               <p className="text-[10px] text-gray-400 px-1">
                 {msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""}
@@ -126,7 +156,13 @@ function ChatContent() {
     hasWrittenContract?: boolean;
     paymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY";
     dealValueUsd?: number;
+    website?: string;
   } | null>(null);
+  // Set when the assistant asks to confirm a Deep Verify/Compare run before
+  // spending quota (see ChatService's confirm-before-run gate).
+  const pendingConfirmRef = useRef<{ quotaCost: number; quotaRemaining: number } | null>(null);
+  const [showContractModal, setShowContractModal] = useState(false);
+  const [pickedContract, setPickedContract] = useState<{ id: string; fileName: string } | null>(null);
 
   const userInitials = (user?.fullName || "U")
       .split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
@@ -159,12 +195,14 @@ function ChatContent() {
     const deposit = searchParams.get("dealDeposit");
     const contract = searchParams.get("dealContract");
     const value = searchParams.get("dealValue");
-    if (payment || deposit || contract || value) {
+    const website = searchParams.get("dealWebsite");
+    if (payment || deposit || contract || value || website) {
       dealParamsRef.current = {
         paymentMethodSafety: (payment as "SAFE" | "MODERATE" | "RISKY") || undefined,
         depositPercentage: deposit ? Number(deposit) : undefined,
         hasWrittenContract: contract ? contract === "true" : undefined,
         dealValueUsd: value ? Number(value) : undefined,
+        website: website || undefined,
       };
     }
   }, [searchParams]);
@@ -195,6 +233,107 @@ function ChatContent() {
     }
   };
 
+  // Shared onChunk/onDone/onError/onMeta wiring for both a normal send and a
+  // confirm-verify follow-up — the two only differ in what payload they POST.
+  const makeStreamCallbacks = () => ({
+    onChunk: (chunk: string, status?: string) => {
+      // "thinking" events are progress only — show them as a transient status
+      // line, never fold them into the final answer bubble.
+      if (status === "thinking") {
+        setStreamingStatus(chunk);
+        return;
+      }
+      streamingContentRef.current = streamingContentRef.current
+          ? `${streamingContentRef.current}\n\n${chunk}` : chunk;
+      setStreamingContent(streamingContentRef.current);
+    },
+    onDone: () => {
+      // FIX: chụp giá trị ref ra biến local NGAY LẬP TỨC.
+      // setMessages(updater) chạy trễ (lúc React render), trong khi 2 dòng
+      // reset bên dưới chạy ngay — nếu đọc ref bên trong updater thì lúc đó
+      // ref đã bị xóa thành "" → luôn rơi vào fallback.
+      const finalContent = streamingContentRef.current;
+      const meta = reportMetaRef.current;
+      const pendingConfirm = pendingConfirmRef.current;
+      setIsStreaming(false);
+      setStreamingStatus("");
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: finalContent || t("chat.fallbackReply"),
+          createdAt: new Date().toISOString(),
+          reportId: meta?.reportId,
+          reportMeta: meta
+              ? {
+                overallScore: meta.overallScore,
+                riskLevel: meta.riskLevel,
+                hardStop: meta.hardStop,
+                taxId: meta.taxId,
+              }
+              : undefined,
+          pendingConfirm: pendingConfirm ?? undefined,
+        },
+      ]);
+      setStreamingContent("");
+      streamingContentRef.current = "";
+      reportMetaRef.current = null;
+      pendingConfirmRef.current = null;
+    },
+    onError: (_err: Error) => {
+      setIsStreaming(false);
+      setStreamingStatus("");
+      const partialContent = streamingContentRef.current; // FIX: chụp giá trị trước, lý do như onDone
+      const meta = reportMetaRef.current;
+      if (partialContent) {
+        // Stream đứt NHƯNG đã nhận được nội dung → vẫn hiển thị cho user
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: partialContent,
+            createdAt: new Date().toISOString(),
+            reportId: meta?.reportId,
+            reportMeta: meta
+                ? {
+                  overallScore: meta.overallScore,
+                  riskLevel: meta.riskLevel,
+                  hardStop: meta.hardStop,
+                  taxId: meta.taxId,
+                }
+                : undefined,
+          },
+        ]);
+        streamingContentRef.current = "";
+        setStreamingContent("");
+      } else {
+        setStreamingContent("");
+        toast.error(t("chat.errToast"));
+      }
+      reportMetaRef.current = null;
+      pendingConfirmRef.current = null;
+    },
+    onMeta: (meta: Record<string, unknown>) => {
+      // Confirm-before-run gate: no reportId yet, just quota cost/remaining.
+      if ("quotaCost" in meta && "quotaRemaining" in meta) {
+        pendingConfirmRef.current = {
+          quotaCost: meta.quotaCost as number,
+          quotaRemaining: meta.quotaRemaining as number,
+        };
+        return;
+      }
+      reportMetaRef.current = {
+        reportId: meta.reportId as string | undefined,
+        overallScore: meta.overallScore as number | undefined,
+        riskLevel: meta.riskLevel as string | undefined,
+        hardStop: meta.hardStop as boolean | undefined,
+        taxId: meta.taxId as string | undefined,
+      };
+    },
+  });
+
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
 
@@ -224,102 +363,56 @@ function ChatContent() {
     setStreamingStatus("");
     streamingContentRef.current = "";
     reportMetaRef.current = null;
-
+    pendingConfirmRef.current = null;
 
     const dealParams = dealParamsRef.current;
     dealParamsRef.current = null; // consume once — only the verify message carries them
 
+    const { onChunk, onDone, onError, onMeta } = makeStreamCallbacks();
     streamPipelineMessage(
         { message: sentInput, sessionId: session.id, reportId, ...(dealParams ?? {}) },
-        (chunk, status) => {
-          // "thinking" events are progress only — show them as a transient status
-          // line, never fold them into the final answer bubble.
-          if (status === "thinking") {
-            setStreamingStatus(chunk);
-            return;
-          }
-          streamingContentRef.current = streamingContentRef.current
-              ? `${streamingContentRef.current}\n\n${chunk}` : chunk;
-          setStreamingContent(streamingContentRef.current);
-        },
-        () => {
-          // FIX: chụp giá trị ref ra biến local NGAY LẬP TỨC.
-          // setMessages(updater) chạy trễ (lúc React render), trong khi 2 dòng
-          // reset bên dưới chạy ngay — nếu đọc ref bên trong updater thì lúc đó
-          // ref đã bị xóa thành "" → luôn rơi vào fallback.
-          const finalContent = streamingContentRef.current;
-          const meta = reportMetaRef.current;
-          setIsStreaming(false);
-          setStreamingStatus("");
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: (Date.now() + 1).toString(),
-              role: "assistant",
-              content: finalContent || t("chat.fallbackReply"),
-              createdAt: new Date().toISOString(),
-              reportId: meta?.reportId,
-              reportMeta: meta
-                  ? {
-                    overallScore: meta.overallScore,
-                    riskLevel: meta.riskLevel,
-                    hardStop: meta.hardStop,
-                    taxId: meta.taxId,
-                  }
-                  : undefined,
-            },
-          ]);
-          setStreamingContent("");
-          streamingContentRef.current = "";
-          reportMetaRef.current = null;
-        },
-        (err) => {
-          setIsStreaming(false);
-          setStreamingStatus("");
-          const partialContent = streamingContentRef.current; // FIX: chụp giá trị trước, lý do như onDone
-          const meta = reportMetaRef.current;
-          if (partialContent) {
-            // Stream đứt NHƯNG đã nhận được nội dung → vẫn hiển thị cho user
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: (Date.now() + 1).toString(),
-                role: "assistant",
-                content: partialContent,
-                createdAt: new Date().toISOString(),
-                reportId: meta?.reportId,
-                reportMeta: meta
-                    ? {
-                      overallScore: meta.overallScore,
-                      riskLevel: meta.riskLevel,
-                      hardStop: meta.hardStop,
-                      taxId: meta.taxId,
-                    }
-                    : undefined,
-              },
-            ]);
-            streamingContentRef.current = "";
-            setStreamingContent("");
-          } else {
-            setStreamingContent("");
-            toast.error(t("chat.errToast"));
-          }
-          reportMetaRef.current = null;
-        },
-        (meta) => {
-          reportMetaRef.current = {
-            reportId: meta.reportId as string | undefined,
-            overallScore: meta.overallScore as number | undefined,
-            riskLevel: meta.riskLevel as string | undefined,
-            hardStop: meta.hardStop as boolean | undefined,
-            taxId: meta.taxId as string | undefined,
-          };
-        }
+        onChunk, onDone, onError, onMeta
+    );
+  };
+
+  /** User clicked "Xác nhận quét" under a pending-confirm assistant message. */
+  const handleConfirmVerify = () => {
+    if (!activeSession || isStreaming) return;
+
+    const confirmText = "Xác nhận quét";
+    const contractId = pickedContract?.id;
+    setMessages((prev) => [...prev, {
+      id: Date.now().toString(),
+      role: "user",
+      content: confirmText,
+      createdAt: new Date().toISOString(),
+    }]);
+    setIsStreaming(true);
+    setStreamingContent("");
+    setStreamingStatus("");
+    streamingContentRef.current = "";
+    reportMetaRef.current = null;
+    pendingConfirmRef.current = null;
+    setPickedContract(null); // consumed once — only this confirm carries it
+
+    const { onChunk, onDone, onError, onMeta } = makeStreamCallbacks();
+    streamPipelineMessage(
+        { message: confirmText, sessionId: activeSession.id, confirmVerify: true, ...(contractId ? { contractId } : {}) },
+        onChunk, onDone, onError, onMeta
     );
   };
 
   return (
       <AuthGuard>
+        {showContractModal && (
+            <ContractPickerModal
+                onClose={() => setShowContractModal(false)}
+                onSelected={(contractId, fileName) => {
+                  setPickedContract({ id: contractId, fileName });
+                  setShowContractModal(false);
+                }}
+            />
+        )}
         <div className="flex h-screen bg-[#FAFBFA] overflow-hidden">
           <Sidebar active="ai-assistant" />
 
@@ -435,8 +528,16 @@ function ChatContent() {
                   </div>
               )}
 
-              {messages.map((msg) => (
-                  <MessageBubble key={msg.id} msg={msg} userInitials={userInitials} />
+              {messages.map((msg, i) => (
+                  <MessageBubble
+                      key={msg.id}
+                      msg={msg}
+                      userInitials={userInitials}
+                      isLatest={i === messages.length - 1 && !isStreaming}
+                      onConfirmVerify={handleConfirmVerify}
+                      onAttachContract={() => setShowContractModal(true)}
+                      attachedContractName={pickedContract?.fileName}
+                  />
               ))}
 
               {isStreaming && (() => {

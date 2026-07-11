@@ -58,9 +58,12 @@ public class CrawlerP3VN {
                 .timeout(8000)
                 .get();
 
-            Elements rows = doc.select(".company-row, .result-item, tr");
+            // Only count rows that carry a recognizable result-row class — a bare
+            // "tr" selector counts every HTML table row on the page (nav, ads,
+            // unrelated tables), inflating shipmentCount with noise.
+            Elements rows = doc.select(".company-row, .result-item");
             boolean found = !rows.isEmpty();
-            int shipmentCount = rows.size() > 1 ? rows.size() - 1 : 0;
+            int shipmentCount = rows.size();
             String trend = shipmentCount > 10 ? "GROWING" : shipmentCount > 3 ? "STABLE" : "DECLINING";
 
             String rawText = String.format(

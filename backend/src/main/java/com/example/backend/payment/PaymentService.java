@@ -198,6 +198,33 @@ public class PaymentService {
                 .build();
     }
 
+    // ── Billing history ────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<PaymentDTO.InvoiceSummaryResponse> listInvoices(UUID userId) {
+        return invoiceRepository.findByUser_IdOrderByCreatedAtDesc(userId).stream()
+                .map(inv -> PaymentDTO.InvoiceSummaryResponse.builder()
+                        .invoiceId(inv.getId())
+                        .invoiceNo(inv.getInvoiceNo())
+                        .status(inv.getStatus())
+                        .totalVnd(inv.getTotalVnd())
+                        .paidAt(inv.getPaidAt())
+                        .createdAt(inv.getCreatedAt())
+                        .itemLabel(resolveItemLabel(inv))
+                        .build())
+                .toList();
+    }
+
+    private String resolveItemLabel(Invoice invoice) {
+        PaymentTransaction tx = transactionRepository.findByInvoice_Id(invoice.getId()).orElse(null);
+        if (tx == null) return "—";
+        PlanPurchase plan = planPurchaseRepository.findByTransaction_Id(tx.getId()).orElse(null);
+        if (plan != null) return plan.getPlan().getName() + " plan";
+        QuotaTopup topup = topupRepository.findByTransaction_Id(tx.getId()).orElse(null);
+        if (topup != null) return "Nạp thêm " + topup.getQuotaAdded() + " lượt verify";
+        return "—";
+    }
+
     // ── Status poll ────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)

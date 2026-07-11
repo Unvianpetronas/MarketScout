@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft, AlertTriangle, Shield, RefreshCw, Globe, ExternalLink,
   CheckCircle2, XCircle, Clock, Download, MessageSquare,
@@ -14,7 +15,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { ContractPickerModal } from "@/components/contract/ContractPickerModal";
 import { getReport, getReportRecommendations, patchDealInfo } from "@/services/report.service";
 import { getContract, unlinkContract, listContractLinks } from "@/services/contract.service";
-import { VerificationReport, PillarResult, ReportRecommendations } from "@/types/report";
+import { VerificationReport, PillarResult, ReportRecommendations, isProcessingStatus } from "@/types/report";
 import { LinkResponse, ContractSummary } from "@/types/contract";
 
 interface Props {
@@ -422,6 +423,7 @@ function TransactionInfoCard({
 
 export default function ReportDetailPage({ params }: Props) {
   const { id } = use(params);
+  const router = useRouter();
   const [report, setReport] = useState<VerificationReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRescan, setIsRescan] = useState(false);
@@ -437,7 +439,7 @@ export default function ReportDetailPage({ params }: Props) {
 
   // Generate AI next-step recommendations once the report has loaded.
   useEffect(() => {
-    if (!report || report.status === "PROCESSING") return;
+    if (!report || isProcessingStatus(report.status)) return;
     setRecsLoading(true);
     getReportRecommendations(id)
       .then(setRecs)
@@ -445,10 +447,15 @@ export default function ReportDetailPage({ params }: Props) {
       .finally(() => setRecsLoading(false));
   }, [report, id]);
 
-  const handleRescan = async () => {
+  // A rescan is a brand-new Deep Verify run (fresh quota spend), not an in-place
+  // refresh — pre-fill the /verify form with this report's company/country and
+  // let the user review + confirm there, same as any other verify request.
+  const handleRescan = () => {
+    if (!report) return;
     setIsRescan(true);
-    toast.info("Đang khởi động lại quét...");
-    setTimeout(() => setIsRescan(false), 2000);
+    const params = new URLSearchParams({ q: report.entityName });
+    if (report.countryIso2) params.set("country", report.countryIso2);
+    router.push(`/verify?${params.toString()}`);
   };
 
   const pillars = report?.pillars ?? [];
@@ -482,7 +489,7 @@ export default function ReportDetailPage({ params }: Props) {
                 <Link href="/reports" className="text-sm text-gray-400 hover:text-gray-700">Báo cáo</Link>
                 <span className="text-gray-200">/</span>
                 <span className="text-sm font-medium text-gray-700 font-mono">{id.slice(0, 8).toUpperCase()}</span>
-                {report?.status === "PROCESSING" && (
+                {isProcessingStatus(report?.status) && (
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                     Đang quét

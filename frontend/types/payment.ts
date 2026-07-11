@@ -26,3 +26,13 @@ export interface TopupStatusResponse {
 
 /** Price of a single verification credit, in VND. Mirrors backend config. */
 export const PRICE_PER_CREDIT_VND = 200_000;
+
+export interface InvoiceSummary {
+  invoiceId: string;
+  invoiceNo: string;
+  status: string;
+  totalVnd: number;
+  paidAt: string | number | null;
+  createdAt: string | number;
+  itemLabel: string;
+}

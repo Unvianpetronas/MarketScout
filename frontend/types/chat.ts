@@ -22,6 +22,13 @@ export interface ChatMessage {
     hardStop?: boolean;
     taxId?: string;
   };
+  // Populated client-side when this assistant message is asking the user to
+  // confirm a Deep Verify / Compare run before quota gets spent (see
+  // ChatService's confirm-before-run gate). Only meaningful on the latest message.
+  pendingConfirm?: {
+    quotaCost: number;
+    quotaRemaining: number;
+  };
 }
 
 // Matches backend ConversationResponse
@@ -29,12 +36,6 @@ export interface ConversationResponse {
   sessionId: string;
   title: string;
   messages: ChatMessage[];
-}
-
-// Matches backend ChatResponse { userMessage, assistantMessage }
-export interface ChatPairResponse {
-  userMessage: ChatMessage;
-  assistantMessage: ChatMessage;
 }
 
 // Used by the pipeline SSE endpoint POST /chat/message
@@ -51,9 +52,9 @@ export interface SseMessageRequest {
   paymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY";
   dealValueUsd?: number;
   contractId?: string;
-}
-
-// Used by per-session REST endpoint POST /chat/sessions/{id}/messages
-export interface SendMessageRequest {
-  content: string;  // backend field name is "content", not "message"
+  // true = this call confirms a pending VERIFY_PARTNER/COMPARE_PARTNERS request
+  // (see ChatService's confirm-before-run gate) instead of a fresh message.
+  confirmVerify?: boolean;
+  // Optional — known company website, lets P2 skip its own auto-discovery search.
+  website?: string;
 }

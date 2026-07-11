@@ -13,7 +13,7 @@ import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
 import { getReport } from "@/services/report.service";
 import { getMyQuota } from "@/services/quota.service";
-import { VerificationReport } from "@/types/report";
+import { VerificationReport, isProcessingStatus } from "@/types/report";
 import { QuotaStatus } from "@/types/quota";
 
 interface IntelPageProps {
@@ -93,8 +93,8 @@ export default function IntelligencePage({ params }: IntelPageProps) {
     );
   }
 
-  const isCompleted = (report.status as string) === "COMPLETED";
-  const isProcessing = ["PROCESSING", "DEEP_SCANNING"].includes((report.status as string) || "");
+  const isCompleted = report.status === "DONE";
+  const isProcessing = isProcessingStatus(report.status);
   const overallScore = report.overallScore ?? 0;
   const riskColor = overallScore < 40 ? "#00D26A" : overallScore < 70 ? "#F59E0B" : "#EF4444";
   const dataHealthScore = isCompleted ? Math.min(95, 60 + (report.pillars?.length ?? 0) * 4) : 30;
