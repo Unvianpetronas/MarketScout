@@ -28,7 +28,7 @@ public class TavilyClient {
             return List.of();
         }
         String query = buildQuery(intent, product, market);
-        return search(query);
+        return search(query, market);
     }
 
     public List<String> searchText(String query, int maxResults) {
@@ -95,7 +95,7 @@ public class TavilyClient {
     }
 
     @SuppressWarnings("unchecked")
-    private List<LeadResult> search(String query) {
+    private List<LeadResult> search(String query, String market) {
         try {
             Map<String, Object> body = Map.of(
                 "api_key", apiKey,
@@ -126,6 +126,10 @@ public class TavilyClient {
                     .website(url)
                     .description(content.length() > 200 ? content.substring(0, 200) : content)
                     .source("Tavily")
+                    // Requested market, not independently verified per company —
+                    // Tavily returns no structured geo field. FindPartnersService's
+                    // P1 enrichment is the real per-lead verification signal.
+                    .country(market)
                     .build());
             }
             log.info("Tavily returned {} results for query: {}", leads.size(), query);

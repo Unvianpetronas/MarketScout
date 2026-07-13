@@ -48,6 +48,16 @@ function PartnerCard({ lead, country }: { lead: LeadResult; country: string }) {
                 {lead.source}
               </span>
             )}
+            {lead.country && (
+              <span className="text-[10px] font-semibold text-gray-500 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-200">
+                {lead.country}
+              </span>
+            )}
+            {lead.taxId && (
+              <span className="text-[10px] font-bold text-[#00843F] bg-[#E6F9F0] px-2 py-0.5 rounded-full border border-[#00D26A]/30">
+                {t("partners.taxId")}: {lead.taxId}
+              </span>
+            )}
           </div>
           {lead.description && (
             <p className="text-sm text-gray-500 mb-2 leading-relaxed">{lead.description}</p>
@@ -102,6 +112,18 @@ function PartnerCardGrid({ lead, country }: { lead: LeadResult; country: string 
         )}
       </div>
       <h3 className="font-bold text-gray-900 mb-1 text-sm">{lead.companyName}</h3>
+      <div className="flex items-center gap-1.5 flex-wrap mb-2">
+        {lead.country && (
+          <span className="text-[10px] font-semibold text-gray-500 bg-gray-50 px-2 py-0.5 rounded-full border border-gray-200">
+            {lead.country}
+          </span>
+        )}
+        {lead.taxId && (
+          <span className="text-[10px] font-bold text-[#00843F] bg-[#E6F9F0] px-2 py-0.5 rounded-full border border-[#00D26A]/30">
+            {t("partners.taxId")}: {lead.taxId}
+          </span>
+        )}
+      </div>
       {lead.description && <p className="text-xs text-gray-400 mb-3 line-clamp-2">{lead.description}</p>}
       <div className="flex gap-2">
         <Link
@@ -134,6 +156,7 @@ export default function FindPartnersPage() {
   const [role, setRole] = useState<PartnerRole>("buyer");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [sortAlpha, setSortAlpha] = useState(false);
+  const [groupByMarket, setGroupByMarket] = useState(false);
 
   const [leads, setLeads] = useState<LeadResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -162,6 +185,19 @@ export default function FindPartnersPage() {
     ? [...leads].sort((a, b) => a.companyName.localeCompare(b.companyName))
     : leads;
   const countryMeta = COUNTRY_OPTIONS.find((c) => c.value === country) ?? COUNTRY_OPTIONS[0];
+
+  // Group by market (lead.country) — only meaningful once a search actually spans
+  // more than one market; falls back to a single "Tất cả" group otherwise.
+  const groupedByMarket: Array<[string, LeadResult[]]> = groupByMarket
+    ? Array.from(
+        sorted.reduce((map, lead) => {
+          const marketKey = lead.country || t("partners.unknownMarket");
+          if (!map.has(marketKey)) map.set(marketKey, []);
+          map.get(marketKey)!.push(lead);
+          return map;
+        }, new Map<string, LeadResult[]>())
+      )
+    : [["", sorted]];
 
   return (
     <AuthGuard>
@@ -269,6 +305,16 @@ export default function FindPartnersPage() {
                   </p>
                   <div className="flex items-center gap-3">
                     <button
+                      onClick={() => setGroupByMarket((g) => !g)}
+                      className={`flex items-center gap-1.5 text-sm rounded-xl px-3 py-2 border transition-colors ${
+                        groupByMarket
+                          ? "bg-[#E6F9F0] text-[#00843F] border-[#00D26A]/40"
+                          : "bg-white text-gray-500 border-gray-200 hover:text-gray-700"
+                      }`}
+                    >
+                      <Globe className="w-3.5 h-3.5" /> {t("partners.groupByMarket")}
+                    </button>
+                    <button
                       onClick={() => setSortAlpha((s) => !s)}
                       className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 bg-white border border-gray-200 rounded-xl px-3 py-2"
                     >
@@ -286,20 +332,30 @@ export default function FindPartnersPage() {
                 </div>
 
                 <div className="flex gap-5">
-                  <div className="flex-1">
-                    {viewMode === "list" ? (
-                      <div className="space-y-3">
-                        {sorted.map((lead, i) => (
-                          <PartnerCard key={i} lead={lead} country={country} />
-                        ))}
+                  <div className="flex-1 space-y-6">
+                    {groupedByMarket.map(([marketKey, marketLeads]) => (
+                      <div key={marketKey || "all"}>
+                        {groupByMarket && (
+                          <h3 className="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                            <Globe className="w-3.5 h-3.5 text-[#00D26A]" />
+                            {marketKey} <span className="text-gray-300 font-normal normal-case">({marketLeads.length})</span>
+                          </h3>
+                        )}
+                        {viewMode === "list" ? (
+                          <div className="space-y-3">
+                            {marketLeads.map((lead, i) => (
+                              <PartnerCard key={i} lead={lead} country={country} />
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-4">
+                            {marketLeads.map((lead, i) => (
+                              <PartnerCardGrid key={i} lead={lead} country={country} />
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-4">
-                        {sorted.map((lead, i) => (
-                          <PartnerCardGrid key={i} lead={lead} country={country} />
-                        ))}
-                      </div>
-                    )}
+                    ))}
                   </div>
 
                   {/* Right Panel */}

@@ -1,9 +1,12 @@
 package com.example.backend.partners;
 
+import com.example.backend.verification.crawler.p1.CrawlerP1Router;
 import com.example.backend.verification.crawler.p6.CrawlerP6;
 import com.example.backend.shared.model.agent.AgentEvent;
 import com.example.backend.shared.model.agent.IntentResult;
 import com.example.backend.shared.model.crawler.LeadResult;
+import com.example.backend.shared.model.crawler.P1Data;
+import com.example.backend.shared.model.input.CompanyInput;
 import com.example.backend.shared.cache.CacheService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +16,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -22,9 +28,18 @@ import java.util.stream.Collectors;
 public class FindPartnersService {
 
     private final TavilyClient tavilyClient;
+    private final CrawlerP1Router crawlerP1;
     private final CrawlerP6 crawlerP6;
     private final CacheService cacheService;
     private final ObjectMapper objectMapper;
+
+    // Dedicated pool so up to maxSanctionCheck real registry lookups (masothue.vn
+    // scrape / GLEIF) run in parallel instead of serially blocking the search.
+    private final ExecutorService enrichPool = Executors.newFixedThreadPool(8, r -> {
+        Thread t = new Thread(r, "leads-enrich-pool");
+        t.setDaemon(true);
+        return t;
+    });
 
     @Value("${app.partners.max-sanction-check:8}")
     private int maxSanctionCheck;
@@ -52,6 +67,9 @@ public class FindPartnersService {
         candidates = crawlerP6.batchCheck(candidates);
         log.info("P6 sanction-checked {}/{} leads (cap={})", candidates.size(), leads.size(), maxSanctionCheck);
 
+        emit(sseCallback, AgentEvent.thinking("crawler", "Đang tra cứu mã số thuế/đăng ký kinh doanh..."));
+        candidates = enrichWithTaxId(candidates);
+
         // Cache the screened candidates in Redis for the session. The final
         // user-facing summary is built by the caller (ChatService) so the chat
         // shows ONE clean result instead of a stack of step events.
@@ -68,6 +86,35 @@ public class FindPartnersService {
             .filter(l -> !l.isSanctionHit())
             .limit(displayCount)
             .collect(Collectors.toList());
+    }
+
+    /**
+     * Real per-lead registry lookup (masothue.vn MST / GLEIF LEI via CrawlerP1Router)
+     * — same source P1 uses for a full Deep Verify, just without persisting a
+     * Report. Runs in parallel since it's a handful of real HTTP calls, not a
+     * cheap in-memory step. A lookup miss just leaves taxId null — never guessed.
+     */
+    private List<LeadResult> enrichWithTaxId(List<LeadResult> candidates) {
+        List<CompletableFuture<Void>> futures = candidates.stream()
+            .map(lead -> CompletableFuture.runAsync(() -> {
+                try {
+                    CompanyInput input = CompanyInput.builder()
+                        .companyName(lead.getCompanyName())
+                        .website(lead.getWebsite())
+                        .country(lead.getCountry())
+                        .build();
+                    P1Data p1 = crawlerP1.fetch(input);
+                    if (p1.isFound() && p1.getRegistrationId() != null && !p1.getRegistrationId().isBlank()) {
+                        lead.setTaxId(p1.getRegistrationId());
+                    }
+                } catch (Exception e) {
+                    log.debug("Tax-ID enrichment failed for lead '{}': {}", lead.getCompanyName(), e.getMessage());
+                }
+            }, enrichPool))
+            .toList();
+
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+        return candidates;
     }
 
     private void emit(Consumer<String> callback, AgentEvent event) {
