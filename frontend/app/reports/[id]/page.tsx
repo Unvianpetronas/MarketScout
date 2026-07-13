@@ -431,10 +431,27 @@ export default function ReportDetailPage({ params }: Props) {
   const [recsLoading, setRecsLoading] = useState(false);
 
   useEffect(() => {
-    getReport(id)
-      .then(setReport)
-      .catch(() => toast.error("Không tải được báo cáo."))
-      .finally(() => setIsLoading(false));
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const load = () => {
+      getReport(id)
+        .then((r) => {
+          if (cancelled) return;
+          setReport(r);
+          // Scan pipeline still running in the background — poll until it lands
+          // on a terminal status, otherwise the deal-safety recommendation and
+          // final score only ever show up after a manual page reload.
+          if (r.status === "PENDING" || r.status === "PROCESSING") {
+            timer = setTimeout(load, 3000);
+          }
+        })
+        .catch(() => { if (!cancelled) toast.error("Không tải được báo cáo."); })
+        .finally(() => { if (!cancelled) setIsLoading(false); });
+    };
+    load();
+
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [id]);
 
   // Generate AI next-step recommendations once the report has loaded.

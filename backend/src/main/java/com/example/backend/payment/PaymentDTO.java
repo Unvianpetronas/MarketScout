@@ -75,7 +75,12 @@ public class PaymentDTO {
         private Long       id;             // SePay transaction id (idempotency ref)
         private String     gateway;
         private String     transactionDate;
-        private String     accountNumber;  // receiving account
+        private String     accountNumber;  // physical receiving account
+        // Virtual-account (VA) identifier for banks that route collection through
+        // one (e.g. BIDV) — null for banks SePay watches on the physical account
+        // directly. When a merchant's app.payment.account-no is configured as a
+        // VA, THIS is the field that actually carries it, not accountNumber.
+        private String     subAccount;
         private String     code;           // payment code SePay parsed (may be null)
         private String     content;        // raw transfer content
         private String     transferType;   // "in" | "out"
