@@ -11,25 +11,23 @@ import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
 import { getReports } from "@/services/report.service";
-import { ReportListItem } from "@/types/report";
+import { ReportListItem, isProcessingStatus, isHighRiskLevel } from "@/types/report";
 
-type StatusFilter = "all" | "COMPLETED" | "PROCESSING" | "FAILED";
+type StatusFilter = "all" | "DONE" | "PROCESSING" | "FAILED";
 
 function getRiskInfo(risk: string | null | undefined) {
-  if (!risk) return { color: "text-gray-400", bg: "bg-gray-50 border-gray-200", label: "—" };
-  const r = (risk as string).toUpperCase();
-  if (r === "LOW") return { color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200", label: "Thấp" };
-  if (r === "MEDIUM") return { color: "text-amber-600", bg: "bg-amber-50 border-amber-200", label: "Trung bình" };
-  if (r === "HIGH") return { color: "text-red-600", bg: "bg-red-50 border-red-200", label: "Cao" };
-  if (r === "CRITICAL") return { color: "text-red-700", bg: "bg-red-100 border-red-300", label: "Nghiêm trọng" };
-  return { color: "text-gray-500", bg: "bg-gray-50 border-gray-200", label: risk };
+  if (risk === "Thấp") return { color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200", label: "Thấp" };
+  if (risk === "Trung bình") return { color: "text-amber-600", bg: "bg-amber-50 border-amber-200", label: "Trung bình" };
+  if (risk === "Cao") return { color: "text-red-600", bg: "bg-red-50 border-red-200", label: "Cao" };
+  if (risk === "Nghiêm trọng") return { color: "text-red-700", bg: "bg-red-100 border-red-300", label: "Nghiêm trọng" };
+  return { color: "text-gray-400", bg: "bg-gray-50 border-gray-200", label: risk || "—" };
 }
 
 function getStatusInfo(status: string | null | undefined) {
-  const s = (status as string || "").toUpperCase();
-  if (s === "COMPLETED") return { icon: CheckCircle2, iconColor: "text-emerald-500", label: "Hoàn thành", bg: "bg-emerald-50 text-emerald-700 border-emerald-200" };
-  if (s === "PROCESSING" || s === "DEEP_SCANNING") return { icon: Clock, iconColor: "text-blue-500", label: "Đang quét", bg: "bg-blue-50 text-blue-700 border-blue-200" };
-  if (s === "FAILED") return { icon: XCircle, iconColor: "text-red-500", label: "Thất bại", bg: "bg-red-50 text-red-700 border-red-200" };
+  if (status === "DONE") return { icon: CheckCircle2, iconColor: "text-emerald-500", label: "Hoàn thành", bg: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+  if (isProcessingStatus(status)) return { icon: Clock, iconColor: "text-blue-500", label: "Đang quét", bg: "bg-blue-50 text-blue-700 border-blue-200" };
+  if (status === "HARD_STOP") return { icon: XCircle, iconColor: "text-red-600", label: "Cấm giao dịch", bg: "bg-red-50 text-red-700 border-red-200" };
+  if (status === "FAILED") return { icon: XCircle, iconColor: "text-red-500", label: "Thất bại", bg: "bg-red-50 text-red-700 border-red-200" };
   return { icon: Clock, iconColor: "text-gray-400", label: status || "—", bg: "bg-gray-50 text-gray-600 border-gray-200" };
 }
 
@@ -73,16 +71,16 @@ export default function ReportsPage() {
   const filtered = reports.filter((r) => {
     const matchSearch = !search || r.entityName?.toLowerCase().includes(search.toLowerCase())
       || r.countryIso2?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "all" || (r.status as string) === statusFilter
-      || (statusFilter === "PROCESSING" && (r.status as string) === "DEEP_SCANNING");
+    const matchStatus = statusFilter === "all"
+      || (statusFilter === "PROCESSING" ? isProcessingStatus(r.status) : r.status === statusFilter);
     return matchSearch && matchStatus;
   });
 
   const stats = {
     total: reports.length,
-    completed: reports.filter((r) => (r.status as string) === "COMPLETED").length,
-    processing: reports.filter((r) => ["PROCESSING", "DEEP_SCANNING"].includes(r.status as string)).length,
-    highRisk: reports.filter((r) => ["HIGH", "CRITICAL"].includes((r.riskLevel as string) || "")).length,
+    completed: reports.filter((r) => r.status === "DONE").length,
+    processing: reports.filter((r) => isProcessingStatus(r.status)).length,
+    highRisk: reports.filter((r) => isHighRiskLevel(r.riskLevel)).length,
   };
 
   return (
@@ -144,14 +142,14 @@ export default function ReportsPage() {
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus-ms" />
               </div>
               <div className="flex items-center gap-2">
-                {(["all", "COMPLETED", "PROCESSING", "FAILED"] as StatusFilter[]).map((s) => (
+                {(["all", "DONE", "PROCESSING", "FAILED"] as StatusFilter[]).map((s) => (
                   <button key={s} onClick={() => setStatusFilter(s)}
                     className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
                       statusFilter === s
                         ? "gradient-brand text-white border-transparent"
                         : "bg-gray-50 text-gray-500 border-gray-200 hover:border-gray-300"
                     }`}>
-                    {s === "all" ? "Tất cả" : s === "COMPLETED" ? "Hoàn thành" : s === "PROCESSING" ? "Đang xử lý" : "Thất bại"}
+                    {s === "all" ? "Tất cả" : s === "DONE" ? "Hoàn thành" : s === "PROCESSING" ? "Đang xử lý" : "Thất bại"}
                   </button>
                 ))}
               </div>
@@ -197,7 +195,7 @@ export default function ReportsPage() {
                       {filtered.map((report) => {
                         const { icon: StatusIcon, iconColor, bg: statusBg, label: statusLabel } = getStatusInfo(report.status);
                         const { color: riskColor, bg: riskBg, label: riskLabel } = getRiskInfo(report.riskLevel);
-                        const isProcessing = ["PROCESSING", "DEEP_SCANNING"].includes((report.status as string) || "");
+                        const isProcessing = isProcessingStatus(report.status);
                         return (
                           <tr key={report.id} className="hover:bg-[#FAFBFA] transition-colors group">
                             <td className="px-5 py-4">

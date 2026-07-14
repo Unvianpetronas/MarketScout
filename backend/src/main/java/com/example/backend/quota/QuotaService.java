@@ -103,13 +103,20 @@ public class QuotaService {
     /**
      * Resets quota when the billing anniversary date has passed.
      *
-     * Free plan  → cycleResetAt == null → never reset (lifetime 2 verifies).
-     * Paid plans → cycleResetAt advances 30 days from the stored date (not
-     *              from now) so the anniversary day never drifts.
+     * Free plan  → refills on schedule (anchor-preserving, see below) —
+     *              this is the free tier's monthly allowance.
+     * Paid plans → NOT refilled here. Renewal only happens via a confirmed
+     *              payment (PaymentService.grantPlan). If a paid plan's
+     *              anniversary passes with no renewal, SubscriptionLifecycleService
+     *              downgrades the account to the free plan after a grace period —
+     *              refilling here would let a single payment renew forever for free.
      */
     private void resetCycleIfExpired(Users user) {
         if (user.getCycleResetAt() == null) {
-            return; // Free plan — lifetime quota, no cycle reset
+            return; // No billing cycle configured
+        }
+        if (isPaidPlan(user)) {
+            return;
         }
 
         if (Instant.now().isAfter(user.getCycleResetAt())) {
@@ -125,6 +132,12 @@ public class QuotaService {
 
             log.info("Quota cycle reset — user={} newQuota={} nextReset={}", user.getId(), planQuota, nextReset);
         }
+    }
+
+    private boolean isPaidPlan(Users user) {
+        return user.getPlan() != null
+                && user.getPlan().getPriceVnd() != null
+                && user.getPlan().getPriceVnd().signum() > 0;
     }
 
     private void requireUserExists(UUID userId) {

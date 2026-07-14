@@ -50,6 +50,16 @@ public class CrawlerP5Intl {
     private P5Data doFetch(CompanyInput input) {
         String query = input.getName() + " annual report revenue 2024 financial";
         List<String> results = tavilyClient.searchText(query, 5);
+
+        // Tavily is the ONLY source here. An empty result (missing API key, quota
+        // exhausted, or genuinely no matches) must not silently become a fabricated
+        // "NORMAL" tax-compliance finding — that reads as a verified clean bill of
+        // health when in fact nothing was checked at all.
+        if (results.isEmpty()) {
+            return P5Data.builder().state(PillarData.DataState.SKIP).companyName(input.getName())
+                .errorMsg("Không có kết quả tìm kiếm để đánh giá tài chính").fetchedAt(LocalDateTime.now()).build();
+        }
+
         String combined = String.join(" ", results).toLowerCase();
 
         String taxStatus = "NORMAL";

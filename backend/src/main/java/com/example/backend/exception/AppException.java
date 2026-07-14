@@ -19,7 +19,8 @@ public class AppException extends RuntimeException {
         CONTRACT_NOT_FOUND("Contract not found or you do not have access.", HttpStatus.NOT_FOUND),
         UNAUTHORIZED("You do not have permission to perform this action.", HttpStatus.FORBIDDEN),
         BAD_REQUEST("Invalid request.", HttpStatus.BAD_REQUEST),
-        RESOURCE_NOT_FOUND("Resource not found.", HttpStatus.NOT_FOUND);
+        RESOURCE_NOT_FOUND("Resource not found.", HttpStatus.NOT_FOUND),
+        TOO_MANY_REQUESTS("Too many attempts. Please try again later.", HttpStatus.TOO_MANY_REQUESTS);
 
         private final String defaultMessage;
         private final HttpStatus httpStatus;

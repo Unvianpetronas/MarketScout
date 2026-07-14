@@ -54,6 +54,7 @@ public class CrawlerP3Intl {
     private P3Data doFetch(CompanyInput input, String slug) {
         // Try ImportYeti first
         boolean hasTradeHistory = false;
+        boolean importYetiSucceeded = false;
         int shipmentCount = 0;
         String trend = "STABLE";
 
@@ -63,10 +64,14 @@ public class CrawlerP3Intl {
                 .userAgent("Mozilla/5.0")
                 .timeout(10000)
                 .get();
-            Elements shipmentRows = doc.select(".shipment-row, .data-row, table tr");
+            // Only count rows with a recognizable shipment-row class — a bare
+            // "table tr" selector counts every HTML table row on the page (nav,
+            // unrelated tables), inflating shipmentCount with noise.
+            Elements shipmentRows = doc.select(".shipment-row, .data-row");
             if (!shipmentRows.isEmpty()) {
                 hasTradeHistory = true;
-                shipmentCount = Math.max(0, shipmentRows.size() - 1);
+                importYetiSucceeded = true;
+                shipmentCount = shipmentRows.size();
                 trend = shipmentCount > 10 ? "GROWING" : "STABLE";
             }
         } catch (Exception e) {
@@ -77,6 +82,13 @@ public class CrawlerP3Intl {
         String tavilyQuery = input.getName() + " import export shipment trade history B2B";
         List<String> tavilyResults = tavilyClient.searchText(tavilyQuery, 3);
         String combined = String.join(" ", tavilyResults).toLowerCase();
+
+        // Neither source returned anything — asserting "no trade history found" here
+        // would present an unchecked company as if it were confirmed to have none.
+        if (!importYetiSucceeded && tavilyResults.isEmpty()) {
+            return P3Data.builder().state(PillarData.DataState.SKIP).companyName(input.getName())
+                .errorMsg("Không tìm được dữ liệu thương mại từ ImportYeti hoặc Tavily").fetchedAt(LocalDateTime.now()).build();
+        }
 
         if (!hasTradeHistory) {
             hasTradeHistory = combined.contains("import") || combined.contains("export")

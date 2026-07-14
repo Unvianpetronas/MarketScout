@@ -18,6 +18,7 @@ import com.example.backend.verification.DealSafetyAgent;
 import com.example.backend.verification.ScoringEngine;
 import com.example.backend.shared.gemini.GeminiService;
 import com.example.backend.quota.QuotaService;
+import com.example.backend.shared.cache.CacheService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +26,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -54,10 +55,14 @@ public class ChatService {
     private final DealSafetyAgent        dealSafetyAgent;
     private final ContractLinkService    contractLinkService;
     private final CompanyResolverService companyResolverService;
+    private final CacheService           cacheService;
     private final ObjectMapper           objectMapper;
 
     private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
     private final ScheduledExecutorService heartbeatExecutor = Executors.newScheduledThreadPool(4);
+
+    private static final int CHAT_RATE_LIMIT_PER_WINDOW = 20;
+    private static final Duration CHAT_RATE_LIMIT_WINDOW = Duration.ofMinutes(5);
 
     // ── MarketScout Pipeline (6-intent SSE) ──────────────────────────────────
 
@@ -80,6 +85,11 @@ public class ChatService {
         // safety margin for slow external crawlers (masothue.vn, GLEIF, etc.)
         SseEmitter emitter = new SseEmitter(180_000L);
 
+        if (isRateLimited(userId)) {
+            sendRateLimitError(emitter);
+            return emitter;
+        }
+
         sseExecutor.submit(() -> {
             try {
                 Users user = requireUser(userId);
@@ -93,8 +103,30 @@ public class ChatService {
                         .content(req.getMessage()).build());
                 }
 
-                IntentResult intent = intentDetector.detect(req.getMessage());
-                String reply = handleIntent(userId, intent, req, emitter);
+                String sessionKey = sessionKeyOf(userId, req);
+                // Only look up a pending confirmation for a real chat session. Without a
+                // sessionId (e.g. /verify's direct-run calls) sessionKeyOf falls back to
+                // bare userId — a shared key across every sessionless call from that user —
+                // so resuming from it here could silently execute a stale, unrelated
+                // request instead of the fresh one this call is actually asking for.
+                // Sessionless callers use the explicit confirmVerify bypass inside
+                // handleVerify instead (see below), which always re-resolves fresh.
+                boolean hasRealSession = req.getSessionId() != null && !req.getSessionId().isBlank();
+                Optional<PendingVerifyConfirm> pendingVerify = hasRealSession
+                    ? getPendingVerifyConfirm(sessionKey) : Optional.empty();
+                // Confirmation must be an explicit action (button click), never guessed from
+                // free text — a stray "ok"/"có" reply to something unrelated must not
+                // silently spend quota and launch an 8-pillar scan.
+                boolean isConfirmation = pendingVerify.isPresent() && Boolean.TRUE.equals(req.getConfirmVerify());
+
+                String reply;
+                if (isConfirmation) {
+                    clearPendingVerifyConfirm(sessionKey);
+                    reply = resumePendingVerify(userId, pendingVerify.get(), req, emitter);
+                } else {
+                    IntentResult intent = intentDetector.detect(req.getMessage());
+                    reply = handleIntent(userId, intent, req, emitter);
+                }
 
                 // Save FIRST — before signalling [DONE] to the client.
                 if (reply != null && !reply.isBlank() && session != null) {
@@ -122,6 +154,23 @@ public class ChatService {
         });
 
         return emitter;
+    }
+
+    /** Redis counter, same fail-open pattern as CrawlerP6's daily-budget guard. */
+    private boolean isRateLimited(UUID userId) {
+        long count = cacheService.incrementCounter("chat:rate:" + userId, CHAT_RATE_LIMIT_WINDOW, 1);
+        return count > CHAT_RATE_LIMIT_PER_WINDOW;
+    }
+
+    private void sendRateLimitError(SseEmitter emitter) {
+        try {
+            emitter.send(SseEmitter.event().data(objectMapper.writeValueAsString(AgentEvent.error("manager",
+                "Bạn đang gửi tin nhắn quá nhanh. Vui lòng đợi vài phút rồi thử lại."))));
+            emitter.send(SseEmitter.event().data("[DONE]"));
+            emitter.complete();
+        } catch (Exception e) {
+            log.warn("Could not deliver rate-limit event: {}", e.getMessage());
+        }
     }
 
     private ChatSession resolveSession(UUID userId, String sessionIdStr) {
@@ -316,9 +365,8 @@ public class ChatService {
 
     private String handleVerify(UUID userId, IntentResult intent, ReportDTO.ChatMessageRequest req,
                                SseEmitter emitter, int quotaCost) throws Exception {
-        // 1. Resolve company name TRƯỚC khi deduct quota — tránh trừ quota khi cần hỏi lại
-        String sessionKey = req.getSessionId() != null && !req.getSessionId().isBlank()
-            ? req.getSessionId() : userId.toString();
+        // 1. Resolve company name TRƯỚC khi hỏi xác nhận — tránh hỏi xác nhận rồi vẫn phải hỏi lại tên
+        String sessionKey = sessionKeyOf(userId, req);
 
         Optional<CompanyResolutionResult> pending = companyResolverService.getPendingClarification(sessionKey);
         String rawName = intent.getCompanyName() != null && !intent.getCompanyName().isBlank()
@@ -338,11 +386,6 @@ public class ChatService {
             return clarifyMsg;
         }
 
-        // 2. Chỉ deduct quota sau khi đã xác nhận tên công ty rõ ràng
-        quotaService.checkAndDeduct(userId);
-        if (quotaCost == 2) quotaService.checkAndDeduct(userId);
-
-        Users user = requireUser(userId);
         String effectiveName = resolved.isVietnam() && resolved.getNormalizedName() != null
             ? resolved.getNormalizedName() : resolved.getSuggestedFullName();
         if (effectiveName == null || effectiveName.isBlank()) effectiveName = rawName;
@@ -351,13 +394,52 @@ public class ChatService {
             ? resolved.getCountryIso2()
             : (intent.getCountry() != null && !intent.getCountry().isBlank() ? intent.getCountry() : null);
 
-        CompanyInput input = CompanyInput.builder()
-            .companyName(effectiveName)
-            .country(country)
+        // The dedicated pre-scan form (/verify) already collects deal info via an
+        // explicit form + submit click — that IS the user's confirmation, so it
+        // sends confirmVerify=true on the very first call and skips the propose/ask
+        // step below entirely (no pending record needed).
+        if (Boolean.TRUE.equals(req.getConfirmVerify())) {
+            return executeVerify(userId, effectiveName, country, intent.getTaxId(),
+                req.getContractId(), req.getWebsite(), req, emitter);
+        }
+
+        // 2. Không trừ quota ngay — hỏi xác nhận trước, vì SePay không auto-charge
+        // được, quota là tài nguyên đã trả tiền, và quét mất 5-8 phút không hủy được.
+        // Đây cũng là chỗ mời đính hợp đồng để P7 được chấm điểm thật ngay lần này.
+        PendingVerifyConfirm confirm = PendingVerifyConfirm.builder()
+            .companyNames(List.of(effectiveName))
+            .countries(List.of(country == null ? "" : country))
             .taxId(intent.getTaxId())
+            .contractId(req.getContractId())
+            .website(req.getWebsite())
+            .quotaCost(quotaCost)
+            .build();
+        savePendingVerifyConfirm(sessionKey, confirm);
+
+        int quotaRemaining = quotaService.getStatus(userId).getQuotaRemaining();
+        String confirmMsg = "Quét sâu \"" + effectiveName + "\" sẽ dùng " + quotaCost
+            + " lượt quota (còn " + quotaRemaining + "), mất khoảng 5-8 phút. "
+            + "Bạn có thể đính kèm hợp đồng để P7 được chấm điểm thật ngay lần này. Xác nhận chạy?";
+        sendEvent(emitter, AgentEvent.done("confirm", confirmMsg, java.util.Map.of(
+            "pending", true, "companyName", effectiveName,
+            "quotaCost", quotaCost, "quotaRemaining", quotaRemaining, "canAttachContract", true)));
+        return confirmMsg;
+    }
+
+    /** The part of handleVerify that actually spends quota and runs the pipeline — only reached after user confirmation. */
+    private String executeVerify(UUID userId, String companyName, String country, String taxId,
+                                UUID contractId, String website, ReportDTO.ChatMessageRequest req,
+                                SseEmitter emitter) throws Exception {
+        quotaService.checkAndDeduct(userId);
+
+        Users user = requireUser(userId);
+        CompanyInput input = CompanyInput.builder()
+            .companyName(companyName)
+            .country(country)
+            .taxId(taxId)
+            .website(website)
             .build();
 
-        // Create report record
         Report report = new Report();
         report.setUser(user);
         report.setEntityName(input.getCompanyName());
@@ -393,12 +475,12 @@ public class ChatService {
         // very first pipeline pass already sees a real, verified P7 contract via
         // ContractP7Mapper. Best-effort: a bad/foreign contractId must not block
         // the verification itself.
-        if (req.getContractId() != null) {
+        if (contractId != null) {
             try {
-                contractLinkService.linkBeforeScoring(reportId, req.getContractId(), userId);
+                contractLinkService.linkBeforeScoring(reportId, contractId, userId);
             } catch (Exception e) {
                 log.warn("Failed to pre-link contract {} to new report {}: {}",
-                    req.getContractId(), reportId, e.getMessage());
+                    contractId, reportId, e.getMessage());
             }
         }
 
@@ -412,25 +494,7 @@ public class ChatService {
             }
         });
 
-        // Send ": heartbeat" SSE comments every 10 seconds while the scoring pipeline runs.
-        // These are ignored by clients but prevent proxy/browser connection timeouts.
-        var heartbeat = heartbeatExecutor.scheduleAtFixedRate(() -> {
-            if (future.isDone()) return;
-            try {
-                emitter.send(SseEmitter.event().comment("heartbeat"));
-            } catch (Exception e) {
-                log.debug("Heartbeat send failed (client likely disconnected): {}", e.getMessage());
-            }
-        }, 10, 10, TimeUnit.SECONDS);
-
-        // Block until the scoring pipeline finishes. Safe here: handleVerify already
-        // runs on sseExecutor (a background pool), never a servlet request thread.
-        ScoringResult result;
-        try {
-            result = future.join();
-        } finally {
-            heartbeat.cancel(false);
-        }
+        ScoringResult result = joinWithHeartbeat(future, emitter);
 
         String message;
         java.util.Map<String, Object> data;
@@ -477,21 +541,146 @@ public class ChatService {
 
     private String handleCompare(UUID userId, IntentResult intent, ReportDTO.ChatMessageRequest req,
                                 SseEmitter emitter) throws Exception {
-        // COMPARE = 2 quota
-        quotaService.checkAndDeduct(userId);
-        quotaService.checkAndDeduct(userId);
-
-        sendEvent(emitter, AgentEvent.thinking("manager",
-            "So sánh đối tác — chạy 2 thẩm định song song (tốn 2 quota)"));
-
+        String sessionKey = sessionKeyOf(userId, req);
         String message = req.getMessage();
         String[] parts = message.split(" vs | VS | và | and ");
         String company1 = parts.length > 0 ? parts[0].trim() : intent.getCompanyName();
         String company2 = parts.length > 1 ? parts[1].trim() : "";
 
-        String resultMessage = "Đang thẩm định " + company1 + " và " + company2 + " song song. Kết quả sẽ có sau vài phút.";
-        sendEvent(emitter, AgentEvent.done("manager", resultMessage, java.util.Map.of("company1", company1, "company2", company2, "note", "2 quota đã bị trừ")));
-        return resultMessage;
+        if (company1 == null || company1.isBlank() || company2.isBlank()) {
+            String msg = "Bạn muốn so sánh 2 công ty nào? Ví dụ: \"Công ty A vs Công ty B\".";
+            sendEvent(emitter, AgentEvent.done("manager", msg, null));
+            return msg;
+        }
+
+        PendingVerifyConfirm confirm = PendingVerifyConfirm.builder()
+            .companyNames(List.of(company1, company2))
+            .countries(List.of("", ""))
+            .quotaCost(2)
+            .build();
+        savePendingVerifyConfirm(sessionKey, confirm);
+
+        int quotaRemaining = quotaService.getStatus(userId).getQuotaRemaining();
+        String confirmMsg = "So sánh \"" + company1 + "\" và \"" + company2 + "\" sẽ dùng 2 lượt quota (còn "
+            + quotaRemaining + "), chạy song song ~5-8 phút. Xác nhận chạy?";
+        sendEvent(emitter, AgentEvent.done("confirm", confirmMsg, java.util.Map.of(
+            "pending", true, "companyNames", List.of(company1, company2),
+            "quotaCost", 2, "quotaRemaining", quotaRemaining)));
+        return confirmMsg;
+    }
+
+    /** Runs two Deep Verify pipelines in parallel — only reached after user confirmation. */
+    private String executeCompare(UUID userId, String company1, String company2, SseEmitter emitter) throws Exception {
+        quotaService.checkAndDeduct(userId);
+        quotaService.checkAndDeduct(userId);
+
+        Users user = requireUser(userId);
+        sendEvent(emitter, AgentEvent.thinking("manager",
+            "Đang thẩm định song song " + company1 + " và " + company2 + "..."));
+
+        UUID reportId1 = createReportRow(user, company1);
+        UUID reportId2 = createReportRow(user, company2);
+
+        CompletableFuture<ScoringResult> f1 = scoringEngine.runAsync(
+            reportId1, CompanyInput.builder().companyName(company1).build(), userId, json -> {});
+        CompletableFuture<ScoringResult> f2 = scoringEngine.runAsync(
+            reportId2, CompanyInput.builder().companyName(company2).build(), userId, json -> {});
+
+        CompletableFuture<Void> both = CompletableFuture.allOf(f1, f2);
+        joinWithHeartbeat(both, emitter);
+        ScoringResult r1 = f1.join();
+        ScoringResult r2 = f2.join();
+
+        String message = buildCompareMessage(company1, reportId1, r1, company2, reportId2, r2);
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("company1", java.util.Map.of("reportId", reportId1,
+            "overallScore", r1 != null ? r1.getOverallScore() : 0, "riskLevel", r1 != null ? r1.getRiskLevel() : "N/A"));
+        data.put("company2", java.util.Map.of("reportId", reportId2,
+            "overallScore", r2 != null ? r2.getOverallScore() : 0, "riskLevel", r2 != null ? r2.getRiskLevel() : "N/A"));
+        sendEvent(emitter, AgentEvent.done("manager", message, data));
+        return message;
+    }
+
+    private UUID createReportRow(Users user, String companyName) {
+        Report report = new Report();
+        report.setUser(user);
+        report.setEntityName(companyName);
+        report.setTier("standard");
+        report.setHardStop(false);
+        report.setStatus("DEEP_SCANNING");
+        report.setSource("MANUAL");
+        report.setQuickScanDone(false);
+        report.setCreatedAt(Instant.now());
+        report.setUpdatedAt(Instant.now());
+        return reportRepo.save(report).getId();
+    }
+
+    private String buildCompareMessage(String company1, UUID reportId1, ScoringResult r1,
+                                      String company2, UUID reportId2, ScoringResult r2) {
+        StringBuilder sb = new StringBuilder("So sánh kết quả:\n");
+        sb.append("- ").append(company1).append(": ")
+          .append(r1 != null ? Math.round(r1.getOverallScore()) + "/100 (" + r1.getRiskLevel() + ")" : "lỗi thẩm định")
+          .append(" | /reports/").append(reportId1).append("\n");
+        sb.append("- ").append(company2).append(": ")
+          .append(r2 != null ? Math.round(r2.getOverallScore()) + "/100 (" + r2.getRiskLevel() + ")" : "lỗi thẩm định")
+          .append(" | /reports/").append(reportId2);
+        if (r1 != null && r2 != null) {
+            String better = r1.getOverallScore() >= r2.getOverallScore() ? company1 : company2;
+            sb.append("\n→ ").append(better).append(" có điểm rủi ro tốt hơn.");
+        }
+        return sb.toString();
+    }
+
+    /** Resumes a confirmed pending VERIFY_PARTNER/COMPARE_PARTNERS request. */
+    private String resumePendingVerify(UUID userId, PendingVerifyConfirm pending,
+                                      ReportDTO.ChatMessageRequest req, SseEmitter emitter) throws Exception {
+        if (pending.getQuotaCost() == 2 && pending.getCompanyNames().size() == 2) {
+            return executeCompare(userId, pending.getCompanyNames().get(0), pending.getCompanyNames().get(1), emitter);
+        }
+        String companyName = pending.getCompanyNames().get(0);
+        String country = pending.getCountries() != null && !pending.getCountries().isEmpty()
+            && !pending.getCountries().get(0).isBlank() ? pending.getCountries().get(0) : null;
+        UUID contractId = req.getContractId() != null ? req.getContractId() : pending.getContractId();
+        String website = req.getWebsite() != null ? req.getWebsite() : pending.getWebsite();
+        return executeVerify(userId, companyName, country, pending.getTaxId(), contractId, website, req, emitter);
+    }
+
+    /** Blocks the calling (background executor) thread until done, sending SSE heartbeats to survive proxy timeouts. */
+    private <T> T joinWithHeartbeat(CompletableFuture<T> future, SseEmitter emitter) {
+        var heartbeat = heartbeatExecutor.scheduleAtFixedRate(() -> {
+            if (future.isDone()) return;
+            try {
+                emitter.send(SseEmitter.event().comment("heartbeat"));
+            } catch (Exception e) {
+                log.debug("Heartbeat send failed (client likely disconnected): {}", e.getMessage());
+            }
+        }, 10, 10, TimeUnit.SECONDS);
+        try {
+            return future.join();
+        } finally {
+            heartbeat.cancel(false);
+        }
+    }
+
+    private String sessionKeyOf(UUID userId, ReportDTO.ChatMessageRequest req) {
+        return req.getSessionId() != null && !req.getSessionId().isBlank() ? req.getSessionId() : userId.toString();
+    }
+
+    // ── Pending verify confirmation (Redis, same pattern as CompanyResolverService) ──
+
+    private static final Duration PENDING_VERIFY_CONFIRM_TTL = Duration.ofMinutes(5);
+    private static final String PENDING_VERIFY_CONFIRM_PREFIX = "pending_verify_confirm:";
+
+    private Optional<PendingVerifyConfirm> getPendingVerifyConfirm(String sessionKey) {
+        return cacheService.get(PENDING_VERIFY_CONFIRM_PREFIX + sessionKey, PendingVerifyConfirm.class);
+    }
+
+    private void savePendingVerifyConfirm(String sessionKey, PendingVerifyConfirm confirm) {
+        cacheService.setRedisOnly(PENDING_VERIFY_CONFIRM_PREFIX + sessionKey, confirm, PENDING_VERIFY_CONFIRM_TTL);
+    }
+
+    private void clearPendingVerifyConfirm(String sessionKey) {
+        cacheService.delete(PENDING_VERIFY_CONFIRM_PREFIX + sessionKey);
     }
 
     private String handleExplainReport(UUID userId, ReportDTO.ChatMessageRequest req,
@@ -566,62 +755,6 @@ public class ChatService {
     }
 
     // ── Messages ──────────────────────────────────────────────────────────────
-
-    @Transactional
-    public ChatDTO.ChatResponse sendMessage(UUID userId, UUID sessionId, ChatDTO.SendMessageRequest req) {
-        Users user       = requireUser(userId);
-        ChatSession session = requireSession(userId, sessionId);
-
-        // Deduct quota before doing any work — throws QUOTA_EXHAUSTED (403) if empty
-        quotaService.checkAndDeduct(userId);
-
-        // Load full history for multi-turn context
-        List<ChatMessage> history = messageRepo.findBySession_IdOrderByCreatedAtAsc(sessionId);
-
-        // Persist user message first
-        ChatMessage userMsg = messageRepo.save(ChatMessage.builder()
-            .session(session)
-            .user(user)
-            .role("user")
-            .content(req.getContent())
-            .build());
-
-        // Build Gemini conversation history (history + new user message)
-        List<GeminiService.GeminiMessage> geminiHistory = new ArrayList<>(history.size() + 1);
-        for (ChatMessage msg : history) {
-            geminiHistory.add(new GeminiService.GeminiMessage(msg.getRole(), msg.getContent()));
-        }
-        geminiHistory.add(new GeminiService.GeminiMessage("user", req.getContent()));
-
-        // Call Gemini — refund quota if the API call itself fails so the user isn't penalized
-        String aiText;
-        try {
-            aiText = geminiService.chat(geminiHistory);
-        } catch (Exception e) {
-            quotaService.refundOne(userId);
-            throw e;
-        }
-
-        // Persist assistant response
-        ChatMessage assistantMsg = messageRepo.save(ChatMessage.builder()
-            .session(session)
-            .user(user)
-            .role("assistant")
-            .content(aiText)
-            .modelUsed(geminiService.getModelName())
-            .build());
-
-        // Touch session's updatedAt so it bubbles up in the session list
-        sessionRepo.touchUpdatedAt(sessionId, Instant.now());
-
-        log.info("Sent message in session {} — {} history msgs, AI replied {} chars",
-            sessionId, history.size(), aiText.length());
-
-        return ChatDTO.ChatResponse.builder()
-            .userMessage(toMessageResponse(userMsg))
-            .assistantMessage(toMessageResponse(assistantMsg))
-            .build();
-    }
 
     @Transactional(readOnly = true)
     public ChatDTO.ConversationResponse getHistory(UUID userId, UUID sessionId) {

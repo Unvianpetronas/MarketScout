@@ -15,13 +15,26 @@ import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
 import { updateProfile, changePassword } from "@/services/auth.service";
 import { getMyQuota } from "@/services/quota.service";
+import { getMyInvoices } from "@/services/payment.service";
 import { QuotaStatus } from "@/types/quota";
+import { InvoiceSummary } from "@/types/payment";
 
-const MOCK_BILLING = [
-  { date: "01/10/2024", plan: "Pro Plan", ref: "REF-2024-10-PRO", amount: "5.800.000₫", status: "Paid" },
-  { date: "01/09/2024", plan: "Pro Plan", ref: "REF-2024-09-PRO", amount: "5.800.000₫", status: "Paid" },
-  { date: "01/08/2024", plan: "Starter Plan", ref: "REF-2024-08-STR", amount: "2.000.000₫", status: "Paid" },
-];
+const VND = new Intl.NumberFormat("vi-VN");
+
+function formatBillingDate(value: string | number | null): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("vi-VN");
+}
+
+function billingStatusLabel(status: string): string {
+  switch (status) {
+    case "paid": return "Paid";
+    case "pending": return "Pending";
+    case "expired": return "Expired";
+    default: return status;
+  }
+}
 
 const TABS = [
   { id: "profile", labelKey: "profile.tab.profile", icon: User },
@@ -43,6 +56,7 @@ export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
   const { t } = useLanguage();
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
+  const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
   const [activeTab, setActiveTab] = useState("profile");
 
   const [profileForm, setProfileForm] = useState({
@@ -63,6 +77,7 @@ export default function ProfilePage() {
       setProfileForm({ fullName: user.fullName || "", email: user.email || "", phone: user.phone || "", taxId: user.taxId || "" });
     }
     getMyQuota().then(setQuota).catch(() => null);
+    getMyInvoices().then(setInvoices).catch(() => null);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [user]);
 
@@ -367,38 +382,42 @@ export default function ProfilePage() {
                       <Download className="w-4 h-4" /> {t("profile.exportAll")}
                     </button>
                   </div>
-                  <table className="w-full">
-                    <thead>
-                      <tr className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/60">
-                        <th className="px-6 py-3 text-left">{t("profile.col.date")}</th>
-                        <th className="px-6 py-3 text-left">{t("profile.col.plan")}</th>
-                        <th className="px-6 py-3 text-left">{t("profile.col.amount")}</th>
-                        <th className="px-6 py-3 text-left">{t("profile.col.status")}</th>
-                        <th className="px-6 py-3 text-left">{t("profile.col.invoice")}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {MOCK_BILLING.map((row, i) => (
-                        <tr key={i} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 text-sm text-gray-600">{row.date}</td>
-                          <td className="px-6 py-4">
-                            <p className="text-sm font-semibold text-gray-900">{row.plan}</p>
-                            <p className="text-xs text-[#00D26A]">{row.ref}</p>
-                          </td>
-                          <td className="px-6 py-4 text-sm font-bold text-gray-900">{row.amount}</td>
-                          <td className="px-6 py-4">
-                            <span className="risk-low text-xs font-semibold px-2.5 py-0.5 rounded-full">{row.status}</span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <button onClick={() => toast.info(t("profile.soon"))}
-                              className="flex items-center gap-1 text-xs text-[#00D26A] hover:underline font-semibold">
-                              <Download className="w-3 h-3" /> PDF
-                            </button>
-                          </td>
+                  {invoices.length === 0 ? (
+                    <div className="px-6 py-10 text-center text-sm text-gray-400">{t("profile.noBilling")}</div>
+                  ) : (
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/60">
+                          <th className="px-6 py-3 text-left">{t("profile.col.date")}</th>
+                          <th className="px-6 py-3 text-left">{t("profile.col.plan")}</th>
+                          <th className="px-6 py-3 text-left">{t("profile.col.amount")}</th>
+                          <th className="px-6 py-3 text-left">{t("profile.col.status")}</th>
+                          <th className="px-6 py-3 text-left">{t("profile.col.invoice")}</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {invoices.map((row) => (
+                          <tr key={row.invoiceId} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-4 text-sm text-gray-600">{formatBillingDate(row.paidAt || row.createdAt)}</td>
+                            <td className="px-6 py-4">
+                              <p className="text-sm font-semibold text-gray-900">{row.itemLabel}</p>
+                              <p className="text-xs text-[#00D26A]">{row.invoiceNo}</p>
+                            </td>
+                            <td className="px-6 py-4 text-sm font-bold text-gray-900">{VND.format(row.totalVnd)}₫</td>
+                            <td className="px-6 py-4">
+                              <span className="risk-low text-xs font-semibold px-2.5 py-0.5 rounded-full">{billingStatusLabel(row.status)}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <button onClick={() => toast.info(t("profile.soon"))}
+                                className="flex items-center gap-1 text-xs text-[#00D26A] hover:underline font-semibold">
+                                <Download className="w-3 h-3" /> PDF
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               )}
             </div>

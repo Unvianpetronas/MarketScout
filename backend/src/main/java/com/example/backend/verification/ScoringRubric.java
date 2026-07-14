@@ -53,7 +53,8 @@ public class ScoringRubric {
             score += 5;
             ev.add(Evidence.builder().type("WARN").text("Ngành nghề khớp một phần").source("P1").build());
         }
-        return build(1, "Entity Validation", Math.min(100, score), ev, "vietqr.io / gleif.org");
+        return build(1, "Entity Validation", Math.min(100, score), ev, "vietqr.io / gleif.org",
+            confidenceFor(f.getStatus(), f.getAgeYears(), f.getHasLegalRepresentative(), f.getIndustryMatch()));
     }
 
     // P2 — Digital Footprint
@@ -92,7 +93,20 @@ public class ScoringRubric {
             score += 8;
             ev.add(Evidence.builder().type("WARN").text("Hiện diện mạng xã hội trung bình").source("Tavily").build());
         }
-        return build(2, "Digital Footprint", Math.min(100, Math.max(0, score)), ev, "RDAP / Tavily");
+        // Informational only — not scored. Facebook content isn't indexable enough
+        // for search to confirm which page (if any) is the company's real one, so
+        // this is surfaced for a human to check, not treated as verified fact.
+        if (f.getFacebookPages() != null && f.getFacebookPages().size() == 1) {
+            ev.add(Evidence.builder().type("PASS")
+                .text("Tìm thấy trang Facebook khả dĩ: " + f.getFacebookPages().get(0)).source("Tavily").build());
+        } else if (f.getFacebookPages() != null && f.getFacebookPages().size() > 1) {
+            ev.add(Evidence.builder().type("WARN")
+                .text("Tìm thấy " + f.getFacebookPages().size() + " trang Facebook khả dĩ — cần xác minh thủ công trang chính thức: "
+                    + String.join(", ", f.getFacebookPages()))
+                .source("Tavily").build());
+        }
+        return build(2, "Digital Footprint", Math.min(100, Math.max(0, score)), ev, "RDAP / Tavily",
+            confidenceFor(f.getHasOfficialWebsite(), f.getDomainAgeMonths(), f.getHasSsl(), f.getUsesFreeEmail(), f.getSocialMediaScore()));
     }
 
     // P3 — Trade Activity
@@ -124,7 +138,8 @@ public class ScoringRubric {
             score += 10;
             ev.add(Evidence.builder().type("PASS").text("Đúng ngành nghề").source("P3").build());
         }
-        return build(3, "Trade Activity", Math.min(100, Math.max(0, score)), ev, "VCCI / ImportYeti");
+        return build(3, "Trade Activity", Math.min(100, Math.max(0, score)), ev, "VCCI / ImportYeti",
+            confidenceFor(f.getHasTradeHistory(), f.getShipmentCountYear(), f.getTradeTrend(), f.getIsIndustryMatched()));
     }
 
     // P4 — Identity Consistency
@@ -134,23 +149,24 @@ public class ScoringRubric {
         int score = 30; // base
         if ("COMPLETELY_MATCHED".equalsIgnoreCase(f.getIdentityMatchLevel())) {
             score = 80;
-            ev.add(Evidence.builder().type("PASS").text("Thông tin nhận dạng khớp hoàn toàn").source("Google Places").build());
+            ev.add(Evidence.builder().type("PASS").text("Thông tin nhận dạng khớp hoàn toàn").source("Nominatim/OSM").build());
         } else if ("MINOR_MISMATCH".equalsIgnoreCase(f.getIdentityMatchLevel())) {
             score = 55;
-            ev.add(Evidence.builder().type("WARN").text("Có sự không khớp nhỏ về thông tin").source("Google Places").build());
+            ev.add(Evidence.builder().type("WARN").text("Có sự không khớp nhỏ về thông tin").source("Nominatim/OSM").build());
         } else if ("MAJOR_MISMATCH".equalsIgnoreCase(f.getIdentityMatchLevel())) {
             score = 15;
-            ev.add(Evidence.builder().type("FAIL").text("Sự không khớp nghiêm trọng về thông tin").source("Google Places").build());
+            ev.add(Evidence.builder().type("FAIL").text("Sự không khớp nghiêm trọng về thông tin").source("Nominatim/OSM").build());
         }
         if (Boolean.TRUE.equals(f.getAddressVerified())) {
             score += 10;
-            ev.add(Evidence.builder().type("PASS").text("Địa chỉ được xác minh").source("Google Places").build());
+            ev.add(Evidence.builder().type("PASS").text("Địa chỉ được xác minh").source("Nominatim/OSM").build());
         }
         if (Boolean.TRUE.equals(f.getCeoVerified())) {
             score += 10;
             ev.add(Evidence.builder().type("PASS").text("Người đại diện được xác minh").source("Tavily").build());
         }
-        return build(4, "Identity Consistency", Math.min(100, score), ev, "Google Places / Tavily");
+        return build(4, "Identity Consistency", Math.min(100, score), ev, "Nominatim/OSM / Tavily",
+            confidenceFor(f.getIdentityMatchLevel(), f.getAddressVerified(), f.getCeoVerified()));
     }
 
     // P5 — Financial & Tax
@@ -183,16 +199,41 @@ public class ScoringRubric {
             score += 10;
             ev.add(Evidence.builder().type("PASS").text("Doanh thu đang tăng trưởng").source("P5").build());
         }
-        return build(5, "Financial & Tax", Math.min(100, score), ev, "dangkykinhdoanh.gov.vn / Tavily");
+        return build(5, "Financial & Tax", Math.min(100, score), ev, sourceLabelForP5(f.getDataSource()),
+            confidenceFor(f.getTaxComplianceStatus(), f.getRegisteredCapitalUsd(), f.getHasFinancialReport(), f.getRevenueTrend()));
+    }
+
+    /** P5 routes to a different real source per country (see CrawlerP5Router) — label whichever one actually answered. */
+    private String sourceLabelForP5(String dataSource) {
+        if (dataSource == null) return "Không xác định";
+        return switch (dataSource) {
+            case "dangkykinhdoanh" -> "dangkykinhdoanh.gov.vn";
+            case "companies_house" -> "Companies House (UK)";
+            case "sec_edgar" -> "SEC EDGAR (US)";
+            case "tavily" -> "Tavily (tìm kiếm văn bản)";
+            default -> dataSource;
+        };
     }
 
     // P6 — Payment & Bank Sanctions
     public PillarScore scoreP6(FactJson.P6Facts f) {
-        if (f == null) return skip(6, "Payment & Bank", "Không có dữ liệu P6");
+        return scoreP6(f, null);
+    }
+
+    /**
+     * @param skipReason why the crawler couldn't check (e.g. daily OpenSanctions
+     *                   budget exhausted vs. API key missing) — surfaced on the
+     *                   report so "we couldn't check" never reads like "all clear".
+     */
+    public PillarScore scoreP6(FactJson.P6Facts f, String skipReason) {
+        if (f == null) {
+            return skip(6, "Payment & Bank",
+                skipReason != null && !skipReason.isBlank() ? skipReason : "Không có dữ liệu P6");
+        }
         List<Evidence> ev = new ArrayList<>();
         if (Boolean.TRUE.equals(f.getIsSanctionHit())) {
             ev.add(Evidence.builder().type("FAIL").text("CẢNH BÁO: Nằm trong danh sách trừng phạt quốc tế").source("OpenSanctions").build());
-            return build(6, "Payment & Bank", 0, ev, "OpenSanctions");
+            return build(6, "Payment & Bank", 0, ev, "OpenSanctions", "HIGH");
         }
         int score = 60;
         ev.add(Evidence.builder().type("PASS").text("Không nằm trong danh sách trừng phạt").source("OpenSanctions").build());
@@ -211,7 +252,8 @@ public class ScoringRubric {
             score -= 20;
             ev.add(Evidence.builder().type("WARN").text("Yêu cầu thanh toán vào tài khoản cá nhân").source("P6").build());
         }
-        return build(6, "Payment & Bank", Math.min(100, Math.max(0, score)), ev, "OpenSanctions");
+        return build(6, "Payment & Bank", Math.min(100, Math.max(0, score)), ev, "OpenSanctions",
+            confidenceFor(f.getBicVerified(), f.getAccountType(), f.getIsPersonalAccountRequested()));
     }
 
     // P7 — Deal Structure Risk
@@ -242,7 +284,8 @@ public class ScoringRubric {
             score -= 10;
             ev.add(Evidence.builder().type("WARN").text("Đặt cọc cao (" + f.getDepositPercentage() + "%)").source("P7").build());
         }
-        return build(7, "Deal Structure Risk", Math.min(100, Math.max(0, score)), ev, "Gemini Deal Safety");
+        return build(7, "Deal Structure Risk", Math.min(100, Math.max(0, score)), ev, "Gemini Deal Safety",
+            confidenceFor(f.getPaymentMethodSafety(), f.getHasWrittenContract(), f.getDepositPercentage()));
     }
 
     // P8 — Operational Proof
@@ -258,10 +301,10 @@ public class ScoringRubric {
         }
         if (Boolean.FALSE.equals(f.getIsStockImageUsed())) {
             score += 30;
-            ev.add(Evidence.builder().type("PASS").text("Ảnh thực tế (không phải ảnh stock)").source("TinEye").build());
+            ev.add(Evidence.builder().type("PASS").text("Ảnh thực tế (không phải ảnh stock)").source("Gemini Vision").build());
         } else if (Boolean.TRUE.equals(f.getIsStockImageUsed())) {
             score -= 10;
-            ev.add(Evidence.builder().type("WARN").text("CẢNH BÁO: Sử dụng ảnh stock").source("TinEye").build());
+            ev.add(Evidence.builder().type("WARN").text("CẢNH BÁO: Sử dụng ảnh stock").source("Gemini Vision").build());
         }
         if (Boolean.TRUE.equals(f.getHasPhysicalEvidence())) {
             score += 30;
@@ -271,7 +314,8 @@ public class ScoringRubric {
             score += 10;
             ev.add(Evidence.builder().type("PASS").text("Quy mô nhân sự: " + f.getEmployeeCountRange()).source("Tavily").build());
         }
-        return build(8, "Operational Proof", Math.min(100, Math.max(0, score)), ev, "TinEye / Tavily");
+        return build(8, "Operational Proof", Math.min(100, Math.max(0, score)), ev, "Gemini Vision / Tavily",
+            confidenceFor(f.getHasVerifiedLocation(), f.getIsStockImageUsed(), f.getHasPhysicalEvidence(), f.getEmployeeCountRange()));
     }
 
     // Overall score calculation.
@@ -303,12 +347,27 @@ public class ScoringRubric {
     }
 
     // Helpers
-    private PillarScore build(int no, String name, int score, List<Evidence> ev, String sources) {
+    private PillarScore build(int no, String name, int score, List<Evidence> ev, String sources, String confidence) {
         String status = score >= 75 ? "PASS" : score >= 40 ? "WARN" : "FAIL";
         return PillarScore.builder()
             .pillarNo(no).pillarName(name).score(score).status(status)
-            .confidence("MEDIUM").evidences(ev).sourcesUsed(sources)
+            .confidence(confidence).evidences(ev).sourcesUsed(sources)
             .build();
+    }
+
+    /**
+     * Confidence reflects data COMPLETENESS (how many of the crawler's fields
+     * actually came back non-null), not favorability — a low score with full
+     * data is still HIGH confidence; a good-looking score built from mostly
+     * null/unknown fields is LOW confidence.
+     */
+    private String confidenceFor(Object... fields) {
+        if (fields.length == 0) return "LOW";
+        long known = java.util.Arrays.stream(fields).filter(java.util.Objects::nonNull).count();
+        double ratio = (double) known / fields.length;
+        if (ratio >= 0.8) return "HIGH";
+        if (ratio >= 0.5) return "MEDIUM";
+        return "LOW";
     }
 
     private PillarScore skip(int no, String name, String reason) {

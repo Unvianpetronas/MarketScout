@@ -17,7 +17,7 @@ import { getMyQuota } from "@/services/quota.service";
 import { QuotaStatus } from "@/types/quota";
 import { getReports } from "@/services/report.service";
 import { streamPipelineMessage } from "@/services/chat.service";
-import { ReportListItem } from "@/types/report";
+import { ReportListItem, isProcessingStatus } from "@/types/report";
 import { useAuth } from "@/providers/auth-provider";
 
 const COUNTRIES = [
@@ -73,14 +73,16 @@ function ScoreRing({ score }: { score: number | null | undefined }) {
   );
 }
 
+// Matches Report.status on the backend: PENDING | QUICK_SCANNING | DEEP_SCANNING | DONE | HARD_STOP | FAILED
 function StatusBadge({ status }: { status: string | null | undefined }) {
-  const s = (status as string || "").toUpperCase();
-  if (s === "COMPLETED") return <span className="risk-low text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Hoàn thành</span>;
-  if (s === "PROCESSING" || s === "DEEP_SCANNING") return (
+  const s = status || "";
+  if (s === "DONE") return <span className="risk-low text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Hoàn thành</span>;
+  if (s === "PENDING" || s === "QUICK_SCANNING" || s === "DEEP_SCANNING") return (
     <span className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Đang quét
     </span>
   );
+  if (s === "HARD_STOP") return <span className="risk-high text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1"><XCircle className="w-3 h-3" /> Cấm giao dịch</span>;
   if (s === "FAILED") return <span className="risk-high text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1"><XCircle className="w-3 h-3" /> Thất bại</span>;
   return <span className="bg-gray-50 text-gray-500 border border-gray-200 text-xs font-bold px-2.5 py-0.5 rounded-full">{status}</span>;
 }
@@ -91,6 +93,7 @@ function VerifyContent() {
   const { user } = useAuth();
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [country, setCountry] = useState(searchParams.get("country") || "");
+  const [website, setWebsite] = useState("");
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState("");
@@ -146,22 +149,26 @@ function VerifyContent() {
     const deal: {
       depositPercentage?: number; hasWrittenContract?: boolean;
       paymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY"; dealValueUsd?: number;
-      contractId?: string;
+      contractId?: string; website?: string;
     } = {};
     if (paymentSafety) deal.paymentMethodSafety = paymentSafety;
     if (depositSet) deal.depositPercentage = deposit;
     if (hasContract !== null) deal.hasWrittenContract = hasContract;
     if (dealValue.trim()) deal.dealValueUsd = Number(dealValue.trim());
     if (pickedContract) deal.contractId = pickedContract.id;
+    if (website.trim()) deal.website = website.trim();
 
     // Run the verification IN PLACE (no chat detour) so the deal params reach the
     // pipeline directly and P7 is scored. Redirect to the report when it's ready.
+    // confirmVerify:true — this dedicated form (with its own quota check above and
+    // an explicit submit click) already IS the user's confirmation, so it skips
+    // ChatService's chat-style "are you sure?" gate and runs immediately.
     setIsSearching(true);
     setVerifyStatus("Đang khởi tạo thẩm định...");
     let navigated = false;
 
     streamPipelineMessage(
-      { message: preMessage, sessionId: "", ...deal },
+      { message: preMessage, sessionId: "", confirmVerify: true, ...deal },
       (chunk, status) => { if (status === "thinking" || !status) setVerifyStatus(chunk); },
       () => {
         // Finished with no report → ambiguous name / non-verify answer. Hand off to
@@ -172,6 +179,7 @@ function VerifyContent() {
         if (deal.depositPercentage != null) params.set("dealDeposit", String(deal.depositPercentage));
         if (deal.hasWrittenContract != null) params.set("dealContract", String(deal.hasWrittenContract));
         if (deal.dealValueUsd != null) params.set("dealValue", String(deal.dealValueUsd));
+        if (deal.website) params.set("dealWebsite", deal.website);
         router.push(`/chat?${params.toString()}`);
       },
       () => { setIsSearching(false); setVerifyStatus(""); toast.error("Thẩm định thất bại. Vui lòng thử lại."); },
@@ -295,6 +303,18 @@ function VerifyContent() {
                     {isSearching ? "Đang xử lý..." : "Thẩm định"}
                   </button>
                 </form>
+
+                {/* Website (optional) — lets P2 (Digital Footprint) check the real
+                    domain instead of guessing one via search. */}
+                <div className="mt-3 relative">
+                  <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
+                  <input
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder="Website công ty (tuỳ chọn — giúp thẩm định chính xác hơn)"
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50/60 border border-gray-100 rounded-xl text-xs focus:outline-none focus:border-[#00D26A] focus:bg-white transition-all"
+                  />
+                </div>
 
                 {/* Quick Examples */}
                 <div className="mt-4 flex items-center gap-2 flex-wrap">
@@ -517,7 +537,7 @@ function VerifyContent() {
               ) : (
                 <div className="space-y-3 stagger">
                   {recentReports.map((report) => {
-                    const isProcessing = ["PROCESSING", "DEEP_SCANNING"].includes((report.status as string) || "");
+                    const isProcessing = isProcessingStatus(report.status);
                     return (
                       <div key={report.id}
                         className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm card-hover group flex items-center gap-4">
@@ -541,7 +561,7 @@ function VerifyContent() {
                             className="flex items-center gap-1.5 px-3 py-1.5 gradient-brand text-white text-xs font-bold rounded-xl hover:opacity-90">
                             Xem báo cáo <ChevronRight className="w-3 h-3" />
                           </Link>
-                          {report.status === "COMPLETED" && (
+                          {report.status === "DONE" && (
                             <button onClick={() => {
                               const msg = encodeURIComponent(`Phân tích thêm về báo cáo thẩm định doanh nghiệp ${report.entityName}`);
                               router.push(`/chat?preMessage=${msg}`);

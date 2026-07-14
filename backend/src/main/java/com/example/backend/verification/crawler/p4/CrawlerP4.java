@@ -76,6 +76,7 @@ public class CrawlerP4 {
         String verifiedAddress = null;
         String osmName = null;
         boolean addressVerified = false;
+        boolean nominatimSucceeded = false;
 
         try {
             Map<String, Object> place = queryNominatim(input);
@@ -84,6 +85,7 @@ public class CrawlerP4 {
                 Map<String, Object> namedetails = (Map<String, Object>) place.get("namedetails");
                 osmName = namedetails != null ? (String) namedetails.get("name") : null;
                 addressVerified = verifiedAddress != null;
+                nominatimSucceeded = true;
             }
         } catch (Exception e) {
             log.debug("Nominatim lookup failed for {}: {}", input.getName(), e.getMessage());
@@ -95,6 +97,14 @@ public class CrawlerP4 {
         String tavilyQuery = input.getName() + " " + (input.getCountry() != null ? input.getCountry() : "") + " office address verify";
         List<String> tavilyResults = tavilyClient.searchText(tavilyQuery, 3);
         String combined = String.join(" ", tavilyResults).toLowerCase();
+
+        // Neither source returned anything — asserting a specific identity-match
+        // verdict (even "MINOR_MISMATCH") here would present an unchecked company
+        // as if its identity had actually been cross-checked.
+        if (!nominatimSucceeded && tavilyResults.isEmpty()) {
+            return P4Data.builder().state(PillarData.DataState.SKIP).companyName(input.getName())
+                .errorMsg("Không tìm được dữ liệu định danh từ Nominatim hoặc Tavily").fetchedAt(LocalDateTime.now()).build();
+        }
 
         String identityMatch = osmName != null
             ? evaluateMatch(input.getName(), osmName)

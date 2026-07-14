@@ -15,14 +15,14 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
 import { getReports } from "@/services/report.service";
-import { ReportListItem } from "@/types/report";
+import { ReportListItem, isProcessingStatus, isHighRiskLevel } from "@/types/report";
 
-function getRiskBadge(risk: string) {
+function getRiskBadge(risk?: string | null) {
   switch (risk) {
-    case "LOW": return "risk-low";
-    case "MEDIUM": return "risk-medium";
-    case "HIGH": return "risk-high";
-    case "CRITICAL": return "risk-critical";
+    case "Thấp": return "risk-low";
+    case "Trung bình": return "risk-medium";
+    case "Cao": return "risk-high";
+    case "Nghiêm trọng": return "risk-critical";
     default: return "bg-gray-100 text-gray-600 border border-gray-200";
   }
 }
@@ -106,9 +106,9 @@ function ActivityFeed({ reports }: { reports: ReportListItem[] }) {
           {recent.map((r) => (
             <div key={r.id} className="flex items-start gap-3">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                r.status === "COMPLETED" ? "bg-emerald-50" : r.status === "FAILED" ? "bg-red-50" : "bg-blue-50"
+                r.status === "DONE" ? "bg-emerald-50" : r.status === "FAILED" ? "bg-red-50" : "bg-blue-50"
               }`}>
-                {r.status === "COMPLETED" ? (
+                {r.status === "DONE" ? (
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                 ) : r.status === "FAILED" ? (
                   <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
@@ -170,9 +170,9 @@ export default function DashboardPage() {
   };
 
   const totalReports = reports.length;
-  const completed = reports.filter((r) => r.status === "COMPLETED").length;
-  const highRisk = reports.filter((r) => (r.riskLevel as string) === "HIGH" || (r.riskLevel as string) === "CRITICAL").length;
-  const processing = reports.filter((r) => (r.status as string) === "PROCESSING" || (r.status as string) === "DEEP_SCANNING").length;
+  const completed = reports.filter((r) => r.status === "DONE").length;
+  const highRisk = reports.filter((r) => isHighRiskLevel(r.riskLevel)).length;
+  const processing = reports.filter((r) => isProcessingStatus(r.status)).length;
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? t("dash.greetingMorning") : hour < 18 ? t("dash.greetingAfternoon") : t("dash.greetingEvening");
@@ -358,24 +358,25 @@ export default function DashboardPage() {
                             </td>
                             <td className="px-6 py-3.5">
                               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${getRiskBadge(report.riskLevel)}`}>
-                                {report.riskLevel === "LOW" ? t("risk.low") :
-                                  report.riskLevel === "MEDIUM" ? t("risk.medium") :
-                                  report.riskLevel === "HIGH" ? t("risk.high") : report.riskLevel || "—"}
+                                {report.riskLevel === "Thấp" ? t("risk.low") :
+                                  report.riskLevel === "Trung bình" ? t("risk.medium") :
+                                  report.riskLevel === "Cao" ? t("risk.high") :
+                                  report.riskLevel === "Nghiêm trọng" ? t("risk.critical") : report.riskLevel || "—"}
                               </span>
                             </td>
                             <td className="px-6 py-3.5">
                               <span className={`flex items-center gap-1.5 text-xs font-medium ${
-                                report.status === "COMPLETED" ? "text-emerald-600" :
-                                report.status === "PROCESSING" ? "text-blue-500" :
+                                report.status === "DONE" ? "text-emerald-600" :
+                                isProcessingStatus(report.status) ? "text-blue-500" :
                                 report.status === "FAILED" ? "text-red-500" : "text-gray-400"
                               }`}>
-                                {report.status === "COMPLETED" && <CheckCircle2 className="w-3 h-3" />}
-                                {report.status === "PROCESSING" && (
+                                {report.status === "DONE" && <CheckCircle2 className="w-3 h-3" />}
+                                {isProcessingStatus(report.status) && (
                                   <RefreshCw className="w-3 h-3 animate-spin" />
                                 )}
                                 {report.status === "FAILED" && <AlertTriangle className="w-3 h-3" />}
-                                {report.status === "COMPLETED" ? t("status.completed") :
-                                  report.status === "PROCESSING" ? t("status.processing") :
+                                {report.status === "DONE" ? t("status.completed") :
+                                  isProcessingStatus(report.status) ? t("status.processing") :
                                   report.status === "FAILED" ? t("status.failed") : report.status}
                               </span>
                             </td>
@@ -391,7 +392,11 @@ export default function DashboardPage() {
                                   <ExternalLink className="w-3.5 h-3.5" />
                                 </Link>
                                 <button
-                                  onClick={() => router.push(`/verify?rescan=${report.id}`)}
+                                  onClick={() => {
+                                    const params = new URLSearchParams({ q: report.entityName });
+                                    if (report.countryIso2) params.set("country", report.countryIso2);
+                                    router.push(`/verify?${params.toString()}`);
+                                  }}
                                   className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                                 >
                                   <RefreshCw className="w-3.5 h-3.5" />

@@ -54,6 +54,19 @@ public class PaymentDTO {
         private int     quotaRemaining;  // user balance after a confirmed payment
     }
 
+    // ── Billing history ─────────────────────────────────────────────────
+
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class InvoiceSummaryResponse {
+        private UUID       invoiceId;
+        private String     invoiceNo;
+        private String     status;       // draft | pending | paid | expired
+        private BigDecimal totalVnd;
+        private Instant    paidAt;
+        private Instant    createdAt;
+        private String     itemLabel;    // plan name, or "Nạp thêm quota"
+    }
+
     // ── SePay webhook payload ──────────────────────────────────────────
     // https://developer.sepay.vn/vi/sepay-webhooks/tich-hop-webhook
     @Data @NoArgsConstructor @AllArgsConstructor
@@ -62,7 +75,12 @@ public class PaymentDTO {
         private Long       id;             // SePay transaction id (idempotency ref)
         private String     gateway;
         private String     transactionDate;
-        private String     accountNumber;  // receiving account
+        private String     accountNumber;  // physical receiving account
+        // Virtual-account (VA) identifier for banks that route collection through
+        // one (e.g. BIDV) — null for banks SePay watches on the physical account
+        // directly. When a merchant's app.payment.account-no is configured as a
+        // VA, THIS is the field that actually carries it, not accountNumber.
+        private String     subAccount;
         private String     code;           // payment code SePay parsed (may be null)
         private String     content;        // raw transfer content
         private String     transferType;   // "in" | "out"

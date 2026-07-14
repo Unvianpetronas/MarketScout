@@ -4,7 +4,7 @@ export type VerificationStatus = "PENDING" | "VERIFIED" | "MISMATCH" | "MANUALLY
 
 // Matches backend ContractDTO.ExtractedField — value/confidence/sourceText
 // for each README §2 field (incoterms, depositPercent, paymentMethod,
-// hasArbitrationClause, signatoryName, signatoryTaxId).
+// hasArbitrationClause, partyAName, partyATaxId, partyBName, partyBTaxId).
 export interface ExtractedField {
   value: string | number | boolean | null;
   confidence: number | null;

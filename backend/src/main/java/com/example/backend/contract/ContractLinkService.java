@@ -93,7 +93,7 @@ public class ContractLinkService {
     // key, throwing on every future read of this link) can never be persisted.
     private static final java.util.Set<String> OVERRIDABLE_FIELDS = java.util.Set.of(
             "incoterms", "depositPercent", "paymentMethod", "hasArbitrationClause",
-            "signatoryName", "signatoryTaxId");
+            "partyAName", "partyATaxId", "partyBName", "partyBTaxId");
 
     @Transactional
     public ContractDTO.LinkResponse updateFieldOverride(UUID reportId, UUID contractId, String field, Object value, UUID userId) {
@@ -162,37 +162,56 @@ public class ContractLinkService {
 
     private record CrossCheck(boolean matched, Map<String, Object> matchDetails) {}
 
+    // Below this, the AI itself flagged the read as uncertain (blurry scan, illegible
+    // digit, conflicting values across the document — see ContractExtractor's prompt).
+    // Trusting a low-confidence guess for matching is worse than treating it as
+    // missing: a wrong guess can produce a false VERIFIED just as easily as a false
+    // MISMATCH, and either silently corrupts P7 scoring.
+    private static final double MATCH_MIN_CONFIDENCE = 0.5;
+
     /**
-     * Signatory tax-ID match is authoritative; falls back to a loose name match
-     * only when a tax ID is missing on either side (README §3.2 point 2).
+     * A contract always has two parties (Bên A/Bên B, seller/buyer) and there is
+     * no reliable way to know in advance which one is the partner under
+     * verification — so the report's tax ID / entity name is checked against
+     * BOTH extracted parties, and either side matching is enough. Tax-ID match
+     * is authoritative; falls back to a loose name match only when a tax ID is
+     * missing (or too low-confidence to trust) on either side for that party
+     * (README §3.2 point 2).
      */
     private CrossCheck crossCheck(Report report, Contract contract) {
         JsonNode data = parseJsonNode(contract.getExtractedData());
-        String extractedTaxId = textOrNull(data.path("signatoryTaxId").path("value"));
-        String extractedName = textOrNull(data.path("signatoryName").path("value"));
-
         String reportTaxId = normalizeDigits(report.getTaxId());
-        String contractTaxId = normalizeDigits(extractedTaxId);
 
         boolean taxIdMatch = false;
         boolean nameMatch = false;
         String matchedAgainst = null;
 
-        if (reportTaxId != null && contractTaxId != null) {
-            taxIdMatch = reportTaxId.equals(contractTaxId);
-            matchedAgainst = "P1_TAX_ID";
-        } else if (extractedName != null && report.getEntityName() != null) {
-            // No tax ID on one/both sides — this is the ONLY signal for every
-            // non-Vietnamese report (report.taxId is only ever populated for
-            // MST_VN registrations; international companies always land here).
-            // A naive substring check would let a short/generic normalized name
-            // "match" almost anything, so require a minimum meaningful length
-            // before allowing containment, not just any raw substring hit.
-            String a = normalizeName(extractedName);
-            String b = normalizeName(report.getEntityName());
-            int minLen = Math.min(a.length(), b.length());
-            nameMatch = !a.isBlank() && !b.isBlank() && minLen >= 6 && (a.equals(b) || a.contains(b) || b.contains(a));
-            matchedAgainst = "P1_NAME_FALLBACK";
+        for (String party : new String[] {"A", "B"}) {
+            String contractTaxId = normalizeDigits(confidentText(data, "party" + party + "TaxId"));
+            String extractedName = confidentText(data, "party" + party + "Name");
+
+            if (reportTaxId != null && contractTaxId != null && taxIdsMatch(reportTaxId, contractTaxId)) {
+                taxIdMatch = true;
+                matchedAgainst = "P1_TAX_ID_PARTY_" + party;
+                break;
+            }
+            if ((reportTaxId == null || contractTaxId == null) && extractedName != null && report.getEntityName() != null) {
+                // No usable tax ID on one/both sides — this is the ONLY signal for
+                // every non-Vietnamese report (report.taxId is only ever populated
+                // for MST_VN registrations; international companies always land
+                // here). A naive substring check would let a short/generic
+                // normalized name "match" almost anything, so require a minimum
+                // meaningful length before allowing containment, not just any raw
+                // substring hit.
+                String a = normalizeName(extractedName);
+                String b = normalizeName(report.getEntityName());
+                int minLen = Math.min(a.length(), b.length());
+                if (!a.isBlank() && !b.isBlank() && minLen >= 6 && (a.equals(b) || a.contains(b) || b.contains(a))) {
+                    nameMatch = true;
+                    matchedAgainst = "P1_NAME_FALLBACK_PARTY_" + party;
+                    break;
+                }
+            }
         }
 
         Map<String, Object> details = new LinkedHashMap<>();
@@ -202,17 +221,53 @@ public class ContractLinkService {
         return new CrossCheck(taxIdMatch || nameMatch, details);
     }
 
+    /** The field's value, but only if the AI's own confidence for it clears {@link #MATCH_MIN_CONFIDENCE}. */
+    private static String confidentText(JsonNode data, String field) {
+        JsonNode fieldNode = data.path(field);
+        double confidence = fieldNode.path("confidence").isNumber() ? fieldNode.path("confidence").asDouble() : 0.0;
+        if (confidence < MATCH_MIN_CONFIDENCE) return null;
+        return textOrNull(fieldNode.path("value"));
+    }
+
     private static String normalizeDigits(String s) {
         if (s == null) return null;
         String digits = s.replaceAll("[^0-9]", "");
         return digits.isBlank() ? null : digits;
     }
 
+    /**
+     * Vietnamese dependent-unit (branch) tax codes are the parent's 10-digit MST
+     * plus a "-XXX" suffix (e.g. "0101243150-001") — same legal entity as the
+     * bare 10-digit parent MST, just a different signing branch. A report
+     * registered under the parent MST must still match a contract signed by one
+     * of its branches, and vice versa.
+     */
+    private static boolean taxIdsMatch(String a, String b) {
+        if (a.equals(b)) return true;
+        String shorter = a.length() <= b.length() ? a : b;
+        String longer = a.length() <= b.length() ? b : a;
+        return shorter.length() == 10 && longer.length() == 13 && longer.startsWith(shorter);
+    }
+
+    // Legal-entity designators stripped before comparing names, so "Cong ty TNHH
+    // Hung Thinh" and "Hung Thinh Co., Ltd" normalize to the same core name.
+    private static final java.util.regex.Pattern LEGAL_DESIGNATORS = java.util.regex.Pattern.compile(
+            "\\b(cong ty|cty|doanh nghiep tu nhan|dntn|tap doan|tnhh|mtv|mot thanh vien|co phan|cp|" +
+            "hop danh|jsc|joint stock company|co\\.?,?\\s*ltd|ltd|limited|corporation|corp|" +
+            "incorporated|inc|gmbh|pte|pty|llc|group)\\b");
+
     private static String normalizeName(String s) {
-        return s.toLowerCase()
-                .replaceAll("(công ty|cong ty)\\s*(tnhh|cổ phần|co phan)?", "")
-                .replaceAll("[^a-z0-9 ]", "")
-                .trim();
+        // Strip Vietnamese diacritics first (NFD splits base letter + combining
+        // marks) — OCR/AI extraction from a scanned or photographed contract
+        // frequently drops or garbles accents, so "Hưng Thịnh" vs "Hung Thinh"
+        // must compare equal rather than fail as two different companies.
+        String noAccents = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace('đ', 'd').replace('Đ', 'D'); // đ/Đ has no combining decomposition
+        String cleaned = noAccents.toLowerCase()
+                .replaceAll("[^a-z0-9 ]", " ");
+        cleaned = LEGAL_DESIGNATORS.matcher(cleaned).replaceAll(" ");
+        return cleaned.replaceAll("\\s+", " ").trim();
     }
 
     private static String textOrNull(JsonNode node) {

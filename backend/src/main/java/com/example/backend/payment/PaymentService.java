@@ -198,6 +198,33 @@ public class PaymentService {
                 .build();
     }
 
+    // ── Billing history ────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<PaymentDTO.InvoiceSummaryResponse> listInvoices(UUID userId) {
+        return invoiceRepository.findByUser_IdOrderByCreatedAtDesc(userId).stream()
+                .map(inv -> PaymentDTO.InvoiceSummaryResponse.builder()
+                        .invoiceId(inv.getId())
+                        .invoiceNo(inv.getInvoiceNo())
+                        .status(inv.getStatus())
+                        .totalVnd(inv.getTotalVnd())
+                        .paidAt(inv.getPaidAt())
+                        .createdAt(inv.getCreatedAt())
+                        .itemLabel(resolveItemLabel(inv))
+                        .build())
+                .toList();
+    }
+
+    private String resolveItemLabel(Invoice invoice) {
+        PaymentTransaction tx = transactionRepository.findByInvoice_Id(invoice.getId()).orElse(null);
+        if (tx == null) return "—";
+        PlanPurchase plan = planPurchaseRepository.findByTransaction_Id(tx.getId()).orElse(null);
+        if (plan != null) return plan.getPlan().getName() + " plan";
+        QuotaTopup topup = topupRepository.findByTransaction_Id(tx.getId()).orElse(null);
+        if (topup != null) return "Nạp thêm " + topup.getQuotaAdded() + " lượt verify";
+        return "—";
+    }
+
     // ── Status poll ────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
@@ -254,18 +281,44 @@ public class PaymentService {
     public WebhookResult processWebhook(PaymentDTO.SepayWebhook p) {
         // Only money-in transfers can fulfill an order.
         if (p.getTransferType() == null || !p.getTransferType().equalsIgnoreCase("in")) {
+            log.info("SePay webhook ignored — transferType={} (not an incoming transfer) sepayRef={}",
+                    p.getTransferType(), p.getId());
             return WebhookResult.IRRELEVANT;
         }
-        // Must land on our configured receiving account.
-        if (props.getAccountNo() == null || props.getAccountNo().isBlank()
-                || !props.getAccountNo().equals(p.getAccountNumber())) {
+        // Must land on our configured receiving account. Some banks (e.g. BIDV)
+        // route collection through an alphanumeric virtual account (VA) — for
+        // those, SePay reports the VA in `subAccount` and the underlying physical
+        // account (shared by every VA on that bank connection) in `accountNumber`.
+        // So a configured VA must be checked against subAccount, not accountNumber.
+        // Compared case/whitespace-insensitive rather than digits-only — stripping
+        // to digits would mangle a VA like "96247MARKETSCOUT" down to "96247".
+        if (props.getAccountNo() == null || props.getAccountNo().isBlank()) {
+            log.error("SePay webhook ignored — app.payment.account-no is not configured, "
+                    + "so no incoming transfer can ever be matched. Set SEPAY_ACCOUNT_NO. sepayRef={}", p.getId());
+            return WebhookResult.IRRELEVANT;
+        }
+        String configuredAccount = normalizeAccountId(props.getAccountNo());
+        boolean accountMatches = configuredAccount.equals(normalizeAccountId(p.getAccountNumber()))
+                || configuredAccount.equals(normalizeAccountId(p.getSubAccount()));
+        if (!accountMatches) {
+            log.warn("SePay webhook ignored — account mismatch: configured={} received accountNumber={} subAccount={} sepayRef={}",
+                    props.getAccountNo(), p.getAccountNumber(), p.getSubAccount(), p.getId());
             return WebhookResult.IRRELEVANT;
         }
         String code = extractCode(p);
-        if (code == null) return WebhookResult.IRRELEVANT;
+        if (code == null) {
+            log.warn("SePay webhook ignored — no MSQT payment code found in code/content: "
+                    + "code={} content={} sepayRef={}", p.getCode(), p.getContent(), p.getId());
+            return WebhookResult.IRRELEVANT;
+        }
 
         String sepayRef = p.getId() != null ? String.valueOf(p.getId()) : null;
-        return confirmTransfer(code, p.getTransferAmount(), sepayRef, "webhook");
+        WebhookResult result = confirmTransfer(code, p.getTransferAmount(), sepayRef, "webhook");
+        if (result == WebhookResult.IRRELEVANT) {
+            log.warn("SePay webhook parsed code={} but no matching pending order was found — "
+                    + "possibly already expired-and-swept or never created. sepayRef={}", code, p.getId());
+        }
+        return result;
     }
 
     /**
@@ -280,7 +333,12 @@ public class PaymentService {
     @Transactional
     public WebhookResult confirmTransfer(String code, BigDecimal paidAmount, String sepayRef, String source) {
         Optional<VietqrPayment> opt = vietqrRepository.findByTransferContentForUpdate(code);
-        if (opt.isEmpty()) return WebhookResult.IRRELEVANT;
+        if (opt.isEmpty()) {
+            log.warn("No VietQR payment row for code={} (source={}) — the buyer's transfer content did not "
+                    + "carry a code this system ever generated, or the code was misread from the bank message.",
+                    code, source);
+            return WebhookResult.IRRELEVANT;
+        }
         VietqrPayment qr = opt.get();
 
         // Idempotency: a retry of an already-confirmed transfer must not re-credit.
@@ -490,6 +548,18 @@ public class PaymentService {
 
     private static String enc(String s) {
         return URLEncoder.encode(s == null ? "" : s, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Uppercased, whitespace/dash-stripped, or null — so a receiving account
+     * identifier (plain numeric account OR an alphanumeric virtual account like
+     * "96247MARKETSCOUT") compares equal regardless of case or incidental
+     * formatting, without discarding letters the way a digits-only strip would.
+     */
+    private static String normalizeAccountId(String s) {
+        if (s == null) return null;
+        String t = s.replaceAll("[\\s-]", "").toUpperCase();
+        return t.isBlank() ? null : t;
     }
 
     private String generateTransferCode() {

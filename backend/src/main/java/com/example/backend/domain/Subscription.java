@@ -57,6 +57,12 @@ public class Subscription {
     @Column(name = "cancel_at")
     private Instant cancelAt;
 
+    @Column(name = "reminder_sent_3d_at")
+    private Instant reminderSent3dAt;
+
+    @Column(name = "reminder_sent_1d_at")
+    private Instant reminderSent1dAt;
+
     @NotNull
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
