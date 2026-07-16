@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { getPlans, updatePlan, PlanDTO } from "@/services/admin.service";
+import { useLanguage } from "@/providers/language-provider";
 
 function getPlanStyle(plan: string) {
   const p = plan.toLowerCase();
@@ -16,6 +17,7 @@ function getPlanStyle(plan: string) {
 }
 
 export default function AdminQuotaPage() {
+  const { t } = useLanguage();
   const [plans, setPlans] = useState<PlanDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -27,7 +29,7 @@ export default function AdminQuotaPage() {
       const res = await getPlans();
       setPlans(res);
     } catch {
-      toast.error("Không thể tải danh sách gói.");
+      toast.error(t("admin.quota.loadError"));
     } finally {
       setIsLoading(false);
     }
@@ -46,17 +48,17 @@ export default function AdminQuotaPage() {
     if (raw === undefined) return;
     const quota = parseInt(raw, 10);
     if (Number.isNaN(quota) || quota < 0) {
-      toast.error("Quota phải là số không âm.");
+      toast.error(t("admin.quota.invalidQuota"));
       return;
     }
     setSavingId(plan.id);
     try {
       await updatePlan(plan.id, { monthlyQuota: quota });
-      toast.success(`Đã cập nhật quota cho gói ${plan.name}`);
+      toast.success(t("admin.quota.updateSuccess", { plan: plan.name }));
       setEdits((prev) => { const next = { ...prev }; delete next[plan.id]; return next; });
       fetchPlans();
     } catch {
-      toast.error("Cập nhật quota thất bại.");
+      toast.error(t("admin.quota.updateError"));
     } finally {
       setSavingId(null);
     }
@@ -67,8 +69,8 @@ export default function AdminQuotaPage() {
       <AdminShell active="quota">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Global Operations &gt; Quota Matrix</p>
-            <h1 className="text-2xl font-extrabold text-gray-900">Quota theo gói dịch vụ</h1>
+            <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">{t("admin.quota.breadcrumb")}</p>
+            <h1 className="text-2xl font-extrabold text-gray-900">{t("admin.quota.title")}</h1>
           </div>
           <button onClick={handleRefresh} disabled={isRefreshing}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
@@ -80,22 +82,22 @@ export default function AdminQuotaPage() {
           {isLoading ? (
             <div className="p-12 flex flex-col items-center">
               <div className="w-10 h-10 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin mb-3" />
-              <p className="text-sm text-gray-400">Đang tải...</p>
+              <p className="text-sm text-gray-400">{t("admin.quota.loading")}</p>
             </div>
           ) : plans.length === 0 ? (
             <div className="p-16 text-center">
               <Database className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-              <p className="text-gray-400 text-sm">Chưa có gói dịch vụ nào.</p>
+              <p className="text-gray-400 text-sm">{t("admin.quota.empty")}</p>
             </div>
           ) : (
             <table className="w-full">
               <thead>
                 <tr className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/80">
-                  <th className="px-5 py-4 text-left">Gói</th>
-                  <th className="px-5 py-4 text-left">Chu kỳ</th>
-                  <th className="px-5 py-4 text-left">Quota / tháng</th>
-                  <th className="px-5 py-4 text-left">Trạng thái</th>
-                  <th className="px-5 py-4 text-left">Thao tác</th>
+                  <th className="px-5 py-4 text-left">{t("admin.quota.colPlan")}</th>
+                  <th className="px-5 py-4 text-left">{t("admin.quota.colCycle")}</th>
+                  <th className="px-5 py-4 text-left">{t("admin.quota.colQuotaMonth")}</th>
+                  <th className="px-5 py-4 text-left">{t("admin.quota.colStatus")}</th>
+                  <th className="px-5 py-4 text-left">{t("admin.quota.colActions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -122,7 +124,7 @@ export default function AdminQuotaPage() {
                       <td className="px-5 py-4">
                         <span className={`text-xs font-bold flex items-center gap-1.5 ${plan.isActive ? "text-emerald-600" : "text-gray-400"}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${plan.isActive ? "bg-emerald-500" : "bg-gray-300"}`} />
-                          {plan.isActive ? "Đang bán" : "Tạm ẩn"}
+                          {plan.isActive ? t("admin.quota.statusActive") : t("admin.quota.statusInactive")}
                         </span>
                       </td>
                       <td className="px-5 py-4">
@@ -132,7 +134,7 @@ export default function AdminQuotaPage() {
                           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 border border-blue-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <Save className="w-3.5 h-3.5" />
-                          {savingId === plan.id ? "Đang lưu..." : "Lưu"}
+                          {savingId === plan.id ? t("admin.quota.saving") : t("admin.quota.save")}
                         </button>
                       </td>
                     </tr>

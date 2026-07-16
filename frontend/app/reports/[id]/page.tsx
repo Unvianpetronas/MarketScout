@@ -442,7 +442,7 @@ export default function ReportDetailPage({ params }: Props) {
           // Scan pipeline still running in the background — poll until it lands
           // on a terminal status, otherwise the deal-safety recommendation and
           // final score only ever show up after a manual page reload.
-          if (r.status === "PENDING" || r.status === "PROCESSING") {
+          if (isProcessingStatus(r.status)) {
             timer = setTimeout(load, 3000);
           }
         })
