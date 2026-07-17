@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -32,6 +33,7 @@ const TEAM = [
     bioKey: "landing.team.tuan.bio",
     initials: "TQT",
     gradient: "from-emerald-400 to-teal-500",
+    avatar: "/team/tuan.jpg",
   },
   {
     name: "Lê Vương Định",
@@ -39,6 +41,7 @@ const TEAM = [
     bioKey: "landing.team.dinh.bio",
     initials: "LVD",
     gradient: "from-blue-400 to-indigo-500",
+    avatar: "/team/dinh.jpg",
   },
   {
     name: "Nguyễn Đăng Mạnh",
@@ -46,6 +49,7 @@ const TEAM = [
     bioKey: "landing.team.manh.bio",
     initials: "NDM",
     gradient: "from-violet-400 to-purple-500",
+    avatar: "/team/manh.jpg",
   },
   {
     name: "Nguyễn Trường Huy",
@@ -53,6 +57,7 @@ const TEAM = [
     bioKey: "landing.team.huy.bio",
     initials: "NTH",
     gradient: "from-amber-400 to-orange-500",
+    avatar: "/team/huy.jpg",
   },
   {
     name: "Nguyễn Anh Minh",
@@ -60,8 +65,29 @@ const TEAM = [
     bioKey: "landing.team.minh.bio",
     initials: "NAM",
     gradient: "from-rose-400 to-pink-500",
+    avatar: "/team/minh.jpg",
   },
 ];
+
+function TeamAvatar({ avatar, initials, gradient, name }: { avatar: string; initials: string; gradient: string; name: string }) {
+  const [errored, setErrored] = useState(false);
+  if (errored) {
+    return (
+      <div className={`w-full aspect-square rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white text-3xl font-bold mb-4`}>
+        {initials}
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- fixed team headshots with a gradient/initials fallback on load error
+    <img
+      src={avatar}
+      alt={name}
+      onError={() => setErrored(true)}
+      className="w-full aspect-square rounded-xl object-cover mb-4"
+    />
+  );
+}
 
 const FEATURES = [
   {
@@ -298,11 +324,7 @@ export default function LandingPage() {
               key={member.name}
               className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col"
             >
-              <div
-                className={`w-full aspect-square rounded-xl bg-gradient-to-br ${member.gradient} flex items-center justify-center text-white text-3xl font-bold mb-4`}
-              >
-                {member.initials}
-              </div>
+              <TeamAvatar avatar={member.avatar} initials={member.initials} gradient={member.gradient} name={member.name} />
               <p className="font-bold text-gray-900">{member.name}</p>
               <p className="text-xs font-bold text-[#00A859] uppercase tracking-wide mb-2">
                 {t(member.roleKey)}
