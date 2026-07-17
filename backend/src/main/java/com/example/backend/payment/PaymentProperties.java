@@ -4,8 +4,6 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-
 /**
  * Bank / SePay configuration for the VietQR quota-top-up flow.
  * Bound from {@code app.payment.*} in application.properties.
@@ -14,9 +12,6 @@ import java.math.BigDecimal;
 @Component
 @ConfigurationProperties(prefix = "app.payment")
 public class PaymentProperties {
-
-    /** Price of a single verification credit, in VND. */
-    private BigDecimal pricePerCreditVnd = new BigDecimal("200000");
 
     /** How long a generated VietQR stays valid before expiry. */
     private int qrExpiryMinutes = 15;

@@ -33,6 +33,7 @@ class PaymentServiceTest {
     @Mock private PlanRepository planRepository;
     @Mock private SubscriptionRepository subscriptionRepository;
     @Mock private PlanPurchaseRepository planPurchaseRepository;
+    @Mock private PaymentSettingsRepository paymentSettingsRepository;
     @Mock private PaymentEmailService paymentEmailService;
 
     private PaymentProperties props;
@@ -47,7 +48,6 @@ class PaymentServiceTest {
     @BeforeEach
     void setUp() {
         props = new PaymentProperties();
-        props.setPricePerCreditVnd(new BigDecimal("200000"));
         props.setQrExpiryMinutes(15);
         props.setBankCode("MB");
         props.setAccountNo("0123456789");
@@ -55,10 +55,13 @@ class PaymentServiceTest {
         props.setSepayApiKey("secret-key");
         props.setSepayQrBaseUrl("https://qr.sepay.vn/img");
 
+        PaymentSettings settings = new PaymentSettings(1, new BigDecimal("200000"), Instant.now());
+        lenient().when(paymentSettingsRepository.findById(1)).thenReturn(Optional.of(settings));
+
         service = new PaymentService(usersRepository, invoiceRepository, transactionRepository,
                 vietqrRepository, topupRepository, billingEventRepository, planRepository,
-                subscriptionRepository, planPurchaseRepository, props, new ObjectMapper(),
-                paymentEmailService);
+                subscriptionRepository, planPurchaseRepository, props, paymentSettingsRepository,
+                new ObjectMapper(), paymentEmailService);
     }
 
     // ── createTopup ────────────────────────────────────────────────────
