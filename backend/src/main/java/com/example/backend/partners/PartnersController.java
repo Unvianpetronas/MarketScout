@@ -33,10 +33,12 @@ public class PartnersController {
             @RequestHeader("Authorization") String authHeader,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String country,
-            @RequestParam(defaultValue = "FIND_BUYER") String role) {
+            @RequestParam(defaultValue = "buyer") String role) {
         UUID userId = extractUserId(authHeader);
 
-        String intent = "FIND_SELLER".equalsIgnoreCase(role) ? "FIND_SELLER" : "FIND_BUYER";
+        // Frontend sends "buyer"/"seller" (see frontend/types/partner.ts PartnerRole) —
+        // not the FIND_BUYER/FIND_SELLER intent constants used internally.
+        String intent = "seller".equalsIgnoreCase(role) ? "FIND_SELLER" : "FIND_BUYER";
         IntentResult intentResult = IntentResult.builder()
             .intent(intent)
             .product(q)

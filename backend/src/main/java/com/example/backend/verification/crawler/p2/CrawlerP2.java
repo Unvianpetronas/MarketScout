@@ -60,6 +60,21 @@ public class CrawlerP2 {
     @SuppressWarnings("unchecked")
     private P2Data doFetch(CompanyInput input, String domain) {
         boolean hasWebsite = domain != null && !domain.isBlank();
+        boolean websiteDiscovered = false;
+
+        // No website was supplied by the caller — Deep Verify almost never has one
+        // (see discoverWebsite() doc). Without this, RDAP (the pillar's strongest
+        // signal) would never run and every company would score as if it had no
+        // official website, regardless of whether it actually does.
+        if (!hasWebsite) {
+            String discovered = discoverWebsite(input);
+            if (discovered != null) {
+                domain = discovered;
+                hasWebsite = true;
+                websiteDiscovered = true;
+            }
+        }
+
         Integer domainAgeMonths = null;
         Boolean hasSsl = null;
         String registrar = null;
@@ -85,12 +100,35 @@ public class CrawlerP2 {
         // Supplement with Tavily
         String tavilyQuery = input.getName() + " official website social media presence";
         List<String> tavilyResults = tavilyClient.searchText(tavilyQuery, 3);
+
+        // No website was supplied AND Tavily returned nothing — every field below
+        // would default to a negative ("no website", "LOW" social presence) that
+        // reads as a confirmed finding when in fact nothing was actually checked.
+        if (!hasWebsite && tavilyResults.isEmpty()) {
+            return P2Data.builder().state(PillarData.DataState.SKIP).companyName(input.getName())
+                .errorMsg("Không có website để kiểm tra và không có kết quả từ Tavily").fetchedAt(LocalDateTime.now()).build();
+        }
+
         String socialMediaScore = evaluateSocialMedia(tavilyResults);
         boolean usesFreeEmail = detectFreeEmail(tavilyResults);
 
+        // Facebook content sits behind a login wall — search engines rarely index
+        // the page itself, so this can only surface candidate URLs that happen to
+        // be linked elsewhere (directories, articles), never confirm ownership.
+        // A shop with several pages under similar names is common in VN — when
+        // more than one candidate turns up we report all of them instead of
+        // silently picking one, so a reviewer knows to check manually.
+        List<String> facebookPages = tavilyClient.searchUrls(input.getName() + " Facebook page", 5).stream()
+            .map(String::toLowerCase)
+            .filter(u -> u.contains("facebook.com/"))
+            .distinct()
+            .limit(3)
+            .toList();
+
         String rawText = String.format(
-            "Company: %s | Domain: %s | DomainAgeMonths: %s | HasSSL: %s | SocialMedia: %s | Registrar: %s | Tavily: %s",
-            input.getName(), domain, domainAgeMonths, hasSsl, socialMediaScore, registrar,
+            "Company: %s | Domain: %s%s | DomainAgeMonths: %s | HasSSL: %s | SocialMedia: %s | Registrar: %s | Facebook: %s | Tavily: %s",
+            input.getName(), domain, websiteDiscovered ? " (auto-discovered)" : "",
+            domainAgeMonths, hasSsl, socialMediaScore, registrar, facebookPages,
             String.join(" ", tavilyResults)
         );
 
@@ -100,6 +138,7 @@ public class CrawlerP2 {
             .hasOfficialWebsite(hasWebsite)
             .domainAgeMonths(domainAgeMonths)
             .usesFreeEmail(usesFreeEmail)
+            .facebookPages(facebookPages)
             .hasSsl(hasSsl != null ? hasSsl : hasWebsite)
             .socialMediaScore(socialMediaScore)
             .domain(domain)
@@ -140,6 +179,38 @@ public class CrawlerP2 {
                 if (propObj instanceof List<?> prop && prop.size() >= 4 && "fn".equals(prop.get(0))) {
                     return String.valueOf(prop.get(3));
                 }
+            }
+        }
+        return null;
+    }
+
+    // Domains that show up in "official website" searches but are never actually
+    // the company's own site — a directory/social profile is not a homepage.
+    private static final List<String> EXCLUDED_DOMAIN_FRAGMENTS = List.of(
+        "linkedin.", "facebook.", "instagram.", "twitter.", "x.com", "youtube.",
+        "wikipedia.", "crunchbase.", "bloomberg.", "glassdoor.", "indeed.",
+        "tiktok.", "pinterest.", "github.com", "medium.com", "yelp.", "google.com/maps"
+    );
+
+    /**
+     * CompanyInput.website is essentially never populated by the Deep Verify
+     * pipeline (chat and /verify both go straight from a company name to
+     * scoring, with no website field collected upstream) — so without this,
+     * RDAP never runs and P2 always scores "no website" regardless of reality.
+     * Best-effort: search for the official site and take the first result whose
+     * domain isn't an obviously-non-company one. May guess wrong for common
+     * company names; a caller-supplied website (form input) always wins over this.
+     */
+    private String discoverWebsite(CompanyInput input) {
+        String query = input.getName() + " official website"
+            + (input.getCountry() != null && !input.getCountry().isBlank() ? " " + input.getCountry() : "");
+        List<String> urls = tavilyClient.searchUrls(query, 5);
+        for (String url : urls) {
+            String candidate = extractDomain(url);
+            if (candidate == null) continue;
+            String lower = candidate.toLowerCase();
+            if (EXCLUDED_DOMAIN_FRAGMENTS.stream().noneMatch(lower::contains)) {
+                return candidate;
             }
         }
         return null;

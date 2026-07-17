@@ -1,5 +1,5 @@
 import { api } from "@/lib/api";
-import { TopupRequest, TopupResponse, TopupStatusResponse } from "@/types/payment";
+import { InvoiceSummary, TopupRequest, TopupResponse, TopupStatusResponse } from "@/types/payment";
 
 /** Creates a pending quota top-up and returns VietQR transfer instructions. */
 export const createTopup = async (quantity: number): Promise<TopupResponse> => {
@@ -17,5 +17,11 @@ export const getTopupStatus = async (invoiceId: string): Promise<TopupStatusResp
 /** Creates a one-time VietQR checkout to buy a subscription plan (starter/pro). */
 export const createPlanCheckout = async (plan: string): Promise<TopupResponse> => {
   const { data } = await api.post<TopupResponse>("/payments/plans", { plan });
+  return data;
+};
+
+/** Real billing history for the authenticated user, newest first. */
+export const getMyInvoices = async (): Promise<InvoiceSummary[]> => {
+  const { data } = await api.get<InvoiceSummary[]>("/payments/invoices");
   return data;
 };

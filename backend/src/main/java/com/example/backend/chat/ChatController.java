@@ -34,7 +34,7 @@ public class ChatController {
     @PostMapping(value = "/message", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter handleMessage(
             @RequestHeader("Authorization") String authHeader,
-            @RequestBody ReportDTO.ChatMessageRequest req) {
+            @Valid @RequestBody ReportDTO.ChatMessageRequest req) {
         UUID userId = extractUserId(authHeader);
         return chatService.processMessage(userId, req);
     }
@@ -71,19 +71,6 @@ public class ChatController {
     }
 
     // ── Messages ──────────────────────────────────────────────────────────────
-
-    /**
-     * Send a user message; Gemini replies.
-     * Returns both the user message and the assistant reply.
-     */
-    @PostMapping("/sessions/{sessionId}/messages")
-    public ResponseEntity<ChatDTO.ChatResponse> sendMessage(
-            @RequestHeader("Authorization") String authHeader,
-            @PathVariable UUID sessionId,
-            @Valid @RequestBody ChatDTO.SendMessageRequest req) {
-        UUID userId = extractUserId(authHeader);
-        return ResponseEntity.ok(chatService.sendMessage(userId, sessionId, req));
-    }
 
     /** Get full conversation history for a session. */
     @GetMapping("/sessions/{sessionId}/messages")

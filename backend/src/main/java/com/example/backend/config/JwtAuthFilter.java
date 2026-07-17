@@ -1,6 +1,8 @@
 package com.example.backend.config;
 
 import com.example.backend.auth.TokenBlacklistService;
+import com.example.backend.domain.Users;
+import com.example.backend.domain.UsersRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -15,6 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -22,6 +25,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final TokenBlacklistService blacklistService;
+    private final UsersRepository usersRepository;
 
     // SSE endpoints (e.g. /api/v1/chat/message) complete via an ASYNC dispatch.
     // OncePerRequestFilter skips ASYNC dispatches by default, which would leave
@@ -55,10 +59,22 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 return;
             }
 
-            String role = jwtService.getRole(claims);
+            // Role and active-status come from the DB, not the token's baked-in "role"
+            // claim — a JWT is valid for up to jwt.expiration-ms (24h default), so an
+            // admin demoting/banning a user must take effect immediately, not only once
+            // that token happens to expire.
+            UUID userId = jwtService.getId(claims);
+            Users user = usersRepository.findById(userId).orElse(null);
+            if (user == null || !Boolean.TRUE.equals(user.getIsActive())) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"error\":\"Account is no longer active, please log in again\"}");
+                return;
+            }
+
             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                     claims.getSubject(), null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                    List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().toUpperCase(java.util.Locale.ROOT)))
             );
             SecurityContextHolder.getContext().setAuthentication(auth);
 

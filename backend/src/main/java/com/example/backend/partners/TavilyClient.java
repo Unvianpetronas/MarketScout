@@ -28,7 +28,7 @@ public class TavilyClient {
             return List.of();
         }
         String query = buildQuery(intent, product, market);
-        return search(query);
+        return search(query, market);
     }
 
     public List<String> searchText(String query, int maxResults) {
@@ -62,8 +62,40 @@ public class TavilyClient {
         }
     }
 
+    /** Same search as {@link #searchText}, but returns result URLs instead of content snippets. */
     @SuppressWarnings("unchecked")
-    private List<LeadResult> search(String query) {
+    public List<String> searchUrls(String query, int maxResults) {
+        if (apiKey.isBlank()) return List.of();
+        try {
+            Map<String, Object> body = Map.of(
+                "api_key", apiKey,
+                "query", query,
+                "max_results", maxResults,
+                "search_depth", "basic"
+            );
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            ResponseEntity<Map> resp = restTemplate.exchange(
+                "https://api.tavily.com/search",
+                HttpMethod.POST,
+                new HttpEntity<>(body, headers),
+                Map.class
+            );
+            if (resp.getBody() == null) return List.of();
+            List<Map<String, Object>> results = (List<Map<String, Object>>) resp.getBody().get("results");
+            if (results == null) return List.of();
+            return results.stream()
+                .map(r -> (String) r.getOrDefault("url", ""))
+                .filter(s -> !s.isBlank())
+                .toList();
+        } catch (Exception e) {
+            log.warn("Tavily URL search failed for '{}': {}", query, e.getMessage());
+            return List.of();
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<LeadResult> search(String query, String market) {
         try {
             Map<String, Object> body = Map.of(
                 "api_key", apiKey,
@@ -94,6 +126,10 @@ public class TavilyClient {
                     .website(url)
                     .description(content.length() > 200 ? content.substring(0, 200) : content)
                     .source("Tavily")
+                    // Requested market, not independently verified per company —
+                    // Tavily returns no structured geo field. FindPartnersService's
+                    // P1 enrichment is the real per-lead verification signal.
+                    .country(market)
                     .build());
             }
             log.info("Tavily returned {} results for query: {}", leads.size(), query);

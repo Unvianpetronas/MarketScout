@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { getAnalyticsOverview, AnalyticsOverview } from "@/services/admin.service";
+import { useLanguage } from "@/providers/language-provider";
 
 function pctChange(current: number, previous: number): number | null {
   if (previous === 0) return current > 0 ? 100 : null;
@@ -35,6 +36,7 @@ function getRiskColor(level: string) {
 }
 
 export default function AdminOverviewPage() {
+  const { t } = useLanguage();
   const [data, setData] = useState<AnalyticsOverview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -44,7 +46,7 @@ export default function AdminOverviewPage() {
       const res = await getAnalyticsOverview();
       setData(res);
     } catch {
-      toast.error("Không thể tải dữ liệu tổng quan.");
+      toast.error(t("admin.dashboard.loadError"));
     } finally {
       setIsLoading(false);
     }
@@ -63,8 +65,8 @@ export default function AdminOverviewPage() {
       <AdminShell active="overview">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Global Operations &gt; Overview</p>
-            <h1 className="text-2xl font-extrabold text-gray-900">Tổng quan hệ thống</h1>
+            <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">{t("admin.dashboard.breadcrumb")}</p>
+            <h1 className="text-2xl font-extrabold text-gray-900">{t("admin.dashboard.title")}</h1>
           </div>
           <button onClick={handleRefresh} disabled={isRefreshing}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
@@ -75,7 +77,7 @@ export default function AdminOverviewPage() {
         {isLoading || !data ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-16 flex flex-col items-center shadow-sm">
             <div className="w-10 h-10 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin mb-3" />
-            <p className="text-sm text-gray-400">Đang tải...</p>
+            <p className="text-sm text-gray-400">{t("admin.dashboard.loading")}</p>
           </div>
         ) : (
           <>
@@ -89,10 +91,10 @@ export default function AdminOverviewPage() {
                   <ArrowUpRight className="w-4 h-4 text-gray-200" />
                 </div>
                 <p className="text-2xl font-extrabold text-gray-900">{data.totalUsers}</p>
-                <p className="text-xs text-gray-500 mt-0.5">Tổng người dùng</p>
+                <p className="text-xs text-gray-500 mt-0.5">{t("admin.dashboard.totalUsers")}</p>
                 <div className="mt-1 flex items-center gap-2">
                   <TrendBadge pct={pctChange(data.newUsersThisMonth, data.newUsersLastMonth)} />
-                  <span className="text-[11px] text-gray-400">{data.newUsersThisMonth} mới tháng này</span>
+                  <span className="text-[11px] text-gray-400">{t("admin.dashboard.newThisMonth", { count: data.newUsersThisMonth })}</span>
                 </div>
               </div>
 
@@ -104,9 +106,9 @@ export default function AdminOverviewPage() {
                   <ArrowUpRight className="w-4 h-4 text-gray-200" />
                 </div>
                 <p className="text-2xl font-extrabold text-gray-900">{data.activeUsers}</p>
-                <p className="text-xs text-gray-500 mt-0.5">Đang hoạt động</p>
+                <p className="text-xs text-gray-500 mt-0.5">{t("admin.dashboard.activeUsers")}</p>
                 <p className="text-[11px] text-gray-400 mt-1">
-                  {data.totalUsers > 0 ? ((data.activeUsers / data.totalUsers) * 100).toFixed(0) : 0}% tổng số
+                  {t("admin.dashboard.pctOfTotal", { pct: data.totalUsers > 0 ? ((data.activeUsers / data.totalUsers) * 100).toFixed(0) : 0 })}
                 </p>
               </div>
 
@@ -118,10 +120,10 @@ export default function AdminOverviewPage() {
                   <ArrowUpRight className="w-4 h-4 text-gray-200" />
                 </div>
                 <p className="text-2xl font-extrabold text-gray-900">{data.totalReports}</p>
-                <p className="text-xs text-gray-500 mt-0.5">Tổng báo cáo</p>
+                <p className="text-xs text-gray-500 mt-0.5">{t("admin.dashboard.totalReports")}</p>
                 <div className="mt-1 flex items-center gap-2">
                   <TrendBadge pct={pctChange(data.reportsThisMonth, data.reportsLastMonth)} />
-                  <span className="text-[11px] text-gray-400">{data.reportsThisMonth} tháng này</span>
+                  <span className="text-[11px] text-gray-400">{t("admin.dashboard.thisMonth", { count: data.reportsThisMonth })}</span>
                 </div>
               </div>
 
@@ -133,9 +135,9 @@ export default function AdminOverviewPage() {
                   <ArrowUpRight className="w-4 h-4 text-gray-200" />
                 </div>
                 <p className="text-2xl font-extrabold text-gray-900">{data.openAlerts}</p>
-                <p className="text-xs text-gray-500 mt-0.5">Cảnh báo chưa xử lý</p>
+                <p className="text-xs text-gray-500 mt-0.5">{t("admin.dashboard.openAlerts")}</p>
                 <p className="text-[11px] text-gray-400 mt-1">
-                  {data.failedJobs} job lỗi · {data.runningJobs} job đang chạy
+                  {t("admin.dashboard.jobsStatus", { failed: data.failedJobs, running: data.runningJobs })}
                 </p>
               </div>
             </div>
@@ -143,10 +145,10 @@ export default function AdminOverviewPage() {
             <div className="grid grid-cols-2 gap-4 mb-6">
               {/* Reports by status */}
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                <p className="text-sm font-bold text-gray-900 mb-4">Báo cáo theo trạng thái</p>
+                <p className="text-sm font-bold text-gray-900 mb-4">{t("admin.dashboard.reportsByStatus")}</p>
                 <div className="space-y-3">
                   {Object.entries(data.reportsByStatus).length === 0 ? (
-                    <p className="text-sm text-gray-400">Chưa có dữ liệu.</p>
+                    <p className="text-sm text-gray-400">{t("admin.dashboard.noData")}</p>
                   ) : (
                     Object.entries(data.reportsByStatus).map(([status, count]) => {
                       const pct = data.totalReports > 0 ? (count / data.totalReports) * 100 : 0;
@@ -168,10 +170,10 @@ export default function AdminOverviewPage() {
 
               {/* Reports by risk level */}
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                <p className="text-sm font-bold text-gray-900 mb-4">Báo cáo theo mức rủi ro</p>
+                <p className="text-sm font-bold text-gray-900 mb-4">{t("admin.dashboard.reportsByRisk")}</p>
                 <div className="space-y-3">
                   {Object.entries(data.reportsByRiskLevel).length === 0 ? (
-                    <p className="text-sm text-gray-400">Chưa có dữ liệu.</p>
+                    <p className="text-sm text-gray-400">{t("admin.dashboard.noData")}</p>
                   ) : (
                     Object.entries(data.reportsByRiskLevel).map(([level, count]) => {
                       const pct = data.totalReports > 0 ? (count / data.totalReports) * 100 : 0;
@@ -195,9 +197,9 @@ export default function AdminOverviewPage() {
             <div className="grid grid-cols-2 gap-4">
               {/* Top companies */}
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                <p className="text-sm font-bold text-gray-900 mb-4">Doanh nghiệp được tra cứu nhiều nhất</p>
+                <p className="text-sm font-bold text-gray-900 mb-4">{t("admin.dashboard.topCompanies")}</p>
                 {data.topCompanies.length === 0 ? (
-                  <p className="text-sm text-gray-400">Chưa có dữ liệu.</p>
+                  <p className="text-sm text-gray-400">{t("admin.dashboard.noData")}</p>
                 ) : (
                   <div className="space-y-2">
                     {data.topCompanies.map((c, i) => (
@@ -206,7 +208,7 @@ export default function AdminOverviewPage() {
                           <span className="text-xs font-bold text-gray-400 w-5 shrink-0">#{i + 1}</span>
                           <span className="text-sm text-gray-700 truncate">{c.name}</span>
                         </div>
-                        <span className="text-xs font-semibold text-gray-500 shrink-0">{c.count} lượt</span>
+                        <span className="text-xs font-semibold text-gray-500 shrink-0">{t("admin.dashboard.lookupCount", { count: c.count })}</span>
                       </div>
                     ))}
                   </div>
@@ -215,9 +217,9 @@ export default function AdminOverviewPage() {
 
               {/* Users by plan */}
               <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-                <p className="text-sm font-bold text-gray-900 mb-4">Người dùng theo gói</p>
+                <p className="text-sm font-bold text-gray-900 mb-4">{t("admin.dashboard.usersByPlan")}</p>
                 {Object.entries(data.usersByPlan).length === 0 ? (
-                  <p className="text-sm text-gray-400">Chưa có dữ liệu.</p>
+                  <p className="text-sm text-gray-400">{t("admin.dashboard.noData")}</p>
                 ) : (
                   <div className="space-y-3">
                     {Object.entries(data.usersByPlan).map(([plan, count]) => {

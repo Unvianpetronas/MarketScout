@@ -51,6 +51,12 @@ public class Report {
     @Column(name = "raw_data", columnDefinition = "text")
     private String rawData;
 
+    // DealSafetyAgent's structured JSON verdict ({warningLabel, recommendation,
+    // requiredProtocols}) — own column so a rescan/retry always overwrites
+    // cleanly instead of accumulating onto raw_data.
+    @Column(name = "deal_safety_analysis", columnDefinition = "text")
+    private String dealSafetyAnalysis;
+
     // AI next-step recommendations (JSON: summary/actionItems/infoToProvide/infoToVerify).
     // Generated ONCE right after scoring and persisted here — re-opening the report
     // reads from DB instead of calling Gemini again (stable + instant + no extra cost).

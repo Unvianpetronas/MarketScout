@@ -95,7 +95,9 @@ public class FactExtractor {
                     .build());
             }
 
-            // P2
+            // P2 — facebookPages comes straight from the crawler (ground truth
+            // search-result URLs), not Gemini interpretation, same rationale as
+            // P6's sanction flag below.
             if (p2 != null && p2.isFound()) {
                 var p2n = node.path("p2");
                 f.setP2(FactJson.P2Facts.builder()
@@ -104,6 +106,7 @@ public class FactExtractor {
                     .usesFreeEmail(boolVal(p2n, "uses_free_email"))
                     .hasSsl(boolVal(p2n, "has_ssl"))
                     .socialMediaScore(text(p2n, "social_media_score"))
+                    .facebookPages(p2.getFacebookPages())
                     .build());
             }
 
@@ -128,7 +131,9 @@ public class FactExtractor {
                     .build());
             }
 
-            // P5
+            // P5 — dataSource is ground truth from the crawler (which real source
+            // actually answered), not Gemini interpretation, so the report never
+            // mislabels e.g. a Companies House lookup as "Tavily".
             if (p5 != null && p5.isFound()) {
                 var p5n = node.path("p5");
                 f.setP5(FactJson.P5Facts.builder()
@@ -136,6 +141,7 @@ public class FactExtractor {
                     .registeredCapitalUsd(doubleVal(p5n, "registered_capital_usd"))
                     .hasFinancialReport(boolVal(p5n, "has_financial_report"))
                     .revenueTrend(text(p5n, "revenue_trend"))
+                    .dataSource(p5.getDataSource())
                     .build());
             }
 
@@ -194,7 +200,7 @@ public class FactExtractor {
             f.setP2(FactJson.P2Facts.builder()
                 .hasOfficialWebsite(p2.getHasOfficialWebsite()).domainAgeMonths(p2.getDomainAgeMonths())
                 .usesFreeEmail(p2.getUsesFreeEmail()).hasSsl(p2.getHasSsl())
-                .socialMediaScore(p2.getSocialMediaScore()).build());
+                .socialMediaScore(p2.getSocialMediaScore()).facebookPages(p2.getFacebookPages()).build());
         }
         if (p3 != null && p3.isFound()) {
             f.setP3(FactJson.P3Facts.builder()
@@ -209,7 +215,8 @@ public class FactExtractor {
         if (p5 != null && p5.isFound()) {
             f.setP5(FactJson.P5Facts.builder()
                 .taxComplianceStatus(p5.getTaxComplianceStatus()).registeredCapitalUsd(p5.getRegisteredCapitalUsd())
-                .hasFinancialReport(p5.getHasFinancialReport()).revenueTrend(p5.getRevenueTrend()).build());
+                .hasFinancialReport(p5.getHasFinancialReport()).revenueTrend(p5.getRevenueTrend())
+                .dataSource(p5.getDataSource()).build());
         }
         if (p6 != null && p6.isFound()) {
             f.setP6(FactJson.P6Facts.builder().isSanctionHit(p6.isSanctioned()).build());

@@ -54,6 +54,19 @@ public class PaymentDTO {
         private int     quotaRemaining;  // user balance after a confirmed payment
     }
 
+    // ── Billing history ─────────────────────────────────────────────────
+
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class InvoiceSummaryResponse {
+        private UUID       invoiceId;
+        private String     invoiceNo;
+        private String     status;       // draft | pending | paid | expired
+        private BigDecimal totalVnd;
+        private Instant    paidAt;
+        private Instant    createdAt;
+        private String     itemLabel;    // plan name, or "Nạp thêm quota"
+    }
+
     // ── SePay webhook payload ──────────────────────────────────────────
     // https://developer.sepay.vn/vi/sepay-webhooks/tich-hop-webhook
     @Data @NoArgsConstructor @AllArgsConstructor

@@ -291,6 +291,50 @@
 .stagger > *:nth-child(5) { animation: fadeInUp 0.4s 0.25s ease-out forwards; }
 .stagger > *:nth-child(6) { animation: fadeInUp 0.4s 0.3s ease-out forwards; }
 
+/* ── Neumorphism (Soft UI) — Checkout ── */
+:root {
+  --neu-bg: #EDEAE2;
+  --neu-bg-soft: #F5F3EE;
+  --neu-shadow-dark: rgba(163, 153, 132, 0.45);
+  --neu-shadow-light: rgba(255, 255, 255, 0.95);
+}
+
+@layer utilities {
+  .neu-surface {
+    background: var(--neu-bg);
+    border-radius: 1.75rem;
+    box-shadow: 9px 9px 18px var(--neu-shadow-dark), -9px -9px 18px var(--neu-shadow-light);
+  }
+  .neu-surface-soft {
+    background: var(--neu-bg-soft);
+    border-radius: 1.5rem;
+    box-shadow: 6px 6px 14px var(--neu-shadow-dark), -6px -6px 14px var(--neu-shadow-light);
+  }
+  .neu-inset {
+    background: var(--neu-bg);
+    border-radius: 1rem;
+    box-shadow: inset 5px 5px 10px var(--neu-shadow-dark), inset -5px -5px 10px var(--neu-shadow-light);
+  }
+  .neu-btn {
+    background: var(--neu-bg);
+    box-shadow: 5px 5px 10px var(--neu-shadow-dark), -5px -5px 10px var(--neu-shadow-light);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .neu-btn:active {
+    box-shadow: inset 4px 4px 8px var(--neu-shadow-dark), inset -4px -4px 8px var(--neu-shadow-light);
+    transform: scale(0.98);
+  }
+  .neu-btn-primary {
+    background: linear-gradient(145deg, #00D97A, #00B85D);
+    box-shadow: 6px 6px 14px rgba(0, 150, 80, 0.35), -6px -6px 14px rgba(255, 255, 255, 0.6);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .neu-btn-primary:active {
+    box-shadow: inset 4px 4px 8px rgba(0, 110, 60, 0.45), inset -3px -3px 8px rgba(255, 255, 255, 0.3);
+    transform: scale(0.98);
+  }
+}
+
 /* ── Route/page transition (used by app/template.tsx) ── */
 @keyframes pageEnter {
   from { opacity: 0; transform: translateY(8px) scale(0.992); }

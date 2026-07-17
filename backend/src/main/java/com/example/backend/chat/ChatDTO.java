@@ -32,12 +32,6 @@ public class ChatDTO {
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
-    public static class SendMessageRequest {
-        @NotBlank(message = "Message content cannot be blank")
-        private String content;
-    }
-
-    @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class MessageResponse {
         private UUID    id;
         private UUID    sessionId;
@@ -52,11 +46,5 @@ public class ChatDTO {
         private UUID                  sessionId;
         private String                title;
         private List<MessageResponse> messages;
-    }
-
-    @Data @NoArgsConstructor @AllArgsConstructor @Builder
-    public static class ChatResponse {
-        private MessageResponse userMessage;
-        private MessageResponse assistantMessage;
     }
 }

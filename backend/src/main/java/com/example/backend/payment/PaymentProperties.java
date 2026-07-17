@@ -48,4 +48,10 @@ public class PaymentProperties {
 
     /** How far back the reconciler looks for unconfirmed-but-paid orders. */
     private int reconcileLookbackHours = 24;
+
+    /**
+     * Comma-separated IP allowlist for the SePay webhook. Empty (default) = disabled —
+     * set this once SePay publishes its outbound IP ranges, no code change needed.
+     */
+    private String sepayIpAllowlist = "";
 }

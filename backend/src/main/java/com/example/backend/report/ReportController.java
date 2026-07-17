@@ -149,7 +149,7 @@ public class ReportController {
             .website(r.getWebsite()).taxId(r.getTaxId()).lei(r.getLei())
             .createdAt(r.getCreatedAt()).updatedAt(r.getUpdatedAt())
             .pillars(pillars.stream().map(this::toPillarDTO).toList())
-            .dealSafetyAnalysis(r.getRawData())
+            .dealSafetyAnalysis(r.getDealSafetyAnalysis())
             .selfReportPaymentMethodSafety(r.getSelfReportPaymentMethodSafety())
             .selfReportDepositPercentage(r.getSelfReportDepositPercentage())
             .selfReportDealValueUsd(r.getSelfReportDealValueUsd())

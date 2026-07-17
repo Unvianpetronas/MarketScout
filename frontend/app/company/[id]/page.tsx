@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
 import { getReport, quickScan } from "@/services/report.service";
-import { VerificationReport, PillarResult } from "@/types/report";
+import { VerificationReport, PillarResult, isProcessingStatus } from "@/types/report";
 import { getMyQuota } from "@/services/quota.service";
 import { QuotaStatus } from "@/types/quota";
 
@@ -192,8 +192,8 @@ export default function CompanyDetailPage({ params }: Props) {
 
   const overallScore = report.overallScore ?? 0;
   const { color: scoreColor, bg: scoreBg, textClass, badgeCls } = getRiskInfo(overallScore);
-  const isCompleted = (report.status as string) === "COMPLETED";
-  const isProcessing = ["PROCESSING", "DEEP_SCANNING"].includes((report.status as string) || "");
+  const isCompleted = report.status === "DONE";
+  const isProcessing = isProcessingStatus(report.status);
 
   return (
     <AuthGuard>

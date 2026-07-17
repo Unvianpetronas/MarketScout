@@ -17,8 +17,9 @@ import { getMyQuota } from "@/services/quota.service";
 import { QuotaStatus } from "@/types/quota";
 import { getReports } from "@/services/report.service";
 import { streamPipelineMessage } from "@/services/chat.service";
-import { ReportListItem } from "@/types/report";
+import { ReportListItem, isProcessingStatus } from "@/types/report";
 import { useAuth } from "@/providers/auth-provider";
+import { useLanguage } from "@/providers/language-provider";
 
 const COUNTRIES = [
   { code: "US", name: "United States", flag: "🇺🇸" },
@@ -73,15 +74,18 @@ function ScoreRing({ score }: { score: number | null | undefined }) {
   );
 }
 
+// Matches Report.status on the backend: PENDING | QUICK_SCANNING | DEEP_SCANNING | DONE | HARD_STOP | FAILED
 function StatusBadge({ status }: { status: string | null | undefined }) {
-  const s = (status as string || "").toUpperCase();
-  if (s === "COMPLETED") return <span className="risk-low text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Hoàn thành</span>;
-  if (s === "PROCESSING" || s === "DEEP_SCANNING") return (
+  const { t } = useLanguage();
+  const s = status || "";
+  if (s === "DONE") return <span className="risk-low text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {t("status.completed")}</span>;
+  if (s === "PENDING" || s === "QUICK_SCANNING" || s === "DEEP_SCANNING") return (
     <span className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Đang quét
+      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> {t("verify.status.scanning")}
     </span>
   );
-  if (s === "FAILED") return <span className="risk-high text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1"><XCircle className="w-3 h-3" /> Thất bại</span>;
+  if (s === "HARD_STOP") return <span className="risk-high text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1"><XCircle className="w-3 h-3" /> {t("verify.status.hardStop")}</span>;
+  if (s === "FAILED") return <span className="risk-high text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1"><XCircle className="w-3 h-3" /> {t("status.failed")}</span>;
   return <span className="bg-gray-50 text-gray-500 border border-gray-200 text-xs font-bold px-2.5 py-0.5 rounded-full">{status}</span>;
 }
 
@@ -89,8 +93,10 @@ function VerifyContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [country, setCountry] = useState(searchParams.get("country") || "");
+  const [website, setWebsite] = useState("");
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState("");
@@ -127,10 +133,10 @@ function VerifyContent() {
   const handleSearch = async (e: React.FormEvent | null, overrideQuery?: string) => {
     e?.preventDefault();
     const q = overrideQuery ?? query;
-    if (!q.trim()) { toast.error("Vui lòng nhập tên doanh nghiệp."); return; }
+    if (!q.trim()) { toast.error(t("dash.errEnterName")); return; }
 
     if (quota && quota.quotaRemaining <= 0) {
-      toast.error("Hết quota. Vui lòng nâng cấp gói dịch vụ.");
+      toast.error(t("verify.errQuotaExceeded"));
       router.push("/pricing");
       return;
     }
@@ -146,22 +152,26 @@ function VerifyContent() {
     const deal: {
       depositPercentage?: number; hasWrittenContract?: boolean;
       paymentMethodSafety?: "SAFE" | "MODERATE" | "RISKY"; dealValueUsd?: number;
-      contractId?: string;
+      contractId?: string; website?: string;
     } = {};
     if (paymentSafety) deal.paymentMethodSafety = paymentSafety;
     if (depositSet) deal.depositPercentage = deposit;
     if (hasContract !== null) deal.hasWrittenContract = hasContract;
     if (dealValue.trim()) deal.dealValueUsd = Number(dealValue.trim());
     if (pickedContract) deal.contractId = pickedContract.id;
+    if (website.trim()) deal.website = website.trim();
 
     // Run the verification IN PLACE (no chat detour) so the deal params reach the
     // pipeline directly and P7 is scored. Redirect to the report when it's ready.
+    // confirmVerify:true — this dedicated form (with its own quota check above and
+    // an explicit submit click) already IS the user's confirmation, so it skips
+    // ChatService's chat-style "are you sure?" gate and runs immediately.
     setIsSearching(true);
-    setVerifyStatus("Đang khởi tạo thẩm định...");
+    setVerifyStatus(t("verify.statusInitializing"));
     let navigated = false;
 
     streamPipelineMessage(
-      { message: preMessage, sessionId: "", ...deal },
+      { message: preMessage, sessionId: "", confirmVerify: true, ...deal },
       (chunk, status) => { if (status === "thinking" || !status) setVerifyStatus(chunk); },
       () => {
         // Finished with no report → ambiguous name / non-verify answer. Hand off to
@@ -172,9 +182,10 @@ function VerifyContent() {
         if (deal.depositPercentage != null) params.set("dealDeposit", String(deal.depositPercentage));
         if (deal.hasWrittenContract != null) params.set("dealContract", String(deal.hasWrittenContract));
         if (deal.dealValueUsd != null) params.set("dealValue", String(deal.dealValueUsd));
+        if (deal.website) params.set("dealWebsite", deal.website);
         router.push(`/chat?${params.toString()}`);
       },
-      () => { setIsSearching(false); setVerifyStatus(""); toast.error("Thẩm định thất bại. Vui lòng thử lại."); },
+      () => { setIsSearching(false); setVerifyStatus(""); toast.error(t("verify.errVerifyFailed")); },
       (meta) => {
         if (meta.reportId && !navigated) {
           navigated = true;
@@ -200,10 +211,10 @@ function VerifyContent() {
               </div>
             </div>
             <h3 className="text-lg font-extrabold text-gray-900 mb-1.5">
-              Đang thẩm định {query.trim() || "doanh nghiệp"}
+              {t("verify.overlayTitle", { name: query.trim() || t("verify.overlayDefaultName") })}
             </h3>
             <p className="text-sm text-gray-500 min-h-[20px] mb-5">
-              {verifyStatus || "Đang phân tích 8 trụ cột..."}
+              {verifyStatus || t("verify.overlayAnalyzing")}
             </p>
             <div className="flex items-center justify-center gap-1.5 mb-5">
               {[0, 150, 300].map((d) => (
@@ -213,10 +224,10 @@ function VerifyContent() {
             </div>
             {pickedContract && (
               <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#7C3AED] bg-[#F3EEFF] px-3 py-1.5 rounded-full mb-4">
-                <FileSignature className="w-3 h-3" /> Đang đối chiếu hợp đồng cho Trụ cột 7
+                <FileSignature className="w-3 h-3" /> {t("verify.overlayContractCheck")}
               </div>
             )}
-            <p className="text-[11px] text-gray-400">Quá trình có thể mất 30–60 giây — vui lòng không đóng trang.</p>
+            <p className="text-[11px] text-gray-400">{t("verify.overlayDurationNote")}</p>
           </div>
         </div>
       )}
@@ -241,9 +252,9 @@ function VerifyContent() {
             <div className="mb-8 animate-fade-in-up">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <p className="text-xs font-bold text-[#00D26A] uppercase tracking-widest mb-1">AI-Powered Intelligence</p>
-                  <h1 className="text-3xl font-extrabold text-gray-900 mb-1">Thẩm định doanh nghiệp</h1>
-                  <p className="text-sm text-gray-400">Xác minh đối tác thương mại toàn cầu qua 8 trụ cột phân tích</p>
+                  <p className="text-xs font-bold text-[#00D26A] uppercase tracking-widest mb-1">{t("verify.eyebrow")}</p>
+                  <h1 className="text-3xl font-extrabold text-gray-900 mb-1">{t("verify.pageTitle")}</h1>
+                  <p className="text-sm text-gray-400">{t("verify.pageSubtitle")}</p>
                 </div>
                 {quota && (
                   <div className="flex flex-col items-end gap-1">
@@ -252,11 +263,11 @@ function VerifyContent() {
                         : quota.quotaRemaining > 0 ? "bg-amber-50 border-amber-200 text-amber-700"
                         : "bg-red-50 border-red-200 text-red-700"
                     }`}>
-                      🔋 {quota.quotaRemaining} quota còn lại
+                      🔋 {t("profile.quotaRemaining", { n: quota.quotaRemaining })}
                     </div>
                     {quota.quotaRemaining <= 3 && (
                       <Link href="/pricing" className="text-xs text-[#00D26A] hover:underline font-semibold">
-                        Nâng cấp gói →
+                        {t("nav.upgrade")} →
                       </Link>
                     )}
                   </div>
@@ -275,7 +286,7 @@ function VerifyContent() {
                       onChange={(e) => setQuery(e.target.value)}
                       onFocus={() => setInputFocused(true)}
                       onBlur={() => setInputFocused(false)}
-                      placeholder="Tên doanh nghiệp, mã số thuế, hoặc tên người đại diện..."
+                      placeholder={t("verify.searchPlaceholder")}
                       className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#00D26A] focus:bg-white transition-all font-medium"
                     />
                   </div>
@@ -283,7 +294,7 @@ function VerifyContent() {
                     <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                     <select value={country} onChange={(e) => setCountry(e.target.value)}
                       className="w-full pl-10 pr-4 py-3.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#00D26A] bg-gray-50 appearance-none font-medium">
-                      <option value="">Tất cả quốc gia</option>
+                      <option value="">{t("country.all")}</option>
                       {COUNTRIES.map((c) => (
                         <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
                       ))}
@@ -292,13 +303,25 @@ function VerifyContent() {
                   <button type="submit" disabled={isSearching}
                     className="px-7 py-3.5 gradient-brand text-white font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-60 flex items-center gap-2 shrink-0 shadow-sm">
                     {isSearching ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Zap className="w-4 h-4" />}
-                    {isSearching ? "Đang xử lý..." : "Thẩm định"}
+                    {isSearching ? `${t("status.processing")}...` : t("verify.submitBtn")}
                   </button>
                 </form>
 
+                {/* Website (optional) — lets P2 (Digital Footprint) check the real
+                    domain instead of guessing one via search. */}
+                <div className="mt-3 relative">
+                  <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
+                  <input
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    placeholder={t("verify.websitePlaceholder")}
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50/60 border border-gray-100 rounded-xl text-xs focus:outline-none focus:border-[#00D26A] focus:bg-white transition-all"
+                  />
+                </div>
+
                 {/* Quick Examples */}
                 <div className="mt-4 flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-gray-400 font-medium">Ví dụ:</span>
+                  <span className="text-xs text-gray-400 font-medium">{t("verify.examplesLabel")}</span>
                   {EXAMPLE_QUERIES.map((q) => (
                     <button key={q} onClick={() => { setQuery(q.split(",")[0].trim()); setCountry(q.split(",")[1]?.trim() || ""); }}
                       className="text-xs px-3 py-1 bg-gray-50 border border-gray-200 text-gray-500 rounded-full hover:border-[#00D26A] hover:text-[#00843F] hover:bg-[#E6F9F0] transition-all">
@@ -320,16 +343,16 @@ function VerifyContent() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-bold text-gray-900">Thông tin giao dịch</p>
-                      <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full uppercase tracking-wide">Tuỳ chọn</span>
+                      <p className="text-sm font-bold text-gray-900">{t("verify.dealInfoTitle")}</p>
+                      <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full uppercase tracking-wide">{t("verify.optionalBadge")}</span>
                       {dealFilledCount > 0 && (
                         <span className="text-[10px] font-bold text-[#7C3AED] bg-[#F3EEFF] px-1.5 py-0.5 rounded-full">
-                          {dealFilledCount} mục
+                          {t("verify.itemsCount", { n: dealFilledCount })}
                         </span>
                       )}
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      Cung cấp để chấm điểm <span className="font-semibold text-gray-500">Trụ cột 7 — Rủi ro cấu trúc giao dịch</span>
+                      {t("verify.dealInfoDescPrefix")} <span className="font-semibold text-gray-500">{t("verify.pillar7Label")}</span>
                     </p>
                   </div>
                   <ChevronDown className={`w-5 h-5 text-gray-300 shrink-0 transition-transform ${showDeal ? "rotate-180" : ""}`} />
@@ -340,13 +363,13 @@ function VerifyContent() {
                     {/* Payment method safety */}
                     <div>
                       <label className="text-xs font-bold text-gray-700 mb-2.5 block">
-                        Phương thức thanh toán
+                        {t("verify.paymentMethodLabel")}
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                         {([
-                          { v: "SAFE", label: "An toàn", sub: "L/C, Escrow / Ký quỹ", Icon: ShieldCheck, color: "#00A859", bg: "#E6F9F0", ring: "#00D26A" },
-                          { v: "MODERATE", label: "Trung bình", sub: "T/T sau B/L, CAD", Icon: Shield, color: "#D97706", bg: "#FFF8E7", ring: "#F59E0B" },
-                          { v: "RISKY", label: "Rủi ro", sub: "Trả trước 100%", Icon: ShieldAlert, color: "#DC2626", bg: "#FFF1F0", ring: "#EF4444" },
+                          { v: "SAFE", label: t("verify.payment.safe"), sub: t("verify.payment.safeSub"), Icon: ShieldCheck, color: "#00A859", bg: "#E6F9F0", ring: "#00D26A" },
+                          { v: "MODERATE", label: t("verify.payment.moderate"), sub: t("verify.payment.moderateSub"), Icon: Shield, color: "#D97706", bg: "#FFF8E7", ring: "#F59E0B" },
+                          { v: "RISKY", label: t("verify.payment.risky"), sub: t("verify.payment.riskySub"), Icon: ShieldAlert, color: "#DC2626", bg: "#FFF1F0", ring: "#EF4444" },
                         ] as const).map(({ v, label, sub, Icon, color, bg, ring }) => {
                           const active = paymentSafety === v;
                           return (
@@ -378,7 +401,7 @@ function VerifyContent() {
                       <div>
                         <div className="flex items-center justify-between mb-2.5">
                           <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                            <Percent className="w-3.5 h-3.5 text-gray-400" /> Đặt cọc trước
+                            <Percent className="w-3.5 h-3.5 text-gray-400" /> {t("verify.depositLabel")}
                           </label>
                           <span className={`text-sm font-extrabold ${depositSet ? "text-[#00843F]" : "text-gray-300"}`}>
                             {depositSet ? `${deposit}%` : "—"}
@@ -390,21 +413,21 @@ function VerifyContent() {
                           className="w-full accent-[#00D26A] cursor-pointer"
                         />
                         <div className="flex justify-between text-[10px] text-gray-300 font-medium mt-1">
-                          <span>0%</span><span>Cọc thấp = an toàn hơn</span><span>100%</span>
+                          <span>0%</span><span>{t("verify.depositLowSafer")}</span><span>100%</span>
                         </div>
                       </div>
 
                       {/* Deal value */}
                       <div>
                         <label className="text-xs font-bold text-gray-700 mb-2.5 flex items-center gap-1.5">
-                          <DollarSign className="w-3.5 h-3.5 text-gray-400" /> Giá trị giao dịch <span className="text-gray-300 font-medium">(USD)</span>
+                          <DollarSign className="w-3.5 h-3.5 text-gray-400" /> {t("verify.dealValueLabel")} <span className="text-gray-300 font-medium">(USD)</span>
                         </label>
                         <div className="relative">
                           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">$</span>
                           <input
                             type="number" min={0} inputMode="numeric" value={dealValue}
                             onChange={(e) => setDealValue(e.target.value)}
-                            placeholder="Ví dụ: 50000"
+                            placeholder={t("verify.dealValuePlaceholder")}
                             className="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#00D26A] focus:bg-white transition-all font-medium"
                           />
                         </div>
@@ -420,14 +443,14 @@ function VerifyContent() {
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-gray-700 truncate">{pickedContract.fileName}</p>
                               <p className="text-[11px] text-emerald-600">
-                                Sẽ được đối chiếu với đối tác sau khi thẩm định xong
+                                {t("verify.contractCrossCheckNote")}
                               </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <button type="button" onClick={() => setShowContractModal(true)}
                               className="text-xs font-semibold text-gray-500 hover:text-gray-700">
-                              Đổi
+                              {t("verify.changeBtn")}
                             </button>
                             <button type="button" onClick={() => setPickedContract(null)}
                               className="text-gray-300 hover:text-gray-500">
@@ -440,8 +463,8 @@ function VerifyContent() {
                           <div className="flex items-center gap-2.5 min-w-0">
                             <FileSignature className="w-4 h-4 text-gray-400 shrink-0" />
                             <div>
-                              <p className="text-xs font-bold text-gray-700">Đã có hợp đồng thành văn?</p>
-                              <p className="text-[11px] text-gray-400">Chỉ hợp đồng thật, đã tải lên và khớp đối tác mới được tính điểm</p>
+                              <p className="text-xs font-bold text-gray-700">{t("verify.hasContractQuestion")}</p>
+                              <p className="text-[11px] text-gray-400">{t("verify.hasContractHint")}</p>
                             </div>
                           </div>
                           <div className="flex gap-1.5 shrink-0">
@@ -450,7 +473,7 @@ function VerifyContent() {
                               onClick={() => setShowContractModal(true)}
                               className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all border bg-white text-gray-400 border-gray-200 hover:border-[#00D26A] hover:text-[#00843F]"
                             >
-                              Có
+                              {t("verify.yesBtn")}
                             </button>
                             <button
                               type="button"
@@ -461,7 +484,7 @@ function VerifyContent() {
                                   : "bg-white text-gray-400 border-gray-200 hover:border-gray-300"
                               }`}
                             >
-                              Chưa
+                              {t("verify.noBtn")}
                             </button>
                           </div>
                         </div>
@@ -471,9 +494,8 @@ function VerifyContent() {
                     <div className="flex items-start gap-2 text-[11px] text-gray-400 leading-relaxed">
                       <Sparkles className="w-3.5 h-3.5 text-[#7C3AED] shrink-0 mt-0.5" />
                       <span>
-                        Các trường trên chỉ mang tính tham khảo. Riêng Trụ cột 7 chỉ thật sự được tính điểm khi có hợp đồng
-                        đã tải lên và <span className="font-semibold">khớp với đối tác đang thẩm định</span> — bỏ trống cũng
-                        không sao, trụ cột sẽ hiển thị <span className="font-semibold">N/A</span> và không ảnh hưởng điểm tổng.
+                        {t("verify.dealNotePart1")} <span className="font-semibold">{t("verify.dealNoteMatch")}</span> {t("verify.dealNotePart2")}{" "}
+                        <span className="font-semibold">N/A</span> {t("verify.dealNotePart3")}
                       </span>
                     </div>
                   </div>
@@ -484,10 +506,9 @@ function VerifyContent() {
               <div className="mt-4 bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
                 <Shield className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-semibold text-blue-800 mb-0.5">Quy trình thẩm định AI</p>
+                  <p className="text-sm font-semibold text-blue-800 mb-0.5">{t("verify.aiProcessTitle")}</p>
                   <p className="text-xs text-blue-600 leading-relaxed">
-                    Sau khi nhấn &quot;Thẩm định&quot;, AI sẽ thu thập dữ liệu từ 50+ nguồn và phân tích 8 trụ cột: Pháp lý, Tài chính, Tuân thủ, Uy tín, Hoạt động, Nhân sự, Kỹ thuật số, và Thương mại quốc tế.
-                    Kết quả sẽ hiển thị trong vài phút.
+                    {t("verify.aiProcessDesc")}
                   </p>
                 </div>
               </div>
@@ -496,9 +517,9 @@ function VerifyContent() {
             {/* ── Recent Reports ── */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-extrabold text-gray-900">Báo cáo gần đây</h2>
+                <h2 className="text-base font-extrabold text-gray-900">{t("dash.recentReports")}</h2>
                 <Link href="/reports" className="text-sm text-[#00D26A] hover:underline font-semibold flex items-center gap-1">
-                  Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
+                  {t("dash.viewAll")} <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
 
@@ -511,13 +532,13 @@ function VerifyContent() {
               ) : recentReports.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center shadow-sm">
                   <Building2 className="w-10 h-10 text-gray-100 mx-auto mb-3" />
-                  <p className="text-gray-400 text-sm font-semibold mb-1">Chưa có báo cáo nào</p>
-                  <p className="text-xs text-gray-300">Bắt đầu thẩm định doanh nghiệp đầu tiên của bạn</p>
+                  <p className="text-gray-400 text-sm font-semibold mb-1">{t("dash.noReports")}</p>
+                  <p className="text-xs text-gray-300">{t("dash.noReportsSub")}</p>
                 </div>
               ) : (
                 <div className="space-y-3 stagger">
                   {recentReports.map((report) => {
-                    const isProcessing = ["PROCESSING", "DEEP_SCANNING"].includes((report.status as string) || "");
+                    const isProcessing = isProcessingStatus(report.status);
                     return (
                       <div key={report.id}
                         className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm card-hover group flex items-center gap-4">
@@ -539,14 +560,14 @@ function VerifyContent() {
                         <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Link href={`/reports/${report.id}`}
                             className="flex items-center gap-1.5 px-3 py-1.5 gradient-brand text-white text-xs font-bold rounded-xl hover:opacity-90">
-                            Xem báo cáo <ChevronRight className="w-3 h-3" />
+                            {t("verify.viewReportBtn")} <ChevronRight className="w-3 h-3" />
                           </Link>
-                          {report.status === "COMPLETED" && (
+                          {report.status === "DONE" && (
                             <button onClick={() => {
-                              const msg = encodeURIComponent(`Phân tích thêm về báo cáo thẩm định doanh nghiệp ${report.entityName}`);
+                              const msg = encodeURIComponent(t("verify.analyzeReportPrompt", { name: report.entityName }));
                               router.push(`/chat?preMessage=${msg}`);
                             }} className="px-3 py-1.5 bg-gray-50 border border-gray-200 text-gray-600 text-xs font-semibold rounded-xl hover:bg-gray-100">
-                              Hỏi AI
+                              {t("dash.askAi")}
                             </button>
                           )}
                         </div>
@@ -561,18 +582,18 @@ function VerifyContent() {
             <div className="mt-8 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
               <h3 className="text-sm font-extrabold text-gray-900 mb-4 flex items-center gap-2">
                 <Shield className="w-4 h-4 text-[#00D26A]" />
-                8 Trụ cột thẩm định
+                {t("verify.pillarsTitle")}
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
-                  { no: 1, name: "Xác thực Pháp nhân", icon: "🛡" },
-                  { no: 2, name: "Dấu vết Kỹ thuật số", icon: "🌐" },
-                  { no: 3, name: "Hoạt động Thương mại", icon: "📈" },
-                  { no: 4, name: "Tính nhất quán Danh tính", icon: "🏢" },
-                  { no: 5, name: "Tín hiệu Tài chính & Thuế", icon: "💰" },
-                  { no: 6, name: "Thanh toán & Ngân hàng", icon: "🏦" },
-                  { no: 7, name: "Rủi ro Cấu trúc Giao dịch", icon: "📜" },
-                  { no: 8, name: "Minh chứng Vận hành", icon: "✅" },
+                  { no: 1, name: t("verify.pillar.p1"), icon: "🛡" },
+                  { no: 2, name: t("verify.pillar.p2"), icon: "🌐" },
+                  { no: 3, name: t("verify.pillar.p3"), icon: "📈" },
+                  { no: 4, name: t("verify.pillar.p4"), icon: "🏢" },
+                  { no: 5, name: t("verify.pillar.p5"), icon: "💰" },
+                  { no: 6, name: t("verify.pillar.p6"), icon: "🏦" },
+                  { no: 7, name: t("verify.pillar.p7"), icon: "📜" },
+                  { no: 8, name: t("verify.pillar.p8"), icon: "✅" },
                 ].map((p) => (
                   <div key={p.no} className="flex items-center gap-2.5 p-3 bg-gray-50 rounded-xl">
                     <span className="text-lg">{p.icon}</span>

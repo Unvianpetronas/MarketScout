@@ -36,6 +36,22 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    // Deleting a row still referenced elsewhere (e.g. a Contract linked to a
+    // Report, or a Report holding a P7 contract link) — reports.p7_verified_contract_id
+    // and assessment_contract_links.contract_id are RESTRICT, not CASCADE, on
+    // purpose (deleting a contract must not silently blank out a report's P7
+    // evidence). Without this handler the raw FK violation message leaks to the
+    // client as an opaque 500.
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrity(org.springframework.dao.DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause() != null
+                ? ex.getMostSpecificCause().getMessage() : ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "error", "CONFLICT",
+                "message", "Không thể xoá vì dữ liệu này đang được tham chiếu bởi dữ liệu khác."
+        ));
+    }
+
     // Catches legacy RuntimeException throws in UserService until they are migrated to AppException
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntime(RuntimeException ex) {

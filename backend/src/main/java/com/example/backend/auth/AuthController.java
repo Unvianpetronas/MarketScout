@@ -7,6 +7,8 @@ import com.example.backend.auth.email.PasswordResetService;
 import com.example.backend.auth.RefreshTokenService;
 import com.example.backend.auth.TokenBlacklistService;
 import com.example.backend.auth.UserService;
+import com.example.backend.exception.AppException;
+import com.example.backend.shared.cache.CacheService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
 
 @RestController
@@ -32,16 +35,32 @@ public class AuthController {
     private final RefreshTokenService refreshTokenService;
     private final EmailVerificationService emailVerificationService;
     private final PasswordResetService passwordResetService;
+    private final CacheService cacheService;
     private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+
+    private static final int AUTH_RATE_LIMIT = 5;
+    private static final Duration AUTH_RATE_LIMIT_WINDOW = Duration.ofMinutes(15);
+
+    /** Redis counter (same fail-open pattern as CrawlerP6's daily-budget guard), keyed per email — bounds brute-force/enumeration. */
+    private void checkAuthRateLimit(String email) {
+        String key = "auth:rate:" + (email == null ? "unknown" : email.trim().toLowerCase());
+        long count = cacheService.incrementCounter(key, AUTH_RATE_LIMIT_WINDOW, 1);
+        if (count > AUTH_RATE_LIMIT) {
+            throw new AppException(AppException.ErrorCode.TOO_MANY_REQUESTS,
+                "Quá nhiều lần thử. Vui lòng đợi vài phút rồi thử lại.");
+        }
+    }
 
     @PostMapping("/users")
     public ResponseEntity<AuthDTO.RegisterResponse> register(@Valid @RequestBody AuthDTO.RegisterRequest req) {
+        checkAuthRateLimit(req.getEmail());
         logger.info("Register request for: {}", req.getEmail());
         return ResponseEntity.ok(userService.register(req));
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthDTO.LoginResponse> login(@Valid @RequestBody AuthDTO.LoginRequest req) {
+        checkAuthRateLimit(req.getEmail());
         logger.info("Login attempt for: {}", req.getEmail());
         return ResponseEntity.ok(userService.login(req));
     }
@@ -111,6 +130,7 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, String>> forgotPassword(
             @Valid @RequestBody AuthDTO.ForgotPasswordRequest req) {
+        checkAuthRateLimit(req.getEmail());
         userService.forgotPassword(req);
         return ResponseEntity.ok(Map.of("message", "Password reset email has been sent"));
     }

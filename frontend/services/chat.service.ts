@@ -3,9 +3,7 @@ import { getAccessToken } from "@/lib/token-storage";
 import {
   ChatSession,
   ConversationResponse,
-  ChatPairResponse,
   SseMessageRequest,
-  SendMessageRequest,
 } from "@/types/chat";
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
@@ -35,22 +33,6 @@ export const getSessionHistory = async (sessionId: string): Promise<Conversation
   return response.data;
 };
 
-/**
- * Send a message to a specific session (non-streaming).
- * Backend field is "content", not "message".
- * Returns both user + assistant messages.
- */
-export const sendMessage = async (
-    sessionId: string,
-    data: SendMessageRequest
-): Promise<ChatPairResponse> => {
-  const response = await api.post<ChatPairResponse>(
-      `/chat/sessions/${sessionId}/messages`,
-      data
-  );
-  return response.data;
-};
-
 // ── SSE Pipeline (POST + fetch ReadableStream) ────────────────────────────────
 
 /**
@@ -71,8 +53,6 @@ export const streamPipelineMessage = (
   const token = typeof window !== "undefined" ? getAccessToken() : null;
   const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "";
 
-  console.log("[SSE] PARSER VERSION 2026-06-11 — starting request", data); // DEBUG
-
   fetch(`${baseUrl}/chat/message`, {
     method: "POST",
     headers: {
@@ -83,8 +63,6 @@ export const streamPipelineMessage = (
     signal: controller.signal,
   })
       .then(async (res) => {
-        console.log("[SSE] response status:", res.status, "| content-type:", res.headers.get("content-type")); // 🔍 DEBUG
-
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         if (!res.body) throw new Error("No response body");
 
@@ -100,11 +78,8 @@ export const streamPipelineMessage = (
           const payload = dataLines.join("\n");
           dataLines = [];
 
-          console.log("[SSE] flushEvent payload:", JSON.stringify(payload)); //  DEBUG
-
           if (!payload) return false;
           if (payload === "[DONE]") {
-            console.log("[SSE] [DONE] received → calling onDone()"); //  DEBUG
             onDone();
             return true;
           }
@@ -121,29 +96,26 @@ export const streamPipelineMessage = (
               }
             }
             if (typeof parsed === "string") {
-              console.log("[SSE] → onChunk (string):", parsed.slice(0, 80)); //  DEBUG
               onChunk(parsed);
             } else {
               const event = parsed as { message?: string; status?: string; data?: unknown };
-              console.log("[SSE] parsed event:", parsed); //  DEBUG
+              // Meta events carry either a reportId (verify/lookup result) or a
+              // "pending" flag (clarify question / confirm-before-run gate).
               if (
                   onMeta &&
                   event.data &&
                   typeof event.data === "object" &&
                   !Array.isArray(event.data) &&
-                  "reportId" in (event.data as Record<string, unknown>)
+                  ("reportId" in (event.data as Record<string, unknown>)
+                      || "pending" in (event.data as Record<string, unknown>))
               ) {
                 onMeta(event.data as Record<string, unknown>);
               }
               if (event.message) {
-                console.log("[SSE] → onChunk (message):", event.message.slice(0, 80)); //  DEBUG
                 onChunk(event.message, event.status);
-              } else {
-                console.warn("[SSE] ⚠️ event KHÔNG có field message — bị bỏ qua:", parsed); //  DEBUG
               }
             }
-          } catch (e) {
-            console.log("[SSE] → onChunk (raw, JSON.parse failed):", payload.slice(0, 80), e); // 🔍 DEBUG
+          } catch {
             onChunk(payload);
           }
           return false;
@@ -153,9 +125,7 @@ export const streamPipelineMessage = (
           const { done, value } = await reader.read();
 
           if (value) {
-            const text = decoder.decode(value, { stream: true });
-            console.log("[SSE] RAW chunk:", JSON.stringify(text)); //  DEBUG
-            buffer += text;
+            buffer += decoder.decode(value, { stream: true });
           }
 
           let newlineIndex;
@@ -173,17 +143,14 @@ export const streamPipelineMessage = (
           }
 
           if (done) {
-            console.log("[SSE] stream closed by server (done=true)"); //  DEBUG
             // Flush a trailing event that never received its terminating blank line.
             if (flushEvent()) return;
             break;
           }
         }
-        console.log("[SSE] stream ended WITHOUT [DONE] → calling onDone() fallback"); //  DEBUG
         onDone();
       })
       .catch((err: Error) => {
-        console.error("[SSE] ❌ fetch/stream error:", err); //  DEBUG
         if (err.name !== "AbortError") onError(err);
       });
 

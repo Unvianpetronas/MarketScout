@@ -5,8 +5,7 @@ import com.example.backend.verification.crawler.p2.CrawlerP2;
 import com.example.backend.verification.crawler.p3.CrawlerP3Intl;
 import com.example.backend.verification.crawler.p3.CrawlerP3VN;
 import com.example.backend.verification.crawler.p4.CrawlerP4;
-import com.example.backend.verification.crawler.p5.CrawlerP5Intl;
-import com.example.backend.verification.crawler.p5.CrawlerP5VN;
+import com.example.backend.verification.crawler.p5.CrawlerP5Router;
 import com.example.backend.verification.crawler.p6.CrawlerP6;
 import com.example.backend.verification.crawler.p8.CrawlerP8;
 import com.example.backend.shared.model.crawler.*;
@@ -58,8 +57,7 @@ public class ScoringEngine {
     private final CrawlerP3VN crawlerP3VN;
     private final CrawlerP3Intl crawlerP3Intl;
     private final CrawlerP4 crawlerP4;
-    private final CrawlerP5VN crawlerP5VN;
-    private final CrawlerP5Intl crawlerP5Intl;
+    private final CrawlerP5Router crawlerP5Router;
     private final CrawlerP6 crawlerP6;
     private final CrawlerP8 crawlerP8;
     private final DealSafetyAgent dealSafetyAgent;
@@ -168,7 +166,7 @@ public class ScoringEngine {
             input.isVietnam() ? crawlerP3VN.fetch(input) : crawlerP3Intl.fetch(input), crawlerPool);
         CompletableFuture<P4Data> p4f = CompletableFuture.supplyAsync(() -> crawlerP4.fetch(input), crawlerPool);
         CompletableFuture<P5Data> p5f = CompletableFuture.supplyAsync(() ->
-            input.isVietnam() ? crawlerP5VN.fetch(input) : crawlerP5Intl.fetch(input), crawlerPool);
+            crawlerP5Router.fetch(input), crawlerPool);
         CompletableFuture<P8Data> p8f = CompletableFuture.supplyAsync(() -> crawlerP8.fetch(input), crawlerPool);
 
         CompletableFuture.allOf(p1f, p2f, p3f, p4f, p5f, p8f).join();
@@ -203,7 +201,7 @@ public class ScoringEngine {
             rubric.scoreP3(facts.getP3()),
             rubric.scoreP4(facts.getP4()),
             rubric.scoreP5(facts.getP5()),
-            rubric.scoreP6(facts.getP6()),
+            rubric.scoreP6(facts.getP6(), p6.getErrorMsg()),
             rubric.scoreP7(p7Facts != null ? p7Facts : facts.getP7()),
             rubric.scoreP8(facts.getP8())
         );

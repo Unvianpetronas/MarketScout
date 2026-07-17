@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -26,6 +28,7 @@ public class FactJson {
         private Boolean usesFreeEmail;
         private Boolean hasSsl;
         private String socialMediaScore;   // LOW | MEDIUM | HIGH
+        private List<String> facebookPages; // candidate URLs — unverified, see P2Data
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
@@ -49,6 +52,10 @@ public class FactJson {
         private Double registeredCapitalUsd;
         private Boolean hasFinancialReport;
         private String revenueTrend;        // GROWING | STABLE | DECLINING | UNKNOWN
+        // Which crawler actually produced this — ground truth from P5Data, not
+        // Gemini-interpreted, so ScoringRubric can label the real source instead
+        // of a hardcoded guess (dangkykinhdoanh | companies_house | sec_edgar | tavily).
+        private String dataSource;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder

@@ -10,26 +10,26 @@ import {
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
+import { useLanguage } from "@/providers/language-provider";
 import { getReports } from "@/services/report.service";
-import { ReportListItem } from "@/types/report";
+import { ReportListItem, isProcessingStatus, isHighRiskLevel } from "@/types/report";
 
-type StatusFilter = "all" | "COMPLETED" | "PROCESSING" | "FAILED";
+type StatusFilter = "all" | "DONE" | "PROCESSING" | "FAILED";
+type T = (key: string, vars?: Record<string, string | number>) => string;
 
-function getRiskInfo(risk: string | null | undefined) {
-  if (!risk) return { color: "text-gray-400", bg: "bg-gray-50 border-gray-200", label: "—" };
-  const r = (risk as string).toUpperCase();
-  if (r === "LOW") return { color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200", label: "Thấp" };
-  if (r === "MEDIUM") return { color: "text-amber-600", bg: "bg-amber-50 border-amber-200", label: "Trung bình" };
-  if (r === "HIGH") return { color: "text-red-600", bg: "bg-red-50 border-red-200", label: "Cao" };
-  if (r === "CRITICAL") return { color: "text-red-700", bg: "bg-red-100 border-red-300", label: "Nghiêm trọng" };
-  return { color: "text-gray-500", bg: "bg-gray-50 border-gray-200", label: risk };
+function getRiskInfo(risk: string | null | undefined, t: T) {
+  if (risk === "Thấp") return { color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200", label: t("risk.low") };
+  if (risk === "Trung bình") return { color: "text-amber-600", bg: "bg-amber-50 border-amber-200", label: t("risk.medium") };
+  if (risk === "Cao") return { color: "text-red-600", bg: "bg-red-50 border-red-200", label: t("risk.high") };
+  if (risk === "Nghiêm trọng") return { color: "text-red-700", bg: "bg-red-100 border-red-300", label: t("risk.critical") };
+  return { color: "text-gray-400", bg: "bg-gray-50 border-gray-200", label: risk || "—" };
 }
 
-function getStatusInfo(status: string | null | undefined) {
-  const s = (status as string || "").toUpperCase();
-  if (s === "COMPLETED") return { icon: CheckCircle2, iconColor: "text-emerald-500", label: "Hoàn thành", bg: "bg-emerald-50 text-emerald-700 border-emerald-200" };
-  if (s === "PROCESSING" || s === "DEEP_SCANNING") return { icon: Clock, iconColor: "text-blue-500", label: "Đang quét", bg: "bg-blue-50 text-blue-700 border-blue-200" };
-  if (s === "FAILED") return { icon: XCircle, iconColor: "text-red-500", label: "Thất bại", bg: "bg-red-50 text-red-700 border-red-200" };
+function getStatusInfo(status: string | null | undefined, t: T) {
+  if (status === "DONE") return { icon: CheckCircle2, iconColor: "text-emerald-500", label: t("status.completed"), bg: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+  if (isProcessingStatus(status)) return { icon: Clock, iconColor: "text-blue-500", label: t("status.processing"), bg: "bg-blue-50 text-blue-700 border-blue-200" };
+  if (status === "HARD_STOP") return { icon: XCircle, iconColor: "text-red-600", label: t("reports.status.hardStop"), bg: "bg-red-50 text-red-700 border-red-200" };
+  if (status === "FAILED") return { icon: XCircle, iconColor: "text-red-500", label: t("status.failed"), bg: "bg-red-50 text-red-700 border-red-200" };
   return { icon: Clock, iconColor: "text-gray-400", label: status || "—", bg: "bg-gray-50 text-gray-600 border-gray-200" };
 }
 
@@ -45,6 +45,7 @@ function ScoreCircle({ score }: { score: number | null | undefined }) {
 }
 
 export default function ReportsPage() {
+  const { t } = useLanguage();
   const [reports, setReports] = useState<ReportListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -56,7 +57,7 @@ export default function ReportsPage() {
       const data = await getReports();
       setReports(data);
     } catch {
-      toast.error("Không thể tải danh sách báo cáo.");
+      toast.error(t("reports.errLoad"));
     } finally {
       setIsLoading(false);
     }
@@ -73,16 +74,16 @@ export default function ReportsPage() {
   const filtered = reports.filter((r) => {
     const matchSearch = !search || r.entityName?.toLowerCase().includes(search.toLowerCase())
       || r.countryIso2?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "all" || (r.status as string) === statusFilter
-      || (statusFilter === "PROCESSING" && (r.status as string) === "DEEP_SCANNING");
+    const matchStatus = statusFilter === "all"
+      || (statusFilter === "PROCESSING" ? isProcessingStatus(r.status) : r.status === statusFilter);
     return matchSearch && matchStatus;
   });
 
   const stats = {
     total: reports.length,
-    completed: reports.filter((r) => (r.status as string) === "COMPLETED").length,
-    processing: reports.filter((r) => ["PROCESSING", "DEEP_SCANNING"].includes(r.status as string)).length,
-    highRisk: reports.filter((r) => ["HIGH", "CRITICAL"].includes((r.riskLevel as string) || "")).length,
+    completed: reports.filter((r) => r.status === "DONE").length,
+    processing: reports.filter((r) => isProcessingStatus(r.status)).length,
+    highRisk: reports.filter((r) => isHighRiskLevel(r.riskLevel)).length,
   };
 
   return (
@@ -95,22 +96,22 @@ export default function ReportsPage() {
             {/* ── Header ── */}
             <div className="flex items-start justify-between mb-6 animate-fade-in-up">
               <div>
-                <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Báo cáo thẩm định</h1>
-                <p className="text-sm text-gray-400">Tất cả các báo cáo thẩm định doanh nghiệp của bạn</p>
+                <h1 className="text-2xl font-extrabold text-gray-900 mb-1">{t("reports.title")}</h1>
+                <p className="text-sm text-gray-400">{t("reports.subtitle")}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={handleRefresh} disabled={isRefreshing}
                   className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
                   <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                  Làm mới
+                  {t("reports.refresh")}
                 </button>
-                <button onClick={() => toast.info("Sắp ra mắt.")}
+                <button onClick={() => toast.info(t("profile.soon"))}
                   className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
-                  <Download className="w-4 h-4" /> Xuất báo cáo
+                  <Download className="w-4 h-4" /> {t("reports.exportBtn")}
                 </button>
                 <Link href="/verify"
                   className="flex items-center gap-2 px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90 shadow-sm">
-                  <Zap className="w-4 h-4" /> Thẩm định mới
+                  <Zap className="w-4 h-4" /> {t("nav.newVerify")}
                 </Link>
               </div>
             </div>
@@ -118,10 +119,10 @@ export default function ReportsPage() {
             {/* ── Stats ── */}
             <div className="grid grid-cols-4 gap-4 mb-6">
               {[
-                { label: "Tổng báo cáo", value: stats.total, icon: FileText, color: "text-blue-600", bg: "bg-blue-50" },
-                { label: "Hoàn thành", value: stats.completed, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
-                { label: "Đang xử lý", value: stats.processing, icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
-                { label: "Rủi ro cao", value: stats.highRisk, icon: AlertTriangle, color: "text-red-600", bg: "bg-red-50" },
+                { label: t("dash.stat.totalReports"), value: stats.total, icon: FileText, color: "text-blue-600", bg: "bg-blue-50" },
+                { label: t("status.completed"), value: stats.completed, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
+                { label: t("status.processing"), value: stats.processing, icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
+                { label: t("reports.stat.highRisk"), value: stats.highRisk, icon: AlertTriangle, color: "text-red-600", bg: "bg-red-50" },
               ].map(({ label, value, icon: Icon, color, bg }) => (
                 <div key={label} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
                   <div className="flex items-center justify-between mb-2">
@@ -140,18 +141,18 @@ export default function ReportsPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                 <input value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Tìm theo tên doanh nghiệp, quốc gia..."
+                  placeholder={t("reports.searchPlaceholder")}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus-ms" />
               </div>
               <div className="flex items-center gap-2">
-                {(["all", "COMPLETED", "PROCESSING", "FAILED"] as StatusFilter[]).map((s) => (
+                {(["all", "DONE", "PROCESSING", "FAILED"] as StatusFilter[]).map((s) => (
                   <button key={s} onClick={() => setStatusFilter(s)}
                     className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
                       statusFilter === s
                         ? "gradient-brand text-white border-transparent"
                         : "bg-gray-50 text-gray-500 border-gray-200 hover:border-gray-300"
                     }`}>
-                    {s === "all" ? "Tất cả" : s === "COMPLETED" ? "Hoàn thành" : s === "PROCESSING" ? "Đang xử lý" : "Thất bại"}
+                    {s === "all" ? t("reports.filter.all") : s === "DONE" ? t("status.completed") : s === "PROCESSING" ? t("status.processing") : t("status.failed")}
                   </button>
                 ))}
               </div>
@@ -162,21 +163,21 @@ export default function ReportsPage() {
               {isLoading ? (
                 <div className="flex flex-col items-center py-20">
                   <div className="w-10 h-10 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin mb-3" />
-                  <p className="text-sm text-gray-400">Đang tải báo cáo...</p>
+                  <p className="text-sm text-gray-400">{t("reports.loading")}</p>
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="flex flex-col items-center py-20">
                   <FileText className="w-12 h-12 text-gray-100 mb-4" />
                   <p className="text-gray-500 font-semibold mb-1">
-                    {reports.length === 0 ? "Chưa có báo cáo nào" : "Không tìm thấy kết quả"}
+                    {reports.length === 0 ? t("dash.noReports") : t("reports.noResults")}
                   </p>
                   <p className="text-sm text-gray-400 mb-4">
-                    {reports.length === 0 ? "Bắt đầu thẩm định doanh nghiệp đầu tiên của bạn" : "Thử thay đổi bộ lọc"}
+                    {reports.length === 0 ? t("dash.noReportsSub") : t("reports.tryDifferentFilter")}
                   </p>
                   {reports.length === 0 && (
                     <Link href="/verify"
                       className="flex items-center gap-2 px-5 py-2.5 gradient-brand text-white font-semibold rounded-xl hover:opacity-90 text-sm">
-                      <Zap className="w-4 h-4" /> Thẩm định ngay
+                      <Zap className="w-4 h-4" /> {t("reports.verifyNow")}
                     </Link>
                   )}
                 </div>
@@ -185,19 +186,19 @@ export default function ReportsPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/80">
-                        <th className="px-5 py-4 text-left">Doanh nghiệp</th>
-                        <th className="px-5 py-4 text-left">Điểm rủi ro</th>
-                        <th className="px-5 py-4 text-left">Mức rủi ro</th>
-                        <th className="px-5 py-4 text-left">Trạng thái</th>
-                        <th className="px-5 py-4 text-left">Ngày tạo</th>
+                        <th className="px-5 py-4 text-left">{t("dash.col.company")}</th>
+                        <th className="px-5 py-4 text-left">{t("dash.col.riskScore")}</th>
+                        <th className="px-5 py-4 text-left">{t("dash.col.riskLevel")}</th>
+                        <th className="px-5 py-4 text-left">{t("dash.col.status")}</th>
+                        <th className="px-5 py-4 text-left">{t("dash.col.date")}</th>
                         <th className="px-5 py-4 text-left"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {filtered.map((report) => {
-                        const { icon: StatusIcon, iconColor, bg: statusBg, label: statusLabel } = getStatusInfo(report.status);
-                        const { color: riskColor, bg: riskBg, label: riskLabel } = getRiskInfo(report.riskLevel);
-                        const isProcessing = ["PROCESSING", "DEEP_SCANNING"].includes((report.status as string) || "");
+                        const { icon: StatusIcon, iconColor, bg: statusBg, label: statusLabel } = getStatusInfo(report.status, t);
+                        const { color: riskColor, bg: riskBg, label: riskLabel } = getRiskInfo(report.riskLevel, t);
+                        const isProcessing = isProcessingStatus(report.status);
                         return (
                           <tr key={report.id} className="hover:bg-[#FAFBFA] transition-colors group">
                             <td className="px-5 py-4">
@@ -210,7 +211,7 @@ export default function ReportsPage() {
                                     <p className="text-sm font-semibold text-gray-900">{report.entityName}</p>
                                     {report.hardStop && (
                                       <span className="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
-                                        HARD STOP
+                                        {t("reports.badge.hardStop")}
                                       </span>
                                     )}
                                   </div>
@@ -254,7 +255,7 @@ export default function ReportsPage() {
                             <td className="px-5 py-4">
                               <Link href={`/reports/${report.id}`}
                                 className="flex items-center gap-1 text-xs font-semibold text-[#00D26A] hover:underline opacity-0 group-hover:opacity-100 transition-opacity">
-                                Xem chi tiết <ChevronRight className="w-3.5 h-3.5" />
+                                {t("reports.viewDetails")} <ChevronRight className="w-3.5 h-3.5" />
                               </Link>
                             </td>
                           </tr>
@@ -264,12 +265,12 @@ export default function ReportsPage() {
                   </table>
                   <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/30">
                     <p className="text-xs text-gray-400">
-                      Hiển thị <span className="font-semibold text-gray-700">{filtered.length}</span> / {reports.length} báo cáo
+                      {t("reports.showingPrefix")} <span className="font-semibold text-gray-700">{filtered.length}</span> / {reports.length} {t("reports.showingSuffix")}
                     </p>
                     {filtered.length !== reports.length && (
                       <button onClick={() => { setSearch(""); setStatusFilter("all"); }}
                         className="text-xs text-[#00D26A] hover:underline font-semibold">
-                        Xóa bộ lọc
+                        {t("reports.clearFilters")}
                       </button>
                     )}
                   </div>

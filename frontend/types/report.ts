@@ -1,6 +1,24 @@
-export type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
+// Matches ScoringRubric.getRiskLevel() on the backend exactly — it returns
+// these Vietnamese strings directly, not an enum.
+export type RiskLevel = "Thấp" | "Trung bình" | "Cao" | "Nghiêm trọng";
 
-export type ReportStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+// Matches Report.status on the backend exactly (see Report.java's comment:
+// PENDING | QUICK_SCANNING | DEEP_SCANNING | DONE | HARD_STOP | FAILED).
+export type ReportStatus = "PENDING" | "QUICK_SCANNING" | "DEEP_SCANNING" | "DONE" | "HARD_STOP" | "FAILED";
+
+/** True while the pipeline is still running (any pre-terminal status). */
+export function isProcessingStatus(status?: string | null): boolean {
+  return status === "PENDING" || status === "QUICK_SCANNING" || status === "DEEP_SCANNING";
+}
+
+/** True once the report has a final result (success, sanctions hard-stop, or failure). */
+export function isTerminalStatus(status?: string | null): boolean {
+  return status === "DONE" || status === "HARD_STOP" || status === "FAILED";
+}
+
+export function isHighRiskLevel(riskLevel?: string | null): boolean {
+  return riskLevel === "Cao" || riskLevel === "Nghiêm trọng";
+}
 
 // Backend returns findings/sourcesUsed as a single JSON string, not an array
 export interface PillarResult {
