@@ -31,6 +31,17 @@ public class TavilyClient {
         return search(query, market);
     }
 
+    /**
+     * Real web search for businesses matching a (possibly ambiguous) company name —
+     * used to turn a chat "which company did you mean?" moment into an actual list of
+     * real candidates instead of asking the user to type more details.
+     */
+    public List<LeadResult> searchCompanyByName(String name, String country) {
+        if (apiKey.isBlank() || name == null || name.isBlank()) return List.of();
+        String query = "\"" + name + "\" company" + (country != null && !country.isBlank() ? " " + country : "");
+        return search(query, country);
+    }
+
     public List<String> searchText(String query, int maxResults) {
         if (apiKey.isBlank()) return List.of();
         try {

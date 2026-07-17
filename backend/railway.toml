@@ -1,4 +1,10 @@
 [deploy]
-startCommand = "java -jar target/backend-0.0.1-SNAPSHOT.jar"
+# enableAIAcaIssuers: dangkykinhdoanh.gov.vn's server only sends its leaf cert, not
+# the GlobalSign intermediate — browsers tolerate this via AIA fetching, the JVM
+# doesn't by default, causing "PKIX path building failed" on every P5 VN scrape.
+# This flag makes the JVM fetch the missing intermediate itself (still validates
+# the full chain — not a weakening of TLS checks, just filling a gap the server
+# should have filled).
+startCommand = "java -Dcom.sun.security.enableAIAcaIssuers=true -jar target/backend-0.0.1-SNAPSHOT.jar"
 healthcheckPath = "/actuator/health/liveness"
 healthcheckTimeout = 300

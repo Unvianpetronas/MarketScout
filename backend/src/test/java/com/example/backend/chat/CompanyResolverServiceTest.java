@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class CompanyResolverServiceTest {
@@ -24,6 +25,36 @@ class CompanyResolverServiceTest {
     @BeforeEach
     void setUp() {
         service = new CompanyResolverService(geminiService, cacheService, new ObjectMapper());
+    }
+
+    @Test
+    void resolve_bareTaxId_shortCircuitsAsUnambiguous_withoutCallingGemini() {
+        CompanyResolutionResult r = service.resolve("0107781148", null);
+
+        assertThat(r.isAmbiguous()).isFalse();
+        assertThat(r.isVietnam()).isTrue();
+        assertThat(r.getCountryIso2()).isEqualTo("VN");
+        assertThat(r.getNormalizedName()).isEqualTo("0107781148");
+        verifyNoInteractions(geminiService);
+    }
+
+    @Test
+    void resolve_taxIdWithBranchSuffix_shortCircuits() {
+        CompanyResolutionResult r = service.resolve("0107781148-001", null);
+
+        assertThat(r.isAmbiguous()).isFalse();
+        assertThat(r.getNormalizedName()).isEqualTo("0107781148-001");
+        verifyNoInteractions(geminiService);
+    }
+
+    @Test
+    void resolve_taxIdEmbeddedInSentence_doesNotShortCircuit() {
+        // Not an exact match — must fall through to the normal Gemini path so a
+        // phone number mentioned inside a longer message is never misread as an MST.
+        service.resolve("Verify company \"0107781148\" in Vietnam. Run full check.", null);
+
+        org.mockito.Mockito.verify(geminiService).callWithSystemPromptLowTemp(
+            org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
