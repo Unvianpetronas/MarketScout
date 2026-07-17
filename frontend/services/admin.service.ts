@@ -152,6 +152,12 @@ export interface PlanDTO {
   isActive: boolean;
 }
 
+// ── Payment settings ────────────────────────────────────────────────────────
+export interface PaymentSettingsDTO {
+  pricePerCreditVnd: number;
+  updatedAt: string;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // API CALLS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -212,3 +218,9 @@ export const getPlans = () =>
 
 export const updatePlan = (id: number, data: Partial<Pick<PlanDTO, "monthlyQuota" | "priceVnd" | "priceUsd" | "features" | "isActive">>) =>
   api.patch<PlanDTO>(`/admin/plans/${id}`, data).then(r => r.data);
+
+export const getPaymentSettings = () =>
+  api.get<PaymentSettingsDTO>("/admin/payment-settings").then(r => r.data);
+
+export const updatePaymentSettings = (pricePerCreditVnd: number) =>
+  api.patch<PaymentSettingsDTO>("/admin/payment-settings", { pricePerCreditVnd }).then(r => r.data);

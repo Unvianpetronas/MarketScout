@@ -34,6 +34,7 @@ public class AdminController {
     private final AuditLogRepository auditLogRepository;
     private final SystemAlertRepository systemAlertRepository;
     private final PlanRepository planRepository;
+    private final PaymentSettingsRepository paymentSettingsRepository;
 
     // ═══════════════════════════════════════════════════════════════════
     // GROUP 1 — ANALYTICS OVERVIEW
@@ -342,6 +343,37 @@ public class AdminController {
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // GROUP 7b — PAYMENT SETTINGS (top-up credit price)
+    // ═══════════════════════════════════════════════════════════════════
+
+    @GetMapping("/payment-settings")
+    public ResponseEntity<AdminDTO.PaymentSettingsDTO> getPaymentSettings() {
+        PaymentSettings settings = paymentSettingsRepository.findById(1)
+                .orElseThrow(() -> new AppException(AppException.ErrorCode.RESOURCE_NOT_FOUND,
+                        "Payment settings not configured — run db/payment_settings.sql"));
+        return ResponseEntity.ok(toPaymentSettingsDTO(settings));
+    }
+
+    @PatchMapping("/payment-settings")
+    public ResponseEntity<AdminDTO.PaymentSettingsDTO> updatePaymentSettings(
+            @RequestBody AdminDTO.PaymentSettingsUpdateRequest req,
+            @AuthenticationPrincipal UserDetails actor) {
+
+        if (req.pricePerCreditVnd() == null || req.pricePerCreditVnd().signum() <= 0) {
+            throw new AppException(AppException.ErrorCode.BAD_REQUEST, "pricePerCreditVnd must be greater than 0");
+        }
+        PaymentSettings settings = paymentSettingsRepository.findById(1)
+                .orElseThrow(() -> new AppException(AppException.ErrorCode.RESOURCE_NOT_FOUND,
+                        "Payment settings not configured — run db/payment_settings.sql"));
+        settings.setPricePerCreditVnd(req.pricePerCreditVnd());
+        settings.setUpdatedAt(Instant.now());
+        paymentSettingsRepository.save(settings);
+        writeAuditLog(actor, "PAYMENT_SETTINGS_UPDATE", "payment_settings", null,
+                "{\"pricePerCreditVnd\":" + req.pricePerCreditVnd() + "}");
+        return ResponseEntity.ok(toPaymentSettingsDTO(settings));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // INTERNAL HELPERS
     // ═══════════════════════════════════════════════════════════════════
 
@@ -401,5 +433,9 @@ public class AdminController {
                 p.getId(), p.getName(), p.getBillingCycle(),
                 p.getPriceUsd(), p.getPriceVnd(), p.getMonthlyQuota(),
                 p.getFeatures(), p.getIsActive());
+    }
+
+    private AdminDTO.PaymentSettingsDTO toPaymentSettingsDTO(PaymentSettings s) {
+        return new AdminDTO.PaymentSettingsDTO(s.getPricePerCreditVnd(), s.getUpdatedAt());
     }
 }

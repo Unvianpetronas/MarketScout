@@ -60,10 +60,19 @@ public class PaymentService {
     private final SubscriptionRepository subscriptionRepository;
     private final PlanPurchaseRepository planPurchaseRepository;
     private final PaymentProperties props;
+    private final PaymentSettingsRepository paymentSettingsRepository;
     private final ObjectMapper objectMapper;
     private final PaymentEmailService paymentEmailService;
 
     // ── Create top-up ──────────────────────────────────────────────────
+
+    /** Admin-editable price per credit (payment_settings row id=1), set up by db/payment_settings.sql. */
+    private BigDecimal currentPricePerCreditVnd() {
+        return paymentSettingsRepository.findById(1)
+                .map(PaymentSettings::getPricePerCreditVnd)
+                .orElseThrow(() -> new AppException(AppException.ErrorCode.RESOURCE_NOT_FOUND,
+                        "Payment settings not configured — run db/payment_settings.sql"));
+    }
 
     @Transactional
     public PaymentDTO.TopupResponse createTopup(UUID userId, int quantity) {
@@ -71,7 +80,7 @@ public class PaymentService {
             throw new AppException(AppException.ErrorCode.BAD_REQUEST, "Quantity must be at least 1");
         }
         Users user = requireUserForOrder(userId);
-        BigDecimal amount = props.getPricePerCreditVnd().multiply(BigDecimal.valueOf(quantity));
+        BigDecimal amount = currentPricePerCreditVnd().multiply(BigDecimal.valueOf(quantity));
         Instant now = Instant.now();
         Instant expiresAt = now.plus(props.getQrExpiryMinutes(), ChronoUnit.MINUTES);
         try {

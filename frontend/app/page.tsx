@@ -23,7 +23,7 @@ import {
   FileSignature,
   Building2,
 } from "lucide-react";
-import { LinkedinIcon, XIcon, FacebookIcon, GithubIcon } from "@/components/icons/social-icons";
+import { LinkedinIcon, FacebookIcon, GithubIcon } from "@/components/icons/social-icons";
 import { useLanguage } from "@/providers/language-provider";
 
 const TEAM = [
@@ -333,9 +333,6 @@ export default function LandingPage() {
               <div className="flex items-center gap-3 pt-3 border-t border-gray-50">
                 <a href="#" aria-label={t("landing.team.socialLinkedin", { name: member.name })} className="text-gray-400 hover:text-[#00D26A] transition-colors">
                   <LinkedinIcon className="w-4 h-4" />
-                </a>
-                <a href="#" aria-label={t("landing.team.socialX", { name: member.name })} className="text-gray-400 hover:text-[#00D26A] transition-colors">
-                  <XIcon className="w-4 h-4" />
                 </a>
               </div>
             </div>

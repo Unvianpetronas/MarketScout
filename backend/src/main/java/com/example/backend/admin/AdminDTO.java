@@ -126,4 +126,13 @@ public class AdminDTO {
             String features,
             Boolean isActive
     ) {}
+
+    public record PaymentSettingsDTO(
+            BigDecimal pricePerCreditVnd,
+            Instant updatedAt
+    ) {}
+
+    public record PaymentSettingsUpdateRequest(
+            BigDecimal pricePerCreditVnd
+    ) {}
 }

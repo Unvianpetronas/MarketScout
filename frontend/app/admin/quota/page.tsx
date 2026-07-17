@@ -5,7 +5,7 @@ import { Database, RefreshCw, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
-import { getPlans, updatePlan, PlanDTO } from "@/services/admin.service";
+import { getPlans, updatePlan, PlanDTO, getPaymentSettings, updatePaymentSettings } from "@/services/admin.service";
 import { useLanguage } from "@/providers/language-provider";
 
 function getPlanStyle(plan: string) {
@@ -24,6 +24,10 @@ export default function AdminQuotaPage() {
   const [edits, setEdits] = useState<Record<number, string>>({});
   const [savingId, setSavingId] = useState<number | null>(null);
 
+  const [topupPrice, setTopupPrice] = useState<number | null>(null);
+  const [topupPriceEdit, setTopupPriceEdit] = useState("");
+  const [isSavingTopupPrice, setIsSavingTopupPrice] = useState(false);
+
   const fetchPlans = async () => {
     try {
       const res = await getPlans();
@@ -35,7 +39,36 @@ export default function AdminQuotaPage() {
     }
   };
 
-  useEffect(() => { fetchPlans(); }, []);
+  const fetchTopupPrice = async () => {
+    try {
+      const res = await getPaymentSettings();
+      setTopupPrice(res.pricePerCreditVnd);
+      setTopupPriceEdit(String(res.pricePerCreditVnd));
+    } catch {
+      toast.error(t("admin.quota.topupPriceLoadError"));
+    }
+  };
+
+  useEffect(() => { fetchPlans(); fetchTopupPrice(); }, []);
+
+  const handleSaveTopupPrice = async () => {
+    const price = Number(topupPriceEdit);
+    if (!Number.isFinite(price) || price <= 0) {
+      toast.error(t("admin.quota.topupPriceInvalid"));
+      return;
+    }
+    setIsSavingTopupPrice(true);
+    try {
+      const res = await updatePaymentSettings(price);
+      setTopupPrice(res.pricePerCreditVnd);
+      setTopupPriceEdit(String(res.pricePerCreditVnd));
+      toast.success(t("admin.quota.topupPriceUpdateSuccess"));
+    } catch {
+      toast.error(t("admin.quota.topupPriceUpdateError"));
+    } finally {
+      setIsSavingTopupPrice(false);
+    }
+  };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -76,6 +109,29 @@ export default function AdminQuotaPage() {
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
           </button>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
+          <p className="text-sm font-bold text-gray-900 mb-1">{t("admin.quota.topupPriceTitle")}</p>
+          <p className="text-xs text-gray-400 mb-4">{t("admin.quota.topupPriceDesc")}</p>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min="1"
+              value={topupPriceEdit}
+              onChange={(e) => setTopupPriceEdit(e.target.value)}
+              className="w-40 px-3 py-2 border border-gray-200 rounded-xl text-sm focus-ms"
+            />
+            <span className="text-sm text-gray-400">VND</span>
+            <button
+              onClick={handleSaveTopupPrice}
+              disabled={topupPrice === null || isSavingTopupPrice || topupPriceEdit === String(topupPrice)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 border border-blue-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Save className="w-3.5 h-3.5" />
+              {isSavingTopupPrice ? t("admin.quota.saving") : t("admin.quota.save")}
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
