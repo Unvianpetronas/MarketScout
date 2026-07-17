@@ -6,6 +6,7 @@ import com.example.backend.exception.AppException;
 import com.example.backend.domain.*;
 import com.example.backend.shared.model.agent.AgentEvent;
 import com.example.backend.shared.model.agent.IntentResult;
+import com.example.backend.shared.model.crawler.LeadResult;
 import com.example.backend.shared.model.crawler.P1Data;
 import com.example.backend.shared.model.crawler.P6Data;
 import com.example.backend.shared.model.input.CompanyInput;
@@ -267,6 +268,61 @@ public class ChatService {
     }
 
     /**
+     * Resolves the company name for LOOKUP_COMPANY/VERIFY_PARTNER, shared so the two
+     * handlers can't drift. Two deterministic bypasses run before ever asking Gemini
+     * to guess ambiguity:
+     *  - intent.taxId (when IntentDetector split it out from companyName) is preferred
+     *    over the raw message, so CompanyResolverService sees a bare MST instead of a
+     *    whole sentence — fixes typing an MST into /verify still bouncing to chat.
+     *  - a known website (from the /verify form, or a candidate the user picked from a
+     *    "which company?" list) already disambiguates the company, so the LLM guess is
+     *    skipped entirely.
+     */
+    CompanyResolutionResult resolveCompany(String sessionKey, IntentResult intent,
+                                          ReportDTO.ChatMessageRequest req) {
+        Optional<CompanyResolutionResult> pending = companyResolverService.getPendingClarification(sessionKey);
+        String rawName = intent.getCompanyName() != null && !intent.getCompanyName().isBlank()
+            ? intent.getCompanyName()
+            : (intent.getTaxId() != null && !intent.getTaxId().isBlank() ? intent.getTaxId() : req.getMessage());
+
+        CompanyResolutionResult resolved;
+        if (req.getWebsite() != null && !req.getWebsite().isBlank()) {
+            resolved = CompanyResolutionResult.builder()
+                .normalizedName(rawName).suggestedFullName(rawName)
+                .countryIso2(intent.getCountry())
+                .ambiguous(false).vietnam(false)
+                .alternatives(List.of())
+                .build();
+        } else {
+            resolved = companyResolverService.resolve(rawName,
+                pending.map(companyResolverService::buildContextFromPending).orElse(null));
+        }
+
+        if (pending.isPresent()) companyResolverService.clearPendingClarification(sessionKey);
+        return resolved;
+    }
+
+    /**
+     * SSE payload for a "clarify" event: the free-text alternatives CompanyResolverService
+     * already produced, plus — new — a real web-search candidate list (name/website/taxId
+     * per hit) so the chat UI can show an actual pick-one list instead of only asking the
+     * user to type more details.
+     */
+    java.util.Map<String, Object> buildClarifyData(CompanyResolutionResult resolved) {
+        java.util.Map<String, Object> data = new java.util.HashMap<>();
+        data.put("alternatives", resolved.getAlternatives());
+        data.put("pending", true);
+        try {
+            List<LeadResult> candidates = findPartnersService.searchCandidatesByName(
+                resolved.getNormalizedName(), resolved.getCountryIso2());
+            if (!candidates.isEmpty()) data.put("candidates", candidates);
+        } catch (Exception e) {
+            log.debug("Candidate search failed for '{}': {}", resolved.getNormalizedName(), e.getMessage());
+        }
+        return data;
+    }
+
+    /**
      * Lightweight P1(+P6)-only lookup. No quota cost.
      * Chạy CompanyResolverService trước để xử lý tên mơ hồ và detect VN vs quốc tế.
      */
@@ -275,30 +331,20 @@ public class ChatService {
         String sessionKey = req.getSessionId() != null && !req.getSessionId().isBlank()
             ? req.getSessionId() : userId.toString();
 
-        // Kiểm tra pending clarification từ lượt trước
-        Optional<CompanyResolutionResult> pending = companyResolverService.getPendingClarification(sessionKey);
-        String rawName = intent.getCompanyName() != null && !intent.getCompanyName().isBlank()
-            ? intent.getCompanyName() : req.getMessage();
-
-        CompanyResolutionResult resolved = companyResolverService.resolve(
-            rawName,
-            pending.map(companyResolverService::buildContextFromPending).orElse(null));
-
-        if (pending.isPresent()) companyResolverService.clearPendingClarification(sessionKey);
+        CompanyResolutionResult resolved = resolveCompany(sessionKey, intent, req);
 
         // Tên mơ hồ → hỏi lại, không chạy crawler
         if (resolved.isAmbiguous()) {
             companyResolverService.savePendingClarification(sessionKey, resolved);
             String clarifyMsg = companyResolverService.buildClarifyMessage(resolved);
-            sendEvent(emitter, AgentEvent.done("clarify", clarifyMsg,
-                java.util.Map.of("alternatives", resolved.getAlternatives(), "pending", true)));
+            sendEvent(emitter, AgentEvent.done("clarify", clarifyMsg, buildClarifyData(resolved)));
             return clarifyMsg;
         }
 
         // Xác định tên và quốc gia từ kết quả resolver
         String effectiveName = resolved.isVietnam() && resolved.getNormalizedName() != null
             ? resolved.getNormalizedName() : resolved.getSuggestedFullName();
-        if (effectiveName == null || effectiveName.isBlank()) effectiveName = rawName;
+        if (effectiveName == null || effectiveName.isBlank()) effectiveName = resolved.getNormalizedName();
 
         String country = resolved.getCountryIso2() != null
             ? resolved.getCountryIso2()
@@ -368,27 +414,18 @@ public class ChatService {
         // 1. Resolve company name TRƯỚC khi hỏi xác nhận — tránh hỏi xác nhận rồi vẫn phải hỏi lại tên
         String sessionKey = sessionKeyOf(userId, req);
 
-        Optional<CompanyResolutionResult> pending = companyResolverService.getPendingClarification(sessionKey);
-        String rawName = intent.getCompanyName() != null && !intent.getCompanyName().isBlank()
-            ? intent.getCompanyName() : req.getMessage();
-
-        CompanyResolutionResult resolved = companyResolverService.resolve(
-            rawName,
-            pending.map(companyResolverService::buildContextFromPending).orElse(null));
-
-        if (pending.isPresent()) companyResolverService.clearPendingClarification(sessionKey);
+        CompanyResolutionResult resolved = resolveCompany(sessionKey, intent, req);
 
         if (resolved.isAmbiguous()) {
             companyResolverService.savePendingClarification(sessionKey, resolved);
             String clarifyMsg = companyResolverService.buildClarifyMessage(resolved);
-            sendEvent(emitter, AgentEvent.done("clarify", clarifyMsg,
-                java.util.Map.of("alternatives", resolved.getAlternatives(), "pending", true)));
+            sendEvent(emitter, AgentEvent.done("clarify", clarifyMsg, buildClarifyData(resolved)));
             return clarifyMsg;
         }
 
         String effectiveName = resolved.isVietnam() && resolved.getNormalizedName() != null
             ? resolved.getNormalizedName() : resolved.getSuggestedFullName();
-        if (effectiveName == null || effectiveName.isBlank()) effectiveName = rawName;
+        if (effectiveName == null || effectiveName.isBlank()) effectiveName = resolved.getNormalizedName();
 
         String country = resolved.getCountryIso2() != null
             ? resolved.getCountryIso2()

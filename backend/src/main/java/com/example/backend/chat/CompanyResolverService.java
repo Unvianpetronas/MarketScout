@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Phân giải tên công ty từ tin nhắn user trước khi gọi crawler.
@@ -25,6 +27,11 @@ public class CompanyResolverService {
 
     private static final Duration PENDING_TTL = Duration.ofMinutes(5);
     private static final String PENDING_KEY_PREFIX = "pending_clarify:";
+
+    // Vietnamese MST (10 digits, optionally "-" + 3-digit branch suffix). Exact-match
+    // only (not a substring search) so a phone number mentioned inside a longer
+    // message is never mistaken for a tax ID — see resolve() below.
+    private static final Pattern VN_TAX_ID_PATTERN = Pattern.compile("^\\d{10}(-\\d{3})?$");
 
     private static final String RESOLVER_SYSTEM_PROMPT = """
         Bạn là service phân giải tên công ty cho hệ thống thẩm định đối tác thương mại.
@@ -64,6 +71,23 @@ public class CompanyResolverService {
      * @return kết quả phân giải; fallback về không-ambiguous nếu Gemini lỗi
      */
     public CompanyResolutionResult resolve(String companyNameOrMessage, String pendingContext) {
+        // A bare tax ID is unambiguous by definition — it identifies exactly one legal
+        // entity, so skip the LLM guess entirely (also saves a Gemini call). Reported bug:
+        // typing an MST straight into /verify was still being sent through the ambiguous-
+        // name check and bouncing to chat instead of running the lookup directly.
+        String trimmed = companyNameOrMessage == null ? "" : companyNameOrMessage.trim();
+        Matcher taxIdMatch = VN_TAX_ID_PATTERN.matcher(trimmed);
+        if (taxIdMatch.matches()) {
+            return CompanyResolutionResult.builder()
+                .normalizedName(trimmed)
+                .suggestedFullName(trimmed)
+                .countryIso2("VN")
+                .ambiguous(false)
+                .vietnam(true)
+                .alternatives(List.of())
+                .build();
+        }
+
         try {
             String userPrompt = pendingContext != null && !pendingContext.isBlank()
                 ? "[Ngữ cảnh câu trả lời chờ làm rõ]\n" + pendingContext + "\n\n[Tin nhắn mới của user]\n" + companyNameOrMessage

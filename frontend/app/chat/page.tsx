@@ -15,7 +15,7 @@ import {
   getSessions, createSession, deleteSession,
   getSessionHistory, streamPipelineMessage,
 } from "@/services/chat.service";
-import { ChatSession, ChatMessage } from "@/types/chat";
+import { ChatSession, ChatMessage, CompanyCandidate } from "@/types/chat";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
 import { parseResult, VerifyResultCard } from "@/components/chat/verify-result-card";
@@ -42,9 +42,10 @@ function TypingDots() {
   );
 }
 
-function MessageBubble({ msg, userInitials, isLatest, onConfirmVerify, onAttachContract, attachedContractName }: {
+function MessageBubble({ msg, userInitials, isLatest, onConfirmVerify, onAttachContract, attachedContractName, onSelectCandidate }: {
   msg: ChatMessage; userInitials: string; isLatest?: boolean; onConfirmVerify?: () => void;
   onAttachContract?: () => void; attachedContractName?: string | null;
+  onSelectCandidate?: (candidate: CompanyCandidate) => void;
 }) {
   const { t } = useLanguage();
   const isUser = msg.role === "user";
@@ -88,6 +89,31 @@ function MessageBubble({ msg, userInitials, isLatest, onConfirmVerify, onAttachC
               >
                 {t("chat.viewReport")} <ChevronRight className="w-3 h-3" />
               </Link>
+          )}
+
+          {!isUser && isLatest && msg.candidates && msg.candidates.length > 0 && onSelectCandidate && (
+              <div className="flex flex-col gap-2 mt-1 w-full">
+                {msg.candidates.map((c, idx) => (
+                    <button
+                        key={idx}
+                        onClick={() => onSelectCandidate(c)}
+                        className="text-left bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 hover:border-[#00D26A] hover:bg-[#E6F9F0]/30 transition-colors"
+                    >
+                      <p className="text-sm font-bold text-gray-900">{c.companyName}</p>
+                      <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                        {c.website && <span className="text-[11px] text-gray-400 truncate max-w-[220px]">{c.website}</span>}
+                        {c.taxId && (
+                            <span className="text-[10px] font-bold text-[#00843F] bg-[#E6F9F0] px-1.5 py-0.5 rounded-full">
+                              MST: {c.taxId}
+                            </span>
+                        )}
+                      </div>
+                      {c.description && (
+                          <p className="text-xs text-gray-400 mt-1 line-clamp-2">{c.description}</p>
+                      )}
+                    </button>
+                ))}
+              </div>
           )}
 
           {!isUser && isLatest && msg.pendingConfirm && onConfirmVerify && (
@@ -161,6 +187,10 @@ function ChatContent() {
   // Set when the assistant asks to confirm a Deep Verify/Compare run before
   // spending quota (see ChatService's confirm-before-run gate).
   const pendingConfirmRef = useRef<{ quotaCost: number; quotaRemaining: number } | null>(null);
+  // Set when the company name was ambiguous and the backend ran a real web search
+  // for candidates (see ChatService.buildClarifyData) — cleared once attached to
+  // the assistant message that follows.
+  const candidatesRef = useRef<CompanyCandidate[] | null>(null);
   const [showContractModal, setShowContractModal] = useState(false);
   const [pickedContract, setPickedContract] = useState<{ id: string; fileName: string } | null>(null);
 
@@ -255,6 +285,7 @@ function ChatContent() {
       const finalContent = streamingContentRef.current;
       const meta = reportMetaRef.current;
       const pendingConfirm = pendingConfirmRef.current;
+      const candidates = candidatesRef.current;
       setIsStreaming(false);
       setStreamingStatus("");
       setMessages((prev) => [
@@ -274,12 +305,14 @@ function ChatContent() {
               }
               : undefined,
           pendingConfirm: pendingConfirm ?? undefined,
+          candidates: candidates ?? undefined,
         },
       ]);
       setStreamingContent("");
       streamingContentRef.current = "";
       reportMetaRef.current = null;
       pendingConfirmRef.current = null;
+      candidatesRef.current = null;
     },
     onError: (_err: Error) => {
       setIsStreaming(false);
@@ -314,6 +347,7 @@ function ChatContent() {
       }
       reportMetaRef.current = null;
       pendingConfirmRef.current = null;
+      candidatesRef.current = null;
     },
     onMeta: (meta: Record<string, unknown>) => {
       // Confirm-before-run gate: no reportId yet, just quota cost/remaining.
@@ -323,6 +357,9 @@ function ChatContent() {
           quotaRemaining: meta.quotaRemaining as number,
         };
         return;
+      }
+      if (Array.isArray(meta.candidates) && meta.candidates.length > 0) {
+        candidatesRef.current = meta.candidates as CompanyCandidate[];
       }
       reportMetaRef.current = {
         reportId: meta.reportId as string | undefined,
@@ -364,6 +401,7 @@ function ChatContent() {
     streamingContentRef.current = "";
     reportMetaRef.current = null;
     pendingConfirmRef.current = null;
+    candidatesRef.current = null;
 
     const dealParams = dealParamsRef.current;
     dealParamsRef.current = null; // consume once — only the verify message carries them
@@ -393,11 +431,54 @@ function ChatContent() {
     streamingContentRef.current = "";
     reportMetaRef.current = null;
     pendingConfirmRef.current = null;
+    candidatesRef.current = null;
     setPickedContract(null); // consumed once — only this confirm carries it
 
     const { onChunk, onDone, onError, onMeta } = makeStreamCallbacks();
     streamPipelineMessage(
         { message: confirmText, sessionId: activeSession.id, confirmVerify: true, ...(contractId ? { contractId } : {}) },
+        onChunk, onDone, onError, onMeta
+    );
+  };
+
+  /**
+   * User picked one company from a "which one did you mean?" candidate list.
+   * Sending its website disambiguates the name server-side (see ChatService.
+   * resolveCompany) so this goes straight to the confirm-before-run step instead
+   * of asking the same clarifying question again.
+   */
+  const handleSelectCandidate = async (candidate: CompanyCandidate) => {
+    if (isStreaming) return;
+
+    let session = activeSession;
+    if (!session) {
+      try {
+        session = await createSession("New Conversation");
+        setSessions((prev) => [session!, ...prev]);
+        setActiveSession(session);
+      } catch {
+        toast.error(t("chat.errCreateSession")); return;
+      }
+    }
+
+    const messageText = `Verify company "${candidate.companyName}"`;
+    setMessages((prev) => [...prev, {
+      id: Date.now().toString(),
+      role: "user",
+      content: messageText,
+      createdAt: new Date().toISOString(),
+    }]);
+    setIsStreaming(true);
+    setStreamingContent("");
+    setStreamingStatus("");
+    streamingContentRef.current = "";
+    reportMetaRef.current = null;
+    pendingConfirmRef.current = null;
+    candidatesRef.current = null;
+
+    const { onChunk, onDone, onError, onMeta } = makeStreamCallbacks();
+    streamPipelineMessage(
+        { message: messageText, sessionId: session.id, ...(candidate.website ? { website: candidate.website } : {}) },
         onChunk, onDone, onError, onMeta
     );
   };
@@ -537,6 +618,7 @@ function ChatContent() {
                       onConfirmVerify={handleConfirmVerify}
                       onAttachContract={() => setShowContractModal(true)}
                       attachedContractName={pickedContract?.fileName}
+                      onSelectCandidate={handleSelectCandidate}
                   />
               ))}
 

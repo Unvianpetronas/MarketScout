@@ -29,6 +29,19 @@ export interface ChatMessage {
     quotaCost: number;
     quotaRemaining: number;
   };
+  // Populated client-side when the company name was ambiguous and ChatService ran
+  // a real web search for candidates (see ChatService.buildClarifyData) — lets the
+  // user pick the actual company from a list instead of typing more details.
+  candidates?: CompanyCandidate[];
+}
+
+export interface CompanyCandidate {
+  companyName: string;
+  website?: string;
+  description?: string;
+  source?: string;
+  country?: string;
+  taxId?: string;
 }
 
 // Matches backend ConversationResponse

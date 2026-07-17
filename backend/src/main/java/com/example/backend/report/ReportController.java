@@ -62,7 +62,7 @@ public class ReportController {
         return ResponseEntity.ok(ReportDTO.ReportStatusResponse.builder()
             .id(report.getId()).status(report.getStatus())
             .overallScore(report.getOverallScore()).riskLevel(report.getRiskLevel())
-            .hardStop(report.getHardStop()).build());
+            .hardStop(Boolean.TRUE.equals(report.getHardStop())).build());
     }
 
     // AI next-step recommendations (what to do / provide / verify) for a report.
@@ -135,17 +135,17 @@ public class ReportController {
     private ReportDTO.ReportSummary toSummary(Report r) {
         return ReportDTO.ReportSummary.builder()
             .id(r.getId()).entityName(r.getEntityName()).countryIso2(r.getCountryIso2())
-            .overallScore(r.getOverallScore()).hardStop(r.getHardStop())
+            .overallScore(r.getOverallScore()).hardStop(Boolean.TRUE.equals(r.getHardStop()))
             .status(r.getStatus()).riskLevel(r.getRiskLevel()).source(r.getSource())
-            .quickScanDone(r.getQuickScanDone()).createdAt(r.getCreatedAt()).updatedAt(r.getUpdatedAt())
+            .quickScanDone(Boolean.TRUE.equals(r.getQuickScanDone())).createdAt(r.getCreatedAt()).updatedAt(r.getUpdatedAt())
             .build();
     }
 
     private ReportDTO.ReportDetail toDetail(Report r, List<PillarResult> pillars) {
         return ReportDTO.ReportDetail.builder()
             .id(r.getId()).entityName(r.getEntityName()).countryIso2(r.getCountryIso2())
-            .overallScore(r.getOverallScore()).hardStop(r.getHardStop()).status(r.getStatus())
-            .riskLevel(r.getRiskLevel()).source(r.getSource()).quickScanDone(r.getQuickScanDone())
+            .overallScore(r.getOverallScore()).hardStop(Boolean.TRUE.equals(r.getHardStop())).status(r.getStatus())
+            .riskLevel(r.getRiskLevel()).source(r.getSource()).quickScanDone(Boolean.TRUE.equals(r.getQuickScanDone()))
             .website(r.getWebsite()).taxId(r.getTaxId()).lei(r.getLei())
             .createdAt(r.getCreatedAt()).updatedAt(r.getUpdatedAt())
             .pillars(pillars.stream().map(this::toPillarDTO).toList())

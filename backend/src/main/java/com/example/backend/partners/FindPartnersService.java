@@ -89,6 +89,18 @@ public class FindPartnersService {
     }
 
     /**
+     * Real web search for the businesses a possibly-ambiguous name could refer to,
+     * enriched with a real tax-ID lookup per candidate. Used by ChatService when
+     * CompanyResolverService can't confidently pick one company from the name alone —
+     * the chat then shows this as a pick-one list instead of asking follow-up questions.
+     */
+    public List<LeadResult> searchCandidatesByName(String name, String country) {
+        List<LeadResult> leads = tavilyClient.searchCompanyByName(name, country);
+        List<LeadResult> capped = leads.subList(0, Math.min(5, leads.size()));
+        return enrichWithTaxId(capped);
+    }
+
+    /**
      * Real per-lead registry lookup (masothue.vn MST / GLEIF LEI via CrawlerP1Router)
      * — same source P1 uses for a full Deep Verify, just without persisting a
      * Report. Runs in parallel since it's a handful of real HTTP calls, not a
