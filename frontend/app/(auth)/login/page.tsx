@@ -4,13 +4,15 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { Eye, EyeOff, Mail, Lock, Navigation, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, Navigation, ArrowLeft, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/providers/auth-provider";
+import { useLanguage } from "@/providers/language-provider";
 import { LoginRequest } from "@/types/auth";
 
 export default function LoginPage() {
   const { login, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { t, lang, toggle } = useLanguage();
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,7 +37,7 @@ export default function LoginPage() {
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        "Invalid credentials. Please try again.";
+        t("auth.errInvalidCredentials");
       toast.error(message);
     } finally {
       setIsLoading(false);
@@ -45,7 +47,7 @@ export default function LoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("verified") === "true") {
-      toast.success("Email verified successfully! You can now log in.");
+      toast.success(t("auth.emailVerifiedToast"));
     }
   }, []);
 
@@ -73,13 +75,13 @@ export default function LoginPage() {
           {/* Badge */}
           <div className="inline-block mb-8">
             <span className="text-[10px] font-semibold tracking-widest text-[#5FD48A] uppercase border border-[#2A5A3A] rounded-full px-3 py-1">
-              Intelligence Suite
+              {t("auth.badge")}
             </span>
           </div>
 
           {/* Hero */}
           <h1 className="text-5xl font-extrabold text-white leading-tight mb-6">
-            The quickest way to scout{" "}
+            {t("auth.heroPrefix")}{" "}
             <span
               className="text-[#00D26A]"
               style={{
@@ -88,29 +90,28 @@ export default function LoginPage() {
                 textUnderlineOffset: "4px",
               }}
             >
-              market shifts.
+              {t("auth.heroHighlight")}
             </span>
           </h1>
 
           <p className="text-[#8BAA98] text-base leading-relaxed mb-10">
-            MarketScout delivers real-time partner verification across 190+ countries
-            using our AI-powered 8-pillar intelligence framework.
+            {t("auth.heroSubtitle")}
           </p>
 
           {/* Feature bullets */}
           <div className="space-y-5">
             {[
               {
-                title: "End-to-End Encryption",
-                desc: "All data secured with AES-256 enterprise-grade cryptography.",
+                title: t("auth.feature1.title"),
+                desc: t("auth.feature1.desc"),
               },
               {
-                title: "Multi-Factor Compliance",
-                desc: "8-pillar analysis across legal, financial, and operational domains.",
+                title: t("auth.feature2.title"),
+                desc: t("auth.feature2.desc"),
               },
               {
-                title: "190+ Countries Covered",
-                desc: "Global corporate registrar sync updated within 24 hours.",
+                title: t("auth.feature3.title"),
+                desc: t("auth.feature3.desc"),
               },
             ].map((item) => (
               <div key={item.title} className="flex items-start gap-3">
@@ -131,7 +132,7 @@ export default function LoginPage() {
         {/* Bottom navigator box */}
         <div className="bg-white/5 border border-white/10 rounded-xl p-5">
           <p className="text-[#5FD48A] text-xs font-semibold uppercase tracking-widest mb-3">
-            Fidelity Prototype Navigator
+            {t("auth.navigatorLabel")}
           </p>
           <div className="flex gap-2 flex-wrap">
             {["Dashboard", "Verify", "Pricing"].map((label) => (
@@ -149,13 +150,25 @@ export default function LoginPage() {
       {/* RIGHT PANEL — 58% */}
       <div className="flex-1 flex flex-col items-center justify-center p-8 bg-[#E8EDE9]">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-10">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 mb-6 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Về trang chủ
-          </Link>
+          <div className="flex items-center justify-between mb-6">
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              {t("auth.backToHome")}
+            </Link>
+
+            <button
+              type="button"
+              onClick={toggle}
+              title={t("lang.switchTo")}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Globe className="w-3.5 h-3.5" />
+              {lang === "vi" ? "VI" : "EN"}
+            </button>
+          </div>
 
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-2 mb-8">
@@ -165,21 +178,21 @@ export default function LoginPage() {
             <span className="font-bold text-gray-900">MarketScout</span>
           </div>
 
-          <h1 className="text-4xl font-bold text-gray-900 mb-1">Sign In</h1>
-          <p className="text-gray-500 text-sm mb-8">Welcome back. Enter your credentials to continue.</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-1">{t("auth.signInTitle")}</h1>
+          <p className="text-gray-500 text-sm mb-8">{t("auth.signInSubtitle")}</p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Email */}
             <div>
               <label className="block text-xs font-semibold tracking-wider text-gray-500 uppercase mb-2">
-                Business Email
+                {t("auth.emailLabel")}
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="email"
                   placeholder="you@corporate.com"
-                  {...register("email", { required: "Email is required" })}
+                  {...register("email", { required: t("auth.emailRequired") })}
                   className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00D26A] focus:ring-2 focus:ring-[#00D26A]/20 transition-all"
                 />
               </div>
@@ -191,14 +204,14 @@ export default function LoginPage() {
             {/* Password */}
             <div>
               <label className="block text-xs font-semibold tracking-wider text-gray-500 uppercase mb-2">
-                Password
+                {t("auth.passwordLabel")}
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
-                  {...register("password", { required: "Password is required" })}
+                  {...register("password", { required: t("auth.passwordRequired") })}
                   className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00D26A] focus:ring-2 focus:ring-[#00D26A]/20 transition-all"
                 />
                 <button
@@ -223,10 +236,10 @@ export default function LoginPage() {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 rounded border-gray-300 accent-[#00D26A]"
                 />
-                <span className="text-sm text-gray-600">Remember Me</span>
+                <span className="text-sm text-gray-600">{t("auth.rememberMe")}</span>
               </label>
               <Link href="/forgot-password" className="text-sm text-[#00D26A] hover:underline font-medium">
-                Forgot Password?
+                {t("auth.forgotPassword")}
               </Link>
             </div>
 
@@ -239,7 +252,7 @@ export default function LoginPage() {
               {isLoading && (
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               )}
-              Sign In to Dashboard →
+              {t("auth.submitBtn")}
             </button>
           </form>
 
@@ -247,7 +260,7 @@ export default function LoginPage() {
           <div className="my-6 flex items-center gap-3">
             <div className="flex-1 h-px bg-gray-200" />
             <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">
-              Or Connect Via
+              {t("auth.orConnectVia")}
             </span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
@@ -255,7 +268,7 @@ export default function LoginPage() {
           {/* SSO buttons */}
           <div className="grid grid-cols-2 gap-3">
             <button className="py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-              Corporate SSO
+              {t("auth.corporateSso")}
             </button>
             <button className="py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
               <svg className="w-4 h-4" viewBox="0 0 24 24">
@@ -264,21 +277,21 @@ export default function LoginPage() {
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
               </svg>
-              Google Work
+              {t("auth.googleWork")}
             </button>
           </div>
 
           <p className="text-center text-sm text-gray-500 mt-8">
-            Don&apos;t have an account?{" "}
+            {t("auth.noAccount")}{" "}
             <Link href="/register" className="text-[#00D26A] font-medium hover:underline">
-              Sign up for a free trial
+              {t("auth.signUpFreeTrial")}
             </Link>
           </p>
         </div>
 
         {/* Footer */}
         <p className="text-xs text-gray-400 text-center mt-6 max-w-sm">
-          Protected by enterprise grade cryptography. &copy; 2025 MarketScout Inc. All rights reserved.
+          {t("auth.footerCopyright")}
         </p>
       </div>
     </div>
