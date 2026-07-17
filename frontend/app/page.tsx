@@ -149,7 +149,7 @@ const PILLARS = [
 ];
 
 export default function LandingPage() {
-  const { t } = useLanguage();
+  const { t, lang, toggle } = useLanguage();
   return (
     <div className="min-h-screen bg-white">
       {/* Nav */}
@@ -179,12 +179,23 @@ export default function LandingPage() {
           </Link>
         </div>
 
-        <Link
-          href="/login"
-          className="px-5 py-2.5 bg-[#00D26A] text-white text-sm font-semibold rounded-lg hover:bg-[#00b85d] transition-colors"
-        >
-          {t("landing.nav.partnerLogin")}
-        </Link>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggle}
+            title={t("lang.switchTo")}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Globe className="w-4 h-4" />
+            <span className="font-medium">{lang === "vi" ? "VI" : "EN"}</span>
+          </button>
+
+          <Link
+            href="/login"
+            className="px-5 py-2.5 bg-[#00D26A] text-white text-sm font-semibold rounded-lg hover:bg-[#00b85d] transition-colors"
+          >
+            {t("landing.nav.partnerLogin")}
+          </Link>
+        </div>
       </nav>
 
       {/* Hero */}
@@ -505,13 +516,13 @@ export default function LandingPage() {
                 {t("landing.footer.brandDesc")}
               </p>
               <div className="flex items-center gap-3">
-                <a href="#" aria-label="Facebook" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+                <a href="https://www.facebook.com/profile.php?id=61590349996139" target="_blank" rel="noopener noreferrer" aria-label="Facebook" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
                   <FacebookIcon className="w-4 h-4" />
                 </a>
-                <a href="#" aria-label="LinkedIn" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+                <a href="https://www.linkedin.com/in/qu%E1%BB%91c-tu%E1%BA%A5n-tr%C6%B0%C6%A1ng/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
                   <LinkedinIcon className="w-4 h-4" />
                 </a>
-                <a href="#" aria-label="GitHub" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
+                <a href="https://github.com/Unvianpetronas/MarketScout" target="_blank" rel="noopener noreferrer" aria-label="GitHub" className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors">
                   <GithubIcon className="w-4 h-4" />
                 </a>
               </div>
