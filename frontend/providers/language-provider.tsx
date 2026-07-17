@@ -14,9 +14,9 @@ const LanguageContext = createContext<LanguageContextType | null>(null);
 const STORAGE_KEY = "ms_lang";
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  // Default "vi" on both server and first client render to avoid hydration
+  // Default "en" on both server and first client render to avoid hydration
   // mismatch; the stored preference is applied right after mount.
-  const [lang, setLangState] = useState<Lang>("vi");
+  const [lang, setLangState] = useState<Lang>("en");
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);

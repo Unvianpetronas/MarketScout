@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { getPlans, updatePlan, PlanDTO } from "@/services/admin.service";
+import { useLanguage } from "@/providers/language-provider";
 
 function getPlanStyle(plan: string) {
   const p = plan.toLowerCase();
@@ -18,6 +19,7 @@ function getPlanStyle(plan: string) {
 interface PriceEdit { priceVnd: string; priceUsd: string }
 
 export default function AdminBillingPage() {
+  const { t } = useLanguage();
   const [plans, setPlans] = useState<PlanDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -30,7 +32,7 @@ export default function AdminBillingPage() {
       const res = await getPlans();
       setPlans(res);
     } catch {
-      toast.error("Không thể tải dữ liệu billing.");
+      toast.error(t("admin.billing.fetchError"));
     } finally {
       setIsLoading(false);
     }
@@ -58,17 +60,17 @@ export default function AdminBillingPage() {
     const priceVnd = parseFloat(edit.priceVnd);
     const priceUsd = parseFloat(edit.priceUsd);
     if (Number.isNaN(priceVnd) || priceVnd < 0 || Number.isNaN(priceUsd) || priceUsd < 0) {
-      toast.error("Giá phải là số không âm.");
+      toast.error(t("admin.billing.invalidPrice"));
       return;
     }
     setSavingId(plan.id);
     try {
       await updatePlan(plan.id, { priceVnd, priceUsd });
-      toast.success(`Đã cập nhật giá cho gói ${plan.name}`);
+      toast.success(t("admin.billing.priceUpdated", { plan: plan.name }));
       setEdits((prev) => { const next = { ...prev }; delete next[plan.id]; return next; });
       fetchPlans();
     } catch {
-      toast.error("Cập nhật giá thất bại.");
+      toast.error(t("admin.billing.priceUpdateFailed"));
     } finally {
       setSavingId(null);
     }
@@ -78,10 +80,14 @@ export default function AdminBillingPage() {
     setTogglingId(plan.id);
     try {
       await updatePlan(plan.id, { isActive: !plan.isActive });
-      toast.success(`Đã ${plan.isActive ? "tạm ẩn" : "mở bán"} gói ${plan.name}`);
+      toast.success(
+        plan.isActive
+          ? t("admin.billing.toastHidden", { plan: plan.name })
+          : t("admin.billing.toastActivated", { plan: plan.name })
+      );
       fetchPlans();
     } catch {
-      toast.error("Cập nhật trạng thái thất bại.");
+      toast.error(t("admin.billing.statusUpdateFailed"));
     } finally {
       setTogglingId(null);
     }
@@ -92,8 +98,8 @@ export default function AdminBillingPage() {
       <AdminShell active="billing">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Global Operations &gt; Billing</p>
-            <h1 className="text-2xl font-extrabold text-gray-900">Cấu hình giá & gói bán</h1>
+            <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">{t("admin.billing.breadcrumb")}</p>
+            <h1 className="text-2xl font-extrabold text-gray-900">{t("admin.billing.title")}</h1>
           </div>
           <button onClick={handleRefresh} disabled={isRefreshing}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
@@ -105,22 +111,22 @@ export default function AdminBillingPage() {
           {isLoading ? (
             <div className="p-12 flex flex-col items-center">
               <div className="w-10 h-10 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin mb-3" />
-              <p className="text-sm text-gray-400">Đang tải...</p>
+              <p className="text-sm text-gray-400">{t("admin.billing.loading")}</p>
             </div>
           ) : plans.length === 0 ? (
             <div className="p-16 text-center">
               <CreditCard className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-              <p className="text-gray-400 text-sm">Chưa có gói dịch vụ nào.</p>
+              <p className="text-gray-400 text-sm">{t("admin.billing.empty")}</p>
             </div>
           ) : (
             <table className="w-full">
               <thead>
                 <tr className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/80">
-                  <th className="px-5 py-4 text-left">Gói</th>
-                  <th className="px-5 py-4 text-left">Giá (VND)</th>
-                  <th className="px-5 py-4 text-left">Giá (USD)</th>
-                  <th className="px-5 py-4 text-left">Mở bán</th>
-                  <th className="px-5 py-4 text-left">Thao tác</th>
+                  <th className="px-5 py-4 text-left">{t("admin.billing.colPlan")}</th>
+                  <th className="px-5 py-4 text-left">{t("admin.billing.colPriceVnd")}</th>
+                  <th className="px-5 py-4 text-left">{t("admin.billing.colPriceUsd")}</th>
+                  <th className="px-5 py-4 text-left">{t("admin.billing.colActive")}</th>
+                  <th className="px-5 py-4 text-left">{t("admin.billing.colActions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -169,7 +175,7 @@ export default function AdminBillingPage() {
                           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 border border-blue-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <Save className="w-3.5 h-3.5" />
-                          {savingId === plan.id ? "Đang lưu..." : "Lưu giá"}
+                          {savingId === plan.id ? t("admin.billing.saving") : t("admin.billing.save")}
                         </button>
                       </td>
                     </tr>

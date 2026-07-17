@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
 import { getAdminUsers, setUserQuota, refundUserQuota, AdminUser } from "@/services/admin.service";
+import { useLanguage } from "@/providers/language-provider";
 
 function getQuotaBarColor(pct: number) {
   if (pct >= 90) return "#EF4444";
@@ -33,6 +34,7 @@ function getAvatarColor(name: string) {
 }
 
 export default function AdminCustomersPage() {
+  const { t } = useLanguage();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,7 +51,7 @@ export default function AdminCustomersPage() {
       setUsers(res.users);
       setTotal(res.total);
     } catch {
-      toast.error("Không thể tải danh sách người dùng.");
+      toast.error(t("admin.customers.errLoad"));
     } finally {
       setIsLoading(false);
     }
@@ -67,15 +69,15 @@ export default function AdminCustomersPage() {
     if (!quotaModal) return;
     try {
       await setUserQuota(quotaModal.userId, parseInt(quotaValue));
-      toast.success(`Đã cập nhật quota cho ${quotaModal.name}`);
+      toast.success(t("admin.customers.quotaUpdated", { name: quotaModal.name }));
       setQuotaModal(null);
       fetchUsers();
-    } catch { toast.error("Cập nhật quota thất bại."); }
+    } catch { toast.error(t("admin.customers.quotaUpdateFail")); }
   };
 
   const handleRefund = async (userId: string, name: string) => {
-    try { await refundUserQuota(userId); toast.success(`Đã hoàn tiền cho ${name}`); fetchUsers(); }
-    catch { toast.error("Hoàn tiền thất bại."); }
+    try { await refundUserQuota(userId); toast.success(t("admin.customers.refunded", { name })); fetchUsers(); }
+    catch { toast.error(t("admin.customers.refundFail")); }
   };
 
   // Filter by plan locally
@@ -88,10 +90,10 @@ export default function AdminCustomersPage() {
   const unverifiedCount = users.filter((u) => !u.emailVerified).length;
 
   const METRICS = [
-    { label: "Tổng người dùng", value: total.toString(), sub: "Tất cả tài khoản", subColor: "text-blue-600", icon: Users, iconBg: "bg-blue-50", iconColor: "text-blue-600" },
-    { label: "Đang hoạt động", value: activeCount.toString(), sub: "Tài khoản active", subColor: "text-emerald-600", icon: Activity, iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
-    { label: "Chưa xác thực", value: unverifiedCount.toString(), sub: "Email chưa xác minh", subColor: "text-amber-600", icon: AlertTriangle, iconBg: "bg-amber-50", iconColor: "text-amber-600" },
-    { label: "Tạm khóa", value: suspendedCount.toString(), sub: "Cần xem xét", subColor: "text-red-500", icon: Ban, iconBg: "bg-red-50", iconColor: "text-red-600" },
+    { label: t("admin.customers.metric.total"), value: total.toString(), sub: t("admin.customers.metric.totalSub"), subColor: "text-blue-600", icon: Users, iconBg: "bg-blue-50", iconColor: "text-blue-600" },
+    { label: t("admin.customers.metric.active"), value: activeCount.toString(), sub: t("admin.customers.metric.activeSub"), subColor: "text-emerald-600", icon: Activity, iconBg: "bg-emerald-50", iconColor: "text-emerald-600" },
+    { label: t("admin.customers.metric.unverified"), value: unverifiedCount.toString(), sub: t("admin.customers.metric.unverifiedSub"), subColor: "text-amber-600", icon: AlertTriangle, iconBg: "bg-amber-50", iconColor: "text-amber-600" },
+    { label: t("admin.customers.status.suspended"), value: suspendedCount.toString(), sub: t("admin.customers.metric.suspendedSub"), subColor: "text-red-500", icon: Ban, iconBg: "bg-red-50", iconColor: "text-red-600" },
   ];
 
   return (
@@ -102,7 +104,7 @@ export default function AdminCustomersPage() {
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Global Operations &gt; Customer Central</p>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-extrabold text-gray-900">Quản lý khách hàng</h1>
+                  <h1 className="text-2xl font-extrabold text-gray-900">{t("admin.customers.title")}</h1>
                   <span className="text-xs font-bold text-[#00843F] bg-[#E6F9F0] border border-[#00D26A]/30 px-3 py-1 rounded-full">
                     Real-time Data
                   </span>
@@ -113,13 +115,13 @@ export default function AdminCustomersPage() {
                   className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
                   <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
                 </button>
-                <button onClick={() => toast.info("Sắp ra mắt.")}
+                <button onClick={() => toast.info(t("profile.comingSoon"))}
                   className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
-                  <Download className="w-4 h-4" /> Xuất
+                  <Download className="w-4 h-4" /> {t("admin.customers.export")}
                 </button>
-                <button onClick={() => toast.info("Sắp ra mắt.")}
+                <button onClick={() => toast.info(t("profile.comingSoon"))}
                   className="flex items-center gap-2 px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90 shadow-sm">
-                  <UserPlus className="w-4 h-4" /> Tạo tài khoản
+                  <UserPlus className="w-4 h-4" /> {t("admin.customers.createAccount")}
                 </button>
               </div>
             </div>
@@ -146,12 +148,12 @@ export default function AdminCustomersPage() {
               <div className="relative flex-1 min-w-48">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                 <input value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
-                  placeholder="Tìm theo email, tên khách hàng..."
+                  placeholder={t("admin.customers.searchPlaceholder")}
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus-ms" />
               </div>
               <select value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}
                 className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white text-gray-700 focus:outline-none">
-                <option value="all">Tất cả gói</option>
+                <option value="all">{t("admin.customers.filter.all")}</option>
                 <option value="free">Free</option>
                 <option value="starter">Starter</option>
                 <option value="pro">Pro</option>
@@ -164,24 +166,24 @@ export default function AdminCustomersPage() {
               {isLoading ? (
                 <div className="p-12 flex flex-col items-center">
                   <div className="w-10 h-10 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin mb-3" />
-                  <p className="text-sm text-gray-400">Đang tải...</p>
+                  <p className="text-sm text-gray-400">{t("admin.customers.loading")}</p>
                 </div>
               ) : filtered.length === 0 ? (
                 <div className="p-16 text-center">
                   <Users className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                  <p className="text-gray-400 text-sm">Không tìm thấy người dùng nào.</p>
+                  <p className="text-gray-400 text-sm">{t("admin.customers.empty")}</p>
                 </div>
               ) : (
                 <>
                   <table className="w-full">
                     <thead>
                       <tr className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/80">
-                        <th className="px-5 py-4 text-left">Khách hàng</th>
-                        <th className="px-5 py-4 text-left">Gói dịch vụ</th>
-                        <th className="px-5 py-4 text-left">Sử dụng Quota</th>
-                        <th className="px-5 py-4 text-left">Trạng thái</th>
-                        <th className="px-5 py-4 text-left">Ngày tạo</th>
-                        <th className="px-5 py-4 text-left">Thao tác</th>
+                        <th className="px-5 py-4 text-left">{t("admin.customers.col.customer")}</th>
+                        <th className="px-5 py-4 text-left">{t("admin.customers.col.plan")}</th>
+                        <th className="px-5 py-4 text-left">{t("profile.quotaUsage")}</th>
+                        <th className="px-5 py-4 text-left">{t("dash.col.status")}</th>
+                        <th className="px-5 py-4 text-left">{t("admin.customers.col.created")}</th>
+                        <th className="px-5 py-4 text-left">{t("admin.customers.col.actions")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -221,12 +223,12 @@ export default function AdminCustomersPage() {
                                 </div>
                                 <span className="text-xs text-gray-500 shrink-0">{user.quotaUsed}/{user.monthlyQuota}</span>
                               </div>
-                              <p className="text-[11px] text-gray-400">{qPct.toFixed(0)}% đã dùng</p>
+                              <p className="text-[11px] text-gray-400">{t("admin.customers.pctUsed", { pct: qPct.toFixed(0) })}</p>
                             </td>
                             <td className="px-5 py-4">
                               <span className={`text-xs font-bold flex items-center gap-1.5 ${user.isActive ? "text-emerald-600" : "text-red-600"}`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${user.isActive ? "bg-emerald-500" : "bg-red-500"}`} />
-                                {user.isActive ? "Hoạt động" : "Tạm khóa"}
+                                {user.isActive ? t("admin.customers.status.active") : t("admin.customers.status.suspended")}
                               </span>
                             </td>
                             <td className="px-5 py-4 text-xs text-gray-400">
@@ -236,11 +238,11 @@ export default function AdminCustomersPage() {
                               <div className="flex gap-2 opacity-70 group-hover:opacity-100 transition-opacity">
                                 <button onClick={() => { setQuotaModal({ userId: user.id, name: user.fullName }); setQuotaValue("50"); }}
                                   className="px-3 py-1.5 text-xs font-bold bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 border border-blue-200 transition-colors">
-                                  Quota
+                                  {t("admin.customers.quotaBtn")}
                                 </button>
                                 <button onClick={() => handleRefund(user.id, user.fullName)}
                                   className="px-3 py-1.5 text-xs font-bold bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 border border-amber-200 transition-colors">
-                                  Hoàn tiền
+                                  {t("admin.customers.refundBtn")}
                                 </button>
                               </div>
                             </td>
@@ -251,19 +253,19 @@ export default function AdminCustomersPage() {
                   </table>
                   <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
                     <p className="text-xs text-gray-400">
-                      Hiển thị <span className="font-semibold">{filtered.length}</span> / {total} tài khoản
+                      {t("admin.customers.showingLabel")} <span className="font-semibold">{filtered.length}</span> {t("admin.customers.ofTotal", { total })}
                     </p>
                     <div className="flex items-center gap-2">
                       <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}
                         className="px-3 py-1.5 border border-gray-200 rounded-xl text-xs text-gray-500 hover:bg-gray-50 disabled:opacity-40">
-                        ← Trước
+                        {t("admin.customers.prevPage")}
                       </button>
                       <span className="text-xs font-semibold text-gray-600 bg-white border border-gray-200 px-3 py-1.5 rounded-xl">
-                        Trang {page + 1}
+                        {t("admin.customers.pageLabel", { page: page + 1 })}
                       </span>
                       <button onClick={() => setPage(page + 1)} disabled={filtered.length < 20}
                         className="px-3 py-1.5 bg-gray-900 text-white rounded-xl text-xs font-semibold hover:bg-gray-700 disabled:opacity-40">
-                        Tiếp →
+                        {t("admin.customers.nextPage")}
                       </button>
                     </div>
                   </div>
@@ -275,16 +277,16 @@ export default function AdminCustomersPage() {
         {quotaModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-scale-in">
-              <h3 className="text-base font-bold text-gray-900 mb-1">Cập nhật Quota</h3>
-              <p className="text-sm text-gray-500 mb-4">Nhập quota mới cho <strong>{quotaModal.name}</strong></p>
+              <h3 className="text-base font-bold text-gray-900 mb-1">{t("admin.customers.modal.title")}</h3>
+              <p className="text-sm text-gray-500 mb-4">{t("admin.customers.modal.descPrefix")} <strong>{quotaModal.name}</strong></p>
               <input type="number" value={quotaValue} onChange={(e) => setQuotaValue(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus-ms mb-4" min="0" />
               <div className="flex gap-3">
                 <button onClick={handleSetQuota} className="flex-1 py-3 gradient-brand text-white font-bold rounded-xl hover:opacity-90 text-sm">
-                  Áp dụng
+                  {t("admin.customers.modal.apply")}
                 </button>
                 <button onClick={() => setQuotaModal(null)} className="flex-1 py-3 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 text-sm">
-                  Hủy
+                  {t("admin.customers.modal.cancel")}
                 </button>
               </div>
             </div>

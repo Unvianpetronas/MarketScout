@@ -2,29 +2,31 @@
 
 import Link from "next/link";
 import { BarChart2, Users, Database, CreditCard, History, Terminal, Shield, ArrowLeft } from "lucide-react";
+import { useLanguage } from "@/providers/language-provider";
 
 export type AdminNavId = "overview" | "customers" | "quota" | "billing" | "history" | "logs";
 
-const NAV_SECTIONS: { label: string; items: { id: AdminNavId; label: string; href: string; icon: React.ElementType }[] }[] = [
+const NAV_SECTIONS: { labelKey: string; items: { id: AdminNavId; labelKey: string; href: string; icon: React.ElementType }[] }[] = [
   {
-    label: "Core Platform",
+    labelKey: "admin.shell.sectionCore",
     items: [
-      { id: "overview", label: "Tổng quan", href: "/admin", icon: BarChart2 },
-      { id: "customers", label: "Khách hàng", href: "/admin/customers", icon: Users },
-      { id: "quota", label: "Quota Matrix", href: "/admin/quota", icon: Database },
-      { id: "billing", label: "Billing", href: "/admin/billing", icon: CreditCard },
+      { id: "overview", labelKey: "admin.shell.navOverview", href: "/admin", icon: BarChart2 },
+      { id: "customers", labelKey: "admin.shell.navCustomers", href: "/admin/customers", icon: Users },
+      { id: "quota", labelKey: "admin.shell.navQuota", href: "/admin/quota", icon: Database },
+      { id: "billing", labelKey: "admin.shell.navBilling", href: "/admin/billing", icon: CreditCard },
     ],
   },
   {
-    label: "Audit & Logs",
+    labelKey: "admin.shell.sectionAudit",
     items: [
-      { id: "history", label: "Lịch sử", href: "/admin/history", icon: History },
-      { id: "logs", label: "System Logs", href: "/admin/logs", icon: Terminal },
+      { id: "history", labelKey: "admin.shell.navHistory", href: "/admin/history", icon: History },
+      { id: "logs", labelKey: "admin.shell.navLogs", href: "/admin/logs", icon: Terminal },
     ],
   },
 ];
 
 export function AdminShell({ active, children }: { active: AdminNavId; children: React.ReactNode }) {
+  const { t } = useLanguage();
   return (
     <div className="min-h-screen flex bg-[#0A0F1A]">
       <aside className="w-60 shrink-0 flex flex-col bg-[#0D1117] border-r border-white/5">
@@ -35,7 +37,7 @@ export function AdminShell({ active, children }: { active: AdminNavId; children:
             </div>
             <div>
               <p className="text-sm font-bold text-white">MarketScout</p>
-              <p className="text-[10px] text-[#00D26A] font-bold uppercase tracking-widest">Super Admin</p>
+              <p className="text-[10px] text-[#00D26A] font-bold uppercase tracking-widest">{t("admin.shell.superAdmin")}</p>
             </div>
           </div>
         </div>
@@ -46,15 +48,15 @@ export function AdminShell({ active, children }: { active: AdminNavId; children:
             className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all"
           >
             <ArrowLeft className="w-4 h-4 shrink-0" />
-            Về Dashboard
+            {t("admin.shell.backToDashboard")}
           </Link>
         </div>
 
         <nav className="flex-1 p-3 pt-2 space-y-5">
           {NAV_SECTIONS.map((section) => (
-            <div key={section.label}>
+            <div key={section.labelKey}>
               <p className="text-[10px] text-gray-600 uppercase tracking-widest font-bold mb-2 px-3">
-                {section.label}
+                {t(section.labelKey)}
               </p>
               <div className="space-y-0.5">
                 {section.items.map((item) => (
@@ -68,7 +70,7 @@ export function AdminShell({ active, children }: { active: AdminNavId; children:
                     }`}
                   >
                     <item.icon className="w-4 h-4 shrink-0" />
-                    {item.label}
+                    {t(item.labelKey)}
                   </Link>
                 ))}
               </div>
@@ -82,7 +84,7 @@ export function AdminShell({ active, children }: { active: AdminNavId; children:
               SA
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate">Super Admin</p>
+              <p className="text-sm font-semibold text-white truncate">{t("admin.shell.superAdmin")}</p>
               <p className="text-xs text-gray-500 truncate">admin@marketscout.vn</p>
             </div>
             <div className="w-2 h-2 rounded-full bg-[#00D26A]" />
