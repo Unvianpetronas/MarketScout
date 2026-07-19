@@ -97,15 +97,30 @@ public class SubscriptionLifecycleService {
             subscriptionRepository.save(sub);
 
             Users user = sub.getUser();
+            // A scheduled change (see PaymentService.schedulePlanChange) is
+            // exactly what "the cycle ending" means to act on — grab it
+            // before the downgrade-to-free below clears the slate.
+            Plan scheduledPlan = user.getPendingPlan();
+
             user.setPlan(freePlan);
             user.setQuotaRemaining(freePlan.getMonthlyQuota());
             user.setQuotaUsedThisCycle(0);
             user.setCycleResetAt(Instant.now().plus(FREE_CYCLE_DAYS, ChronoUnit.DAYS));
+            user.setPendingPlan(null);
+            user.setPendingPlanRequestedAt(null);
             usersRepository.save(user);
 
-            subscriptionEmailService.sendDowngradedEmail(user.getEmail(), user.getFullName(), oldPlanName);
-
-            log.info("Subscription expired — user={} oldPlan={} downgraded to free", user.getId(), oldPlanName);
+            if (scheduledPlan != null && !isFreePlan(scheduledPlan)) {
+                // Free is only an interim landing spot — nudge them to finish
+                // the transfer for the plan they actually confirmed earlier.
+                subscriptionEmailService.sendScheduledPlanChangeReadyEmail(
+                        user.getEmail(), user.getFullName(), scheduledPlan.getName());
+                log.info("Subscription expired — user={} oldPlan={} moved to free, scheduled change to {} ready",
+                        user.getId(), oldPlanName, scheduledPlan.getName());
+            } else {
+                subscriptionEmailService.sendDowngradedEmail(user.getEmail(), user.getFullName(), oldPlanName);
+                log.info("Subscription expired — user={} oldPlan={} downgraded to free", user.getId(), oldPlanName);
+            }
         }
     }
 

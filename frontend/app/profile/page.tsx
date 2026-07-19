@@ -6,7 +6,7 @@ import {
   User, Lock, CheckCircle2, BarChart2,
   Bell, Shield, Download, Zap, Clock, Key,
   CreditCard, Camera, Mail, Phone, Building2,
-  ChevronRight, AlertCircle, Star
+  ChevronRight, AlertCircle, Star, XCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
@@ -15,7 +15,7 @@ import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
 import { updateProfile, changePassword } from "@/services/auth.service";
 import { getMyQuota } from "@/services/quota.service";
-import { getMyInvoices } from "@/services/payment.service";
+import { getMyInvoices, cancelScheduledPlanChange } from "@/services/payment.service";
 import { QuotaStatus } from "@/types/quota";
 import { InvoiceSummary } from "@/types/payment";
 
@@ -70,6 +70,20 @@ export default function ProfilePage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [notifications, setNotifications] = useState({ quotaAlert: true, reportComplete: true, marketing: false });
+  const [cancellingPlanChange, setCancellingPlanChange] = useState(false);
+
+  const handleCancelPendingPlanChange = async () => {
+    setCancellingPlanChange(true);
+    try {
+      await cancelScheduledPlanChange();
+      toast.success(t("pricing.schedule.cancelled"));
+      await refreshUser();
+    } catch {
+      toast.error(t("pricing.schedule.toastError"));
+    } finally {
+      setCancellingPlanChange(false);
+    }
+  };
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- sync form + quota from loaded user */
@@ -288,6 +302,26 @@ export default function ProfilePage() {
                         <Zap className="w-4 h-4" /> {t("nav.upgrade")}
                       </Link>
                     </div>
+
+                    {user?.pendingPlanName && (
+                      <div className="flex items-center justify-between gap-4 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 mb-4">
+                        <div className="flex items-center gap-2.5">
+                          <Clock className="w-4 h-4 text-purple-500 shrink-0" />
+                          <p className="text-sm text-purple-800">
+                            {t("pricing.schedule.banner", {
+                              plan: user.pendingPlanName,
+                              date: user.pendingPlanEffectiveAt
+                                ? new Date(user.pendingPlanEffectiveAt).toLocaleDateString("vi-VN")
+                                : "",
+                            })}
+                          </p>
+                        </div>
+                        <button onClick={handleCancelPendingPlanChange} disabled={cancellingPlanChange}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 hover:text-purple-900 shrink-0 disabled:opacity-50">
+                          <XCircle className="w-3.5 h-3.5" /> {t("pricing.schedule.cancelPending")}
+                        </button>
+                      </div>
+                    )}
 
                     <div className="bg-gray-50 rounded-2xl p-4 mb-4">
                       <div className="flex items-center justify-between mb-2">

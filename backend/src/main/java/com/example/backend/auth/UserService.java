@@ -161,6 +161,14 @@ public class UserService {
         Users user = usersRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        java.time.Instant pendingPlanEffectiveAt = null;
+        if (user.getPendingPlan() != null) {
+            pendingPlanEffectiveAt = subscriptionRepository.findByUser_IdAndStatus(user.getId(), "active")
+                    .stream().findFirst()
+                    .map(com.example.backend.domain.Subscription::getCurrentPeriodEnd)
+                    .orElse(null);
+        }
+
         return AuthDTO.MeResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -182,6 +190,8 @@ public class UserService {
                 .theme(user.getTheme())
                 .language(user.getLanguage())
                 .aiOptimization(user.getAiOptimization())
+                .pendingPlanName(user.getPendingPlan() != null ? user.getPendingPlan().getName() : null)
+                .pendingPlanEffectiveAt(pendingPlanEffectiveAt)
                 .build();
     }
 

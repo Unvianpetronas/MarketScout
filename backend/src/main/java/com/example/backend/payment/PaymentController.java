@@ -75,6 +75,32 @@ public class PaymentController {
     }
 
     /**
+     * POST /api/v1/payments/plans/schedule
+     * Records an upgrade/downgrade for a user with an active paid
+     * subscription — no charge now; takes effect at the current cycle's end
+     * (see SubscriptionLifecycleService). Re-confirming overwrites any
+     * earlier pending choice.
+     */
+    @PostMapping("/plans/schedule")
+    public ResponseEntity<PaymentDTO.ScheduledPlanChangeResponse> schedulePlanChange(
+            @RequestHeader("Authorization") String authHeader,
+            @Valid @RequestBody PaymentDTO.SchedulePlanChangeRequest request) {
+        UUID userId = extractUserId(authHeader);
+        return ResponseEntity.ok(paymentService.schedulePlanChange(userId, request.getPlan()));
+    }
+
+    /**
+     * DELETE /api/v1/payments/plans/schedule
+     * Cancels a pending plan change — the current plan just keeps renewing.
+     */
+    @DeleteMapping("/plans/schedule")
+    public ResponseEntity<PaymentDTO.ScheduledPlanChangeResponse> cancelScheduledPlanChange(
+            @RequestHeader("Authorization") String authHeader) {
+        UUID userId = extractUserId(authHeader);
+        return ResponseEntity.ok(paymentService.cancelScheduledPlanChange(userId));
+    }
+
+    /**
      * GET /api/v1/payments/topups/{invoiceId}/status
      * Owner-only poll for payment state (pending | paid | expired).
      */

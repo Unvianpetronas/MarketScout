@@ -138,6 +138,17 @@ public class Users {
     @Column(name = "email_verified", nullable = false)
     private Boolean emailVerified;
 
+    // ── Deferred plan change (2026-07-20) — SePay can't auto-charge, so an
+    // upgrade or downgrade requested mid-cycle is recorded here and only
+    // takes effect (with a fresh checkout) when the current cycle ends; the
+    // active plan/quota above are untouched until then. ──
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pending_plan_id")
+    private Plan pendingPlan;
+
+    @Column(name = "pending_plan_requested_at")
+    private Instant pendingPlanRequestedAt;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) createdAt = Instant.now();
