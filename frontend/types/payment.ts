@@ -24,8 +24,15 @@ export interface TopupStatusResponse {
   quotaRemaining: number;
 }
 
-/** Price of a single verification credit, in VND. Mirrors backend config. */
-export const PRICE_PER_CREDIT_VND = 200_000;
+/** Admin-editable plan, fetched live from the backend `plans` table. */
+export interface PublicPlan {
+  id: number;
+  name: string;
+  billingCycle: string;
+  priceVnd: number;
+  priceUsd: number;
+  monthlyQuota: number;
+}
 
 export interface InvoiceSummary {
   invoiceId: string;

@@ -5,6 +5,8 @@ import {
   ReportStatusResponse,
   ReportRecommendations,
   SelfReportDealInfoRequest,
+  FlagReportRequest,
+  FlagReportResponse,
 } from "@/types/report";
 
 export const getReports = async (): Promise<ReportListItem[]> => {
@@ -34,6 +36,31 @@ export const patchDealInfo = async (
   body: SelfReportDealInfoRequest
 ): Promise<VerificationReport> => {
   const response = await api.patch<VerificationReport>(`/reports/${reportId}/deal-info`, body);
+  return response.data;
+};
+
+// Downloads the report as a PDF and triggers a browser save — filename comes
+// from the backend's Content-Disposition header.
+export const exportReportPdf = async (id: string): Promise<void> => {
+  const response = await api.get(`/reports/${id}/export`, { responseType: "blob" });
+  const disposition: string = response.headers["content-disposition"] || "";
+  const match = disposition.match(/filename\*?=(?:UTF-8'')?"?([^;"]+)"?/i);
+  const filename = match ? decodeURIComponent(match[1]) : `report-${id.slice(0, 8)}.pdf`;
+
+  const url = window.URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+// "Báo kết quả sai" — owner-only, opens a flag for admin review. Never
+// touches scoring itself.
+export const flagReport = async (id: string, body: FlagReportRequest): Promise<FlagReportResponse> => {
+  const response = await api.post<FlagReportResponse>(`/reports/${id}/flag`, body);
   return response.data;
 };
 

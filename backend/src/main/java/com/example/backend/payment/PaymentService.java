@@ -100,6 +100,31 @@ public class PaymentService {
         }
     }
 
+    // ── Public pricing (no auth) — feeds the marketing pricing page and the
+    //    checkout pre-order summary so they never drift from admin-edited
+    //    prices in the `plans` / `payment_settings` tables. ─────────────
+
+    @Transactional(readOnly = true)
+    public List<PaymentDTO.PublicPlanResponse> listActivePlans() {
+        return planRepository.findByIsActiveTrueOrderById().stream()
+                .map(p -> PaymentDTO.PublicPlanResponse.builder()
+                        .id(p.getId())
+                        .name(p.getName())
+                        .billingCycle(p.getBillingCycle())
+                        .priceVnd(p.getPriceVnd())
+                        .priceUsd(p.getPriceUsd())
+                        .monthlyQuota(p.getMonthlyQuota())
+                        .build())
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentDTO.PricePerCreditResponse getPricePerCredit() {
+        return PaymentDTO.PricePerCreditResponse.builder()
+                .pricePerCreditVnd(currentPricePerCreditVnd())
+                .build();
+    }
+
     // ── Plan purchase (one-time, via VietQR) ───────────────────────────
 
     @Transactional

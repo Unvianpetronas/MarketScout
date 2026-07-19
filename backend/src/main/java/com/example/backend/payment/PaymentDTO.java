@@ -67,6 +67,23 @@ public class PaymentDTO {
         private String     itemLabel;    // plan name, or "Nạp thêm quota"
     }
 
+    // ── Public pricing (no auth) ─────────────────────────────────────────
+
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class PublicPlanResponse {
+        private Integer    id;
+        private String     name;
+        private String     billingCycle;
+        private BigDecimal priceVnd;
+        private BigDecimal priceUsd;
+        private Integer    monthlyQuota;
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class PricePerCreditResponse {
+        private BigDecimal pricePerCreditVnd;
+    }
+
     // ── SePay webhook payload ──────────────────────────────────────────
     // https://developer.sepay.vn/vi/sepay-webhooks/tich-hop-webhook
     @Data @NoArgsConstructor @AllArgsConstructor

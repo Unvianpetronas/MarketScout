@@ -1,5 +1,17 @@
 import { api } from "@/lib/api";
-import { InvoiceSummary, TopupRequest, TopupResponse, TopupStatusResponse } from "@/types/payment";
+import { InvoiceSummary, PublicPlan, TopupRequest, TopupResponse, TopupStatusResponse } from "@/types/payment";
+
+/** Public pricing — active plans with live admin-configured prices. No auth required. */
+export const getPublicPlans = async (): Promise<PublicPlan[]> => {
+  const { data } = await api.get<PublicPlan[]>("/payments/plans");
+  return data;
+};
+
+/** Public — current admin-configured price per quota credit. No auth required. */
+export const getPricePerCredit = async (): Promise<number> => {
+  const { data } = await api.get<{ pricePerCreditVnd: number }>("/payments/price-per-credit");
+  return data.pricePerCreditVnd;
+};
 
 /** Creates a pending quota top-up and returns VietQR transfer instructions. */
 export const createTopup = async (quantity: number): Promise<TopupResponse> => {

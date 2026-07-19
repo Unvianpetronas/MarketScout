@@ -58,12 +58,46 @@ public class AdminDTO {
             String userEmail,
             UUID userId,
             Instant createdAt,
-            Instant updatedAt
+            Instant updatedAt,
+            Short overrideScore,
+            String overrideRiskLevel,
+            Boolean overrideHardStop,
+            String overrideNote,
+            String overriddenByEmail,
+            Instant overriddenAt
     ) {}
 
     public record ReportDetail(
             ReportSummary report,
             List<PillarDTO> pillars
+    ) {}
+
+    /** clear=true resets the correction (note still required — explain why). */
+    public record ReportOverrideRequest(
+            Short overrideScore,
+            String overrideRiskLevel,
+            Boolean overrideHardStop,
+            String note,
+            boolean clear
+    ) {}
+
+    public record ReportFlagDTO(
+            UUID id,
+            UUID reportId,
+            String reportEntityName,
+            UUID userId,
+            String userEmail,
+            String reason,
+            String note,
+            String status,
+            String resolvedByEmail,
+            Instant resolvedAt,
+            Instant createdAt
+    ) {}
+
+    public record ReportFlagResolveRequest(
+            String status, // resolved | dismissed
+            String resolutionNote
     ) {}
 
     public record PillarDTO(

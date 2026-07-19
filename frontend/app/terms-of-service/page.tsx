@@ -88,16 +88,25 @@ Giá hiển thị chưa bao gồm thuế VAT. Người dùng chịu trách nhi�
     id: "disclaimer",
     title: "7. Tuyên bố miễn trừ trách nhiệm",
     content: `**Thông tin mang tính xác suất:**
-Các báo cáo, điểm số và khuyến nghị do MarketScout cung cấp dựa trên dữ liệu công khai và được phân tích bởi AI. Đây là **khuyến nghị xác suất**, không phải kết luận pháp lý tuyệt đối và không cấu thành tư vấn pháp lý, tài chính hoặc tuân thủ chính thức.
+Các báo cáo, điểm số và khuyến nghị do MarketScout cung cấp dựa trên dữ liệu công khai và được phân tích bởi AI. Đây là **khuyến nghị xác suất**, không phải kết luận pháp lý tuyệt đối và không cấu thành tư vấn pháp lý, tài chính, kế toán hoặc tuân thủ chính thức. MarketScout không phải là công ty luật, công ty kiểm toán hay tổ chức tư vấn tuân thủ được cấp phép.
+
+**Sàng lọc trừng phạt (sanctions screening) — giới hạn quan trọng:**
+Trụ cột sàng lọc trừng phạt của Dịch vụ đối chiếu tự động tên đối tác với các danh sách trừng phạt công khai của bên thứ ba (ví dụ OFAC SDN và các nguồn tương tự). Kết quả này:
+• Có thể xảy ra **báo nhầm dương tính** (false positive — gắn cờ một công ty không thực sự bị trừng phạt) hoặc **báo sót** (false negative — bỏ lọt một công ty thực sự nằm trong danh sách), do sai khác tên gọi, dữ liệu nguồn chưa cập nhật, hoặc giới hạn của thuật toán đối chiếu.
+• **Không phải** là xác nhận tuân thủ (compliance clearance) chính thức. Một báo cáo "không có cảnh báo trừng phạt" **không** đồng nghĩa đối tác chắc chắn không nằm trong bất kỳ danh sách trừng phạt, cấm vận hoặc hạn chế thương mại nào.
+• Trước khi thực hiện giao dịch có rủi ro pháp lý/tuân thủ đáng kể (đặc biệt giao dịch xuất nhập khẩu quốc tế), bạn phải tự thực hiện — hoặc thuê đơn vị tư vấn tuân thủ/luật sư được cấp phép thực hiện — sàng lọc tuân thủ chính thức, độc lập với Dịch vụ.
 
 **Không đảm bảo:**
 Dịch vụ được cung cấp "nguyên trạng" và "tùy theo khả năng hiện có". Chúng tôi không bảo đảm:
-• Tính chính xác tuyệt đối hoặc đầy đủ của dữ liệu thẩm định.
+• Tính chính xác tuyệt đối hoặc đầy đủ của dữ liệu thẩm định, bao gồm cả kết quả sàng lọc trừng phạt nêu trên.
 • Dịch vụ hoạt động liên tục không gián đoạn.
 • Kết quả thẩm định phù hợp với mọi mục đích kinh doanh cụ thể của bạn.
 
 **Quyết định của bạn:**
-Bạn hoàn toàn chịu trách nhiệm về các quyết định kinh doanh dựa trên thông tin từ MarketScout. Luôn bổ sung bằng thẩm định thực địa và tư vấn chuyên môn trước các giao dịch quan trọng.`,
+Bạn hoàn toàn chịu trách nhiệm về các quyết định kinh doanh dựa trên thông tin từ MarketScout. Luôn bổ sung bằng thẩm định thực địa và tư vấn chuyên môn trước các giao dịch quan trọng.
+
+**Nếu bạn cho rằng kết quả sai:**
+Sử dụng chức năng "Báo kết quả sai" ngay trên trang báo cáo để gửi yêu cầu xem xét thủ công — đặc biệt quan trọng với các cảnh báo liên quan đến trừng phạt. Đội ngũ MarketScout sẽ xem xét và có thể điều chỉnh kết quả hiển thị; mọi điều chỉnh đều được ghi nhận lại (audit trail) kèm lý do.`,
   },
   {
     id: "limitation",
@@ -218,16 +227,25 @@ Displayed prices do not include VAT. Users are responsible for tax obligations u
     id: "disclaimer",
     title: "7. Disclaimer",
     content: `**Probabilistic Information:**
-Reports, scores, and recommendations provided by MarketScout are based on publicly available data and analyzed by AI. These are **probabilistic recommendations**, not absolute legal conclusions, and do not constitute formal legal, financial, or compliance advice.
+Reports, scores, and recommendations provided by MarketScout are based on publicly available data and analyzed by AI. These are **probabilistic recommendations**, not absolute legal conclusions, and do not constitute formal legal, financial, accounting, or compliance advice. MarketScout is not a licensed law firm, audit firm, or compliance advisory organization.
+
+**Sanctions Screening — Important Limitations:**
+The Service's sanctions-screening pillar automatically matches a partner's name against third-party public sanctions lists (e.g. the OFAC SDN list and similar sources). This result:
+• May produce **false positives** (flagging a company that is not actually sanctioned) or **false negatives** (missing a company that is actually listed), due to name variations, outdated source data, or matching-algorithm limitations.
+• Is **not** a formal compliance clearance. A report with "no sanctions warning" does **not** mean the partner is confirmed clear of every sanctions, embargo, or trade-restriction list.
+• Before entering into any transaction with meaningful legal/compliance exposure (especially cross-border import/export deals), you must independently perform — or engage a licensed compliance advisor or attorney to perform — formal compliance screening separate from the Service.
 
 **No Warranty:**
 The Service is provided "as is" and "as available." We do not warrant:
-• The absolute accuracy or completeness of verification data.
+• The absolute accuracy or completeness of verification data, including the sanctions-screening results described above.
 • Uninterrupted, continuous operation of the Service.
 • That verification results are suitable for every specific business purpose of yours.
 
 **Your Decisions:**
-You are solely responsible for business decisions made based on information from MarketScout. Always supplement with on-the-ground due diligence and professional advice before important transactions.`,
+You are solely responsible for business decisions made based on information from MarketScout. Always supplement with on-the-ground due diligence and professional advice before important transactions.
+
+**If you believe a result is wrong:**
+Use the "Flag as incorrect" action on the report page to request manual review — this matters most for sanctions-related warnings. Our team reviews flagged reports and may correct the displayed result; every correction is logged with a reason (audit trail).`,
   },
   {
     id: "limitation",

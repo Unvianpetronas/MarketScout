@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Structured logging + error tracking.
+
+  WHY: The app used to log with Spring Boot's bare default console pattern —
+  no error tracking, no machine-parseable logs, so a production incident was
+  only ever noticed if a user complained. This gives two things for free:
+
+    1. Structured (JSON) logs when LOG_FORMAT=JSON is set (production) — a
+       plain human-readable pattern otherwise (local dev). Set via env var,
+       no code change needed either way.
+    2. Sentry error tracking — every log.error(...) becomes a Sentry event
+       automatically via the logback appender below. With no SENTRY_DSN set
+       this appender is a documented no-op (Sentry treats an empty DSN as
+       "disabled"), so it's safe to leave wired even before anyone signs up
+       for a (free-tier) Sentry account.
+-->
+<configuration>
+    <property name="LOG_FORMAT" value="${LOG_FORMAT:-PRETTY}" />
+
+    <appender name="PRETTY" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -- %msg%n%ex</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"service":"marketscout-backend"}</customFields>
+        </encoder>
+    </appender>
+
+    <appender name="SENTRY" class="io.sentry.logback.SentryAppender">
+        <minimumBreadcrumbLevel>INFO</minimumBreadcrumbLevel>
+        <minimumEventLevel>ERROR</minimumEventLevel>
+        <options>
+            <dsn>${SENTRY_DSN:-}</dsn>
+            <environment>${SENTRY_ENVIRONMENT:-production}</environment>
+        </options>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="${LOG_FORMAT}" />
+        <appender-ref ref="SENTRY" />
+    </root>
+</configuration>
