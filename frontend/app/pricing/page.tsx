@@ -1,69 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, X, Zap, Shield, Star, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, X, Zap, Shield, Star, ArrowRight, ChevronDown, ChevronUp, Globe } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
-
-const PLANS = [
-  {
-    id: "free",
-    priceVnd: 0,
-    priceUsd: 0,
-    isFree: true,
-    isPopular: false,
-    href: "/register",
-    cardStyle: "border-gray-200 bg-white",
-    ctaStyle: "border border-gray-300 text-gray-700 hover:bg-gray-50",
-    accentColor: "#9CA3AF",
-    featureCount: 4,
-    noFeatureCount: 4,
-  },
-  {
-    id: "starter",
-    priceVnd: 2000000,
-    priceUsd: 80,
-    isFree: false,
-    isPopular: false,
-    href: "/checkout?plan=starter",
-    cardStyle: "border-blue-200 bg-white",
-    ctaStyle: "border border-blue-500 text-blue-700 hover:bg-blue-50",
-    accentColor: "#3B82F6",
-    featureCount: 5,
-    noFeatureCount: 2,
-  },
-  {
-    id: "pro",
-    priceVnd: 5800000,
-    priceUsd: 230,
-    isFree: false,
-    isPopular: true,
-    href: "/checkout?plan=pro",
-    cardStyle: "border-[#00D26A] bg-white ring-2 ring-[#00D26A]/20",
-    ctaStyle: "gradient-brand text-white hover:opacity-90",
-    accentColor: "#00D26A",
-    featureCount: 7,
-    noFeatureCount: 1,
-  },
-  {
-    id: "enterprise",
-    priceVnd: 0, // Custom
-    priceUsd: 0,
-    isFree: false,
-    isPopular: false,
-    isCustom: true,
-    href: "mailto:unviantruong26@gmail.com",
-    cardStyle: "border-gray-800 bg-[#0A1A12]",
-    ctaStyle: "gradient-brand text-white hover:opacity-90",
-    accentColor: "#00D26A",
-    featureCount: 8,
-    noFeatureCount: 0,
-    isDark: true,
-  },
-];
-
-const FAQS = ["quotaExpire", "changePlan", "trial", "dataSource", "apiAccess"];
+import { getPublicPlans, getPricePerCredit } from "@/services/payment.service";
+import { PublicPlan } from "@/types/payment";
+import { PLANS, FAQS } from "./plans-data";
 
 function PriceDisplay({ vnd, usd, isFree, isCustom, isDark }: { vnd: number; usd: number; isFree: boolean; isCustom?: boolean; isDark?: boolean }) {
   const { t } = useLanguage();
@@ -102,7 +46,20 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 
 export default function PricingPage() {
   const { isAuthenticated, isLoading } = useAuth();
-  const { t } = useLanguage();
+  const { t, lang, toggle } = useLanguage();
+  const [livePlans, setLivePlans] = useState<PublicPlan[]>([]);
+  const [pricePerCreditVnd, setPricePerCreditVnd] = useState<number | null>(null);
+
+  useEffect(() => {
+    getPublicPlans().then(setLivePlans).catch(() => undefined);
+    getPricePerCredit().then(setPricePerCreditVnd).catch(() => undefined);
+  }, []);
+
+  const plans = PLANS.map((plan) => {
+    const live = livePlans.find((p) => p.name.toLowerCase() === plan.id.toLowerCase());
+    if (!live) return plan;
+    return { ...plan, priceVnd: live.priceVnd, priceUsd: live.priceUsd };
+  });
 
   return (
     <div className="min-h-screen bg-[#FAFBFA]">
@@ -118,6 +75,14 @@ export default function PricingPage() {
           </div>
         </Link>
         <div className="flex items-center gap-3">
+          <button
+            onClick={toggle}
+            title={t("lang.switchTo")}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Globe className="w-4 h-4" />
+            <span className="font-medium">{lang === "vi" ? "VI" : "EN"}</span>
+          </button>
           {isLoading ? null : isAuthenticated ? (
             <Link href="/dashboard" className="px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90">
               {t("pricing.nav.dashboard")}
@@ -153,7 +118,7 @@ export default function PricingPage() {
 
         {/* ── Plans Grid ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-16 stagger">
-          {PLANS.map((plan) => (
+          {plans.map((plan) => (
             <div key={plan.id}
               className={`relative flex flex-col rounded-2xl border p-6 shadow-sm transition-all hover:shadow-md ${plan.cardStyle}`}>
 
@@ -209,7 +174,10 @@ export default function PricingPage() {
             </p>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-3xl font-extrabold text-white mb-1">200.000 <span className="text-lg text-gray-400">VND</span></p>
+            <p className="text-3xl font-extrabold text-white mb-1">
+              {pricePerCreditVnd !== null ? new Intl.NumberFormat("vi-VN").format(pricePerCreditVnd) : "…"}
+              {" "}<span className="text-lg text-gray-400">VND</span>
+            </p>
             <p className="text-sm text-gray-400 mb-4">{t("pricing.addon.perUnit")}</p>
             <Link href="/checkout?plan=topup"
               className="inline-flex items-center gap-2 px-6 py-3 gradient-brand text-white font-bold rounded-xl hover:opacity-90 text-sm">

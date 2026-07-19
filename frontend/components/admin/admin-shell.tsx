@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart2, Users, Database, CreditCard, History, Terminal, Shield, ArrowLeft } from "lucide-react";
+import { BarChart2, Users, Database, CreditCard, History, Terminal, Shield, ArrowLeft, FileWarning } from "lucide-react";
 import { useLanguage } from "@/providers/language-provider";
 
-export type AdminNavId = "overview" | "customers" | "quota" | "billing" | "history" | "logs";
+export type AdminNavId = "overview" | "customers" | "quota" | "billing" | "reports" | "history" | "logs";
 
 const NAV_SECTIONS: { labelKey: string; items: { id: AdminNavId; labelKey: string; href: string; icon: React.ElementType }[] }[] = [
   {
@@ -14,6 +14,7 @@ const NAV_SECTIONS: { labelKey: string; items: { id: AdminNavId; labelKey: strin
       { id: "customers", labelKey: "admin.shell.navCustomers", href: "/admin/customers", icon: Users },
       { id: "quota", labelKey: "admin.shell.navQuota", href: "/admin/quota", icon: Database },
       { id: "billing", labelKey: "admin.shell.navBilling", href: "/admin/billing", icon: CreditCard },
+      { id: "reports", labelKey: "admin.shell.navReports", href: "/admin/reports", icon: FileWarning },
     ],
   },
   {

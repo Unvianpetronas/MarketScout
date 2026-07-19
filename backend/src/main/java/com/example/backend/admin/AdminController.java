@@ -35,6 +35,7 @@ public class AdminController {
     private final SystemAlertRepository systemAlertRepository;
     private final PlanRepository planRepository;
     private final PaymentSettingsRepository paymentSettingsRepository;
+    private final ReportFlagRepository reportFlagRepository;
 
     // ═══════════════════════════════════════════════════════════════════
     // GROUP 1 — ANALYTICS OVERVIEW
@@ -228,6 +229,105 @@ public class AdminController {
         return ResponseEntity.ok(Map.of("id", id, "status", "PENDING"));
     }
 
+    /**
+     * PATCH /api/v1/admin/reports/{id}/override
+     * Corrects a report's score/risk-level/hard-stop without touching the
+     * AI-computed fields underneath — those stay intact for audit. A note
+     * explaining the correction is mandatory (also required to clear one),
+     * and every call is written to the audit log.
+     */
+    @PatchMapping("/reports/{id}/override")
+    public ResponseEntity<AdminDTO.ReportSummary> overrideReport(
+            @PathVariable UUID id,
+            @Valid @RequestBody AdminDTO.ReportOverrideRequest req,
+            @AuthenticationPrincipal UserDetails actor) {
+
+        if (req.note() == null || req.note().isBlank()) {
+            throw new AppException(AppException.ErrorCode.BAD_REQUEST,
+                    "note là bắt buộc — giải thích lý do điều chỉnh hoặc gỡ điều chỉnh.");
+        }
+        Report r = reportRepository.findById(id)
+                .orElseThrow(() -> new AppException(AppException.ErrorCode.REPORT_NOT_FOUND));
+        Users actorUser = usersRepository.findByEmail(actor.getUsername()).orElse(null);
+
+        if (req.clear()) {
+            r.setOverrideScore(null);
+            r.setOverrideRiskLevel(null);
+            r.setOverrideHardStop(null);
+        } else {
+            if (req.overrideScore() == null && req.overrideRiskLevel() == null && req.overrideHardStop() == null) {
+                throw new AppException(AppException.ErrorCode.BAD_REQUEST,
+                        "Cần ít nhất một trong overrideScore/overrideRiskLevel/overrideHardStop, hoặc clear=true.");
+            }
+            r.setOverrideScore(req.overrideScore());
+            r.setOverrideRiskLevel(req.overrideRiskLevel());
+            r.setOverrideHardStop(req.overrideHardStop());
+        }
+        r.setOverrideNote(req.note());
+        r.setOverriddenBy(actorUser);
+        r.setOverriddenAt(Instant.now());
+        reportRepository.save(r);
+
+        writeAuditLog(actor, req.clear() ? "REPORT_OVERRIDE_CLEAR" : "REPORT_OVERRIDE", "report", id,
+                "{\"overrideScore\":" + req.overrideScore()
+                        + ",\"overrideRiskLevel\":" + quoteOrNull(req.overrideRiskLevel())
+                        + ",\"overrideHardStop\":" + req.overrideHardStop()
+                        + ",\"note\":" + quoteOrNull(req.note()) + "}");
+        return ResponseEntity.ok(toReportSummary(r));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // GROUP 3b — REPORT FLAGS ("báo kết quả sai" queue)
+    // ═══════════════════════════════════════════════════════════════════
+
+    @GetMapping("/report-flags")
+    public ResponseEntity<Map<String, Object>> listReportFlags(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) UUID reportId) {
+
+        if (reportId != null) {
+            List<AdminDTO.ReportFlagDTO> items = reportFlagRepository.findByReport_IdOrderByCreatedAtDesc(reportId)
+                    .stream().map(this::toReportFlagDTO).toList();
+            return ResponseEntity.ok(Map.of("flags", items, "total", (long) items.size(), "page", 0, "size", items.size()));
+        }
+        Page<ReportFlag> result = (status != null && !status.isBlank())
+                ? reportFlagRepository.findByStatusOrderByCreatedAtDesc(status, PageRequest.of(page, size))
+                : reportFlagRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size));
+
+        List<AdminDTO.ReportFlagDTO> items = result.getContent().stream().map(this::toReportFlagDTO).toList();
+        return ResponseEntity.ok(Map.of(
+                "flags", items, "total", result.getTotalElements(), "page", page, "size", size));
+    }
+
+    @PatchMapping("/report-flags/{id}")
+    public ResponseEntity<AdminDTO.ReportFlagDTO> resolveReportFlag(
+            @PathVariable UUID id,
+            @RequestBody AdminDTO.ReportFlagResolveRequest req,
+            @AuthenticationPrincipal UserDetails actor) {
+
+        String status = req.status();
+        if (!"resolved".equals(status) && !"dismissed".equals(status)) {
+            throw new AppException(AppException.ErrorCode.BAD_REQUEST, "status phải là 'resolved' hoặc 'dismissed'");
+        }
+        ReportFlag flag = reportFlagRepository.findById(id)
+                .orElseThrow(() -> new AppException(AppException.ErrorCode.RESOURCE_NOT_FOUND));
+        Users actorUser = usersRepository.findByEmail(actor.getUsername()).orElse(null);
+
+        flag.setStatus(status);
+        flag.setResolvedBy(actorUser);
+        flag.setResolvedAt(Instant.now());
+        if (req.resolutionNote() != null && !req.resolutionNote().isBlank()) {
+            flag.setNote((flag.getNote() != null ? flag.getNote() + "\n\n" : "")
+                    + "[admin] " + req.resolutionNote());
+        }
+        reportFlagRepository.save(flag);
+        writeAuditLog(actor, "REPORT_FLAG_" + status.toUpperCase(), "report_flag", id,
+                "{\"reportId\":\"" + flag.getReport().getId() + "\"}");
+        return ResponseEntity.ok(toReportFlagDTO(flag));
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // GROUP 4 — AI PIPELINE / JOB MONITORING
     // ═══════════════════════════════════════════════════════════════════
@@ -412,7 +512,24 @@ public class AdminController {
                 r.getSource(), r.getWebsite(), r.getTaxId(),
                 r.getUser() != null ? r.getUser().getEmail() : null,
                 r.getUser() != null ? r.getUser().getId() : null,
-                r.getCreatedAt(), r.getUpdatedAt());
+                r.getCreatedAt(), r.getUpdatedAt(),
+                r.getOverrideScore(), r.getOverrideRiskLevel(), r.getOverrideHardStop(),
+                r.getOverrideNote(), r.getOverriddenBy() != null ? r.getOverriddenBy().getEmail() : null,
+                r.getOverriddenAt());
+    }
+
+    private AdminDTO.ReportFlagDTO toReportFlagDTO(ReportFlag f) {
+        return new AdminDTO.ReportFlagDTO(
+                f.getId(), f.getReport().getId(), f.getReport().getEntityName(),
+                f.getUser().getId(), f.getUser().getEmail(),
+                f.getReason(), f.getNote(), f.getStatus(),
+                f.getResolvedBy() != null ? f.getResolvedBy().getEmail() : null,
+                f.getResolvedAt(), f.getCreatedAt());
+    }
+
+    /** JSON-string-escapes a nullable value for the flat audit-log payload strings used throughout this class. */
+    private static String quoteOrNull(String s) {
+        return s == null ? "null" : "\"" + s.replace("\"", "'") + "\"";
     }
 
     private AdminDTO.PillarDTO toPillarDTO(PillarResult p) {

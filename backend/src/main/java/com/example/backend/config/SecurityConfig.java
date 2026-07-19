@@ -54,6 +54,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/reset-password").permitAll()
                 // SePay webhook is authenticated by its own Apikey header, not JWT.
                 .requestMatchers(HttpMethod.POST, "/api/v1/payments/webhooks/sepay").permitAll()
+                // Public pricing — feeds the marketing pricing/checkout pages.
+                .requestMatchers(HttpMethod.GET, "/api/v1/payments/plans").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/payments/price-per-credit").permitAll()
                 .requestMatchers("/api/v1/test-sse").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/actuator/**").permitAll()
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

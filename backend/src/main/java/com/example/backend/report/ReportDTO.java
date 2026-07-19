@@ -28,6 +28,12 @@ public class ReportDTO {
         private boolean quickScanDone;
         private Instant createdAt;
         private Instant updatedAt;
+
+        // True once an admin has corrected this report — overallScore/riskLevel/
+        // hardStop above already reflect the correction (never the raw AI output
+        // once overridden); this flag + note tell the user it was human-reviewed.
+        private boolean corrected;
+        private String correctionNote;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
@@ -56,6 +62,30 @@ public class ReportDTO {
         private BigDecimal selfReportDealValueUsd;
         private Boolean selfReportHasWrittenContract;
         private UUID p7VerifiedContractId;
+
+        // See ReportSummary.corrected — same "admin corrected this" signal.
+        private boolean corrected;
+        private String correctionNote;
+        private Instant correctedAt;
+    }
+
+    // ── User "báo kết quả sai" ──────────────────────────────────────────
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class FlagRequest {
+        @NotBlank
+        private String reason; // WRONG_SCORE | WRONG_INFO | SANCTIONS_FALSE_POSITIVE | OTHER
+        @Size(max = 2000, message = "Ghi chú tối đa 2000 ký tự")
+        private String note;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class FlagResponse {
+        private UUID id;
+        private UUID reportId;
+        private String reason;
+        private String note;
+        private String status;
+        private Instant createdAt;
     }
 
     // ── Self-reported deal info (manual entry, always weight=0) ────────────

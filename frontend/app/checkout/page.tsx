@@ -6,20 +6,13 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Copy, List, ArrowLeft, Minus, Plus, CheckCircle2, Clock } from "lucide-react";
 import { toast } from "sonner";
 
-import { createTopup, createPlanCheckout, getTopupStatus } from "@/services/payment.service";
+import { createTopup, createPlanCheckout, getTopupStatus, getPublicPlans, getPricePerCredit } from "@/services/payment.service";
 import { getMyQuota } from "@/services/quota.service";
-import { TopupResponse, TopupStatus, PRICE_PER_CREDIT_VND } from "@/types/payment";
+import { TopupResponse, TopupStatus, PublicPlan } from "@/types/payment";
 import { useLanguage } from "@/providers/language-provider";
 import { useAuth } from "@/providers/auth-provider";
 
 const formatVnd = (n: number) => new Intl.NumberFormat("vi-VN").format(n);
-
-// Plan display info (mirrors the pricing page). Price also returned by the
-// backend in the order, this is only for the pre-order summary.
-const PLAN_INFO: Record<string, { name: string; priceVnd: number; quota: number }> = {
-  starter: { name: "Starter", priceVnd: 2_000_000, quota: 15 },
-  pro: { name: "Pro", priceVnd: 5_800_000, quota: 50 },
-};
 
 const handleCopy = (text: string) =>
   navigator.clipboard.writeText(text).then(() => toast.success("Copied to clipboard!"));
@@ -50,7 +43,20 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
   const { refreshUser } = useAuth();
 
   const isTopup = mode === "topup";
-  const planInfo = PLAN_INFO[planKey];
+
+  // Live pricing — same source (`plans` / `payment_settings` tables) the
+  // backend actually charges, so this pre-order estimate can never drift
+  // from what admin configured.
+  const [livePlans, setLivePlans] = useState<PublicPlan[]>([]);
+  const [pricePerCreditVnd, setPricePerCreditVnd] = useState(0);
+  useEffect(() => {
+    if (isTopup) {
+      getPricePerCredit().then(setPricePerCreditVnd).catch(() => undefined);
+    } else {
+      getPublicPlans().then(setLivePlans).catch(() => undefined);
+    }
+  }, [isTopup]);
+  const planInfo = livePlans.find((p) => p.name.toLowerCase() === planKey.toLowerCase());
   const planName = planInfo?.name ?? (planKey.charAt(0).toUpperCase() + planKey.slice(1));
 
   const [quantity, setQuantity] = useState(1);
@@ -64,7 +70,11 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const total = isTopup ? quantity * PRICE_PER_CREDIT_VND : (order?.amountVnd ?? planInfo?.priceVnd ?? 0);
+  // Once an order exists, its `amountVnd` (computed server-side at creation
+  // time) is authoritative for both modes — this used to fall back to a
+  // hardcoded top-up constant even post-order, which could show a stale
+  // price after an admin changed it.
+  const total = order ? order.amountVnd : isTopup ? quantity * pricePerCreditVnd : (planInfo?.priceVnd ?? 0);
   const redirectUrl = isTopup ? "/dashboard?topup=success" : "/dashboard?plan=success";
 
   const stopTimers = useCallback(() => {
@@ -187,7 +197,7 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
             </h1>
             <p className="text-[#8C8672] text-sm">
               {isTopup
-                ? t("checkout.topupSubtitle", { price: formatVnd(PRICE_PER_CREDIT_VND) })
+                ? t("checkout.topupSubtitle", { price: formatVnd(pricePerCreditVnd) })
                 : t("checkout.planSubtitle")}
             </p>
           </div>
@@ -361,7 +371,7 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
                   <div className="space-y-2.5 mb-4 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-[#8C8672]">{t("checkout.unitPrice")}</span>
-                      <span className="text-[#3A362E] font-medium">{formatVnd(PRICE_PER_CREDIT_VND)} VND</span>
+                      <span className="text-[#3A362E] font-medium">{formatVnd(pricePerCreditVnd)} VND</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-[#8C8672]">{t("checkout.quantity")}</span>
@@ -373,7 +383,7 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
                 <>
                   <h3 className="text-[#3A362E] text-xl font-bold mb-1">{planName}</h3>
                   {planInfo && (
-                    <p className="text-[#00843F] text-sm mb-4">{t("checkout.perMonth", { n: planInfo.quota })}</p>
+                    <p className="text-[#00843F] text-sm mb-4">{t("checkout.perMonth", { n: planInfo.monthlyQuota })}</p>
                   )}
                 </>
               )}

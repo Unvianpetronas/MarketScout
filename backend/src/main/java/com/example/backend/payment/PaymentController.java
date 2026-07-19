@@ -32,6 +32,25 @@ public class PaymentController {
     private static final Duration WEBHOOK_RATE_LIMIT_WINDOW = Duration.ofMinutes(1);
 
     /**
+     * GET /api/v1/payments/plans
+     * Public (no auth) — active plans with live admin-edited prices, so the
+     * marketing pricing page and checkout summary never show stale numbers.
+     */
+    @GetMapping("/plans")
+    public ResponseEntity<List<PaymentDTO.PublicPlanResponse>> listPlans() {
+        return ResponseEntity.ok(paymentService.listActivePlans());
+    }
+
+    /**
+     * GET /api/v1/payments/price-per-credit
+     * Public (no auth) — current admin-configured price per quota credit.
+     */
+    @GetMapping("/price-per-credit")
+    public ResponseEntity<PaymentDTO.PricePerCreditResponse> getPricePerCredit() {
+        return ResponseEntity.ok(paymentService.getPricePerCredit());
+    }
+
+    /**
      * POST /api/v1/payments/topups
      * Creates a pending quota top-up and returns VietQR transfer instructions.
      */

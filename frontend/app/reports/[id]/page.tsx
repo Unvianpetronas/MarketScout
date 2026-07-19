@@ -6,17 +6,99 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft, AlertTriangle, Shield, RefreshCw, Globe, ExternalLink,
   CheckCircle2, XCircle, Clock, Download, MessageSquare,
-  Building2, FileText, TrendingUp, Info, Star,
+  Building2, FileText, TrendingUp, Info, Star, Flag, ShieldCheck, X,
   Sparkles, ListChecks, Send, FileSearch
 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
 import { ContractPickerModal } from "@/components/contract/ContractPickerModal";
-import { getReport, getReportRecommendations, patchDealInfo } from "@/services/report.service";
+import { getReport, getReportRecommendations, patchDealInfo, exportReportPdf, flagReport } from "@/services/report.service";
 import { getContract, unlinkContract, listContractLinks } from "@/services/contract.service";
-import { VerificationReport, PillarResult, ReportRecommendations, isProcessingStatus } from "@/types/report";
+import { VerificationReport, PillarResult, ReportRecommendations, FlagReason, isProcessingStatus } from "@/types/report";
 import { LinkResponse, ContractSummary } from "@/types/contract";
+
+const FLAG_REASONS: { value: FlagReason; label: string }[] = [
+  { value: "WRONG_SCORE", label: "Điểm/đánh giá rủi ro không đúng" },
+  { value: "WRONG_INFO", label: "Thông tin công ty sai (địa chỉ, MST, website...)" },
+  { value: "SANCTIONS_FALSE_POSITIVE", label: "Báo nhầm trừng phạt (sanctions false positive)" },
+  { value: "OTHER", label: "Lý do khác" },
+];
+
+function FlagReportModal({ reportId, onClose, onSubmitted }: {
+  reportId: string; onClose: () => void; onSubmitted: () => void;
+}) {
+  const [reason, setReason] = useState<FlagReason>("WRONG_SCORE");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      await flagReport(reportId, { reason, note: note.trim() || undefined });
+      toast.success("Đã gửi báo cáo — đội ngũ MarketScout sẽ xem xét sớm.");
+      onSubmitted();
+      onClose();
+    } catch {
+      toast.error("Không thể gửi báo cáo lúc này.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <div className="flex items-start justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-red-50 rounded-xl flex items-center justify-center">
+              <Flag className="w-4 h-4 text-red-500" />
+            </div>
+            <h3 className="text-sm font-bold text-gray-900">Báo kết quả sai</h3>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-xs text-gray-400 mb-4 ml-10">
+          Đội ngũ MarketScout sẽ xem xét thủ công. Việc này không thay đổi điểm ngay lập tức.
+        </p>
+
+        <label className="text-xs text-gray-500 font-semibold block mb-1.5">Lý do</label>
+        <select
+          value={reason}
+          onChange={(e) => setReason(e.target.value as FlagReason)}
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mb-3"
+        >
+          {FLAG_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+        </select>
+
+        <label className="text-xs text-gray-500 font-semibold block mb-1.5">Chi tiết (không bắt buộc)</label>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={2000}
+          rows={4}
+          placeholder="Mô tả cụ thể điều bạn cho là sai..."
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mb-4 resize-none"
+        />
+
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700">
+            Huỷ
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-60"
+          >
+            {submitting ? "Đang gửi..." : "Gửi báo cáo"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -427,6 +509,9 @@ export default function ReportDetailPage({ params }: Props) {
   const [report, setReport] = useState<VerificationReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRescan, setIsRescan] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [showFlagModal, setShowFlagModal] = useState(false);
+  const [justFlagged, setJustFlagged] = useState(false);
   const [recs, setRecs] = useState<ReportRecommendations | null>(null);
   const [recsLoading, setRecsLoading] = useState(false);
 
@@ -475,6 +560,18 @@ export default function ReportDetailPage({ params }: Props) {
     router.push(`/verify?${params.toString()}`);
   };
 
+  const handleExport = async () => {
+    if (!report) return;
+    setIsExporting(true);
+    try {
+      await exportReportPdf(report.id);
+    } catch {
+      toast.error("Không thể xuất báo cáo PDF.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const pillars = report?.pillars ?? [];
 
   interface DealSafety { warningLabel?: string; recommendation?: string; requiredProtocols?: string[] }
@@ -515,11 +612,12 @@ export default function ReportDetailPage({ params }: Props) {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => toast.info("Export PDF sẽ sớm ra mắt.")}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-60"
                 >
-                  <Download className="w-4 h-4" />
-                  Xuất báo cáo
+                  <Download className={`w-4 h-4 ${isExporting ? "animate-pulse" : ""}`} />
+                  {isExporting ? "Đang xuất..." : "Xuất báo cáo"}
                 </button>
                 <button
                   onClick={handleRescan}
@@ -528,6 +626,14 @@ export default function ReportDetailPage({ params }: Props) {
                 >
                   <RefreshCw className={`w-4 h-4 ${isRescan ? "animate-spin" : ""}`} />
                   Quét lại
+                </button>
+                <button
+                  onClick={() => setShowFlagModal(true)}
+                  disabled={justFlagged}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-colors shadow-sm disabled:opacity-60 disabled:text-gray-400"
+                >
+                  <Flag className="w-4 h-4" />
+                  {justFlagged ? "Đã gửi báo cáo" : "Báo kết quả sai"}
                 </button>
               </div>
             </div>
@@ -544,6 +650,21 @@ export default function ReportDetailPage({ params }: Props) {
               </div>
             ) : (
               <div className="space-y-6 stagger">
+
+                {/* ── Admin correction banner ── */}
+                {report.corrected && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-purple-100 flex items-center justify-center shrink-0">
+                      <ShieldCheck className="w-4.5 h-4.5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-purple-800">Kết quả này đã được đội ngũ MarketScout điều chỉnh thủ công</p>
+                      {report.correctionNote && (
+                        <p className="text-sm text-purple-700/80 mt-0.5">{report.correctionNote}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* ── Company Header ── */}
                 <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
@@ -714,6 +835,14 @@ export default function ReportDetailPage({ params }: Props) {
           </main>
         </div>
       </div>
+
+      {showFlagModal && report && (
+        <FlagReportModal
+          reportId={report.id}
+          onClose={() => setShowFlagModal(false)}
+          onSubmitted={() => setJustFlagged(true)}
+        />
+      )}
     </AuthGuard>
   );
 }

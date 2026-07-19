@@ -10,13 +10,15 @@ import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
 import { useState } from "react";
 
+// Ordered to match the actual task flow: run a verification, discover more
+// partners, review past reports, then ask AI about them — not alphabetical
+// or build order.
 const NAV_ITEMS: { id: string; labelKey: string; icon: React.ElementType; href: string; badge?: string | null }[] = [
   { id: "dashboard", labelKey: "nav.dashboard", icon: Home, href: "/dashboard" },
-  { id: "ai-assistant", labelKey: "nav.assistant", icon: MessageSquare, href: "/chat", badge: null },
-  { id: "find-partners", labelKey: "nav.findPartners", icon: Search, href: "/find-partners" },
   { id: "verify", labelKey: "nav.verify", icon: Shield, href: "/verify" },
+  { id: "find-partners", labelKey: "nav.findPartners", icon: Search, href: "/find-partners" },
   { id: "reports", labelKey: "nav.reports", icon: FileText, href: "/reports" },
-  { id: "intelligence", labelKey: "nav.intelligence", icon: Globe, href: "/intelligence" },
+  { id: "ai-assistant", labelKey: "nav.assistant", icon: MessageSquare, href: "/chat", badge: null },
   { id: "methodology", labelKey: "nav.methodology", icon: BookOpen, href: "/methodology" },
 ];
 

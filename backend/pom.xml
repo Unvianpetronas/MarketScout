@@ -200,6 +200,32 @@
 			<version>1.18.3</version>
 		</dependency>
 
+		<!-- OpenPDF — generates the report PDF export (free iText 4 fork, LGPL/MPL) -->
+		<dependency>
+			<groupId>com.github.librepdf</groupId>
+			<artifactId>openpdf</artifactId>
+			<version>1.3.42</version>
+		</dependency>
+
+		<!-- Structured JSON logging (see logback-spring.xml) — set LOG_FORMAT=JSON
+		     in production so logs are machine-parseable; defaults to a
+		     human-readable console pattern for local dev. -->
+		<dependency>
+			<groupId>net.logstash.logback</groupId>
+			<artifactId>logstash-logback-encoder</artifactId>
+			<version>9.0</version>
+		</dependency>
+
+		<!-- Sentry error tracking — wired as a logback appender (see
+		     logback-spring.xml) so every log.error(...) becomes a Sentry event
+		     for free. No-ops with no SENTRY_DSN set. Free tier is enough at this
+		     scale. -->
+		<dependency>
+			<groupId>io.sentry</groupId>
+			<artifactId>sentry-logback</artifactId>
+			<version>8.49.0</version>
+		</dependency>
+
 		<!-- Jackson for ObjectMapper (used by CacheService, FactExtractor) -->
 		<dependency>
 			<groupId>com.fasterxml.jackson.datatype</groupId>

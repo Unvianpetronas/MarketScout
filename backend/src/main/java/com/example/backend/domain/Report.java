@@ -131,6 +131,34 @@ public class Report {
     @JoinColumn(name = "p7_verified_contract_id")
     private Contract p7VerifiedContract;
 
+    // ── Admin correction (never mutates the AI-computed fields above, so the
+    // original pipeline output stays intact for audit — the override is what
+    // gets shown to the user when present, alongside the mandatory note). ──
+    @Column(name = "override_score")
+    private Short overrideScore;
+
+    @Size(max = 20)
+    @Column(name = "override_risk_level", length = 20)
+    private String overrideRiskLevel;
+
+    @Column(name = "override_hard_stop")
+    private Boolean overrideHardStop;
+
+    @Column(name = "override_note", columnDefinition = "text")
+    private String overrideNote;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "overridden_by")
+    private Users overriddenBy;
+
+    @Column(name = "overridden_at")
+    private Instant overriddenAt;
+
+    /** True once an admin has corrected this report's score/risk/hard-stop. */
+    public boolean isOverridden() {
+        return overrideScore != null || overrideRiskLevel != null || overrideHardStop != null;
+    }
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) createdAt = Instant.now();

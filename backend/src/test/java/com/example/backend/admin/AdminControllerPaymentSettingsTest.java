@@ -32,6 +32,7 @@ class AdminControllerPaymentSettingsTest {
     @Mock private SystemAlertRepository systemAlertRepository;
     @Mock private PlanRepository planRepository;
     @Mock private PaymentSettingsRepository paymentSettingsRepository;
+    @Mock private ReportFlagRepository reportFlagRepository;
     @Mock private UserDetails actor;
 
     private AdminController controller;
@@ -40,7 +41,8 @@ class AdminControllerPaymentSettingsTest {
     void setUp() {
         controller = new AdminController(quotaService, usersRepository, reportRepository,
                 reportJobRepository, pillarResultRepository, auditLogRepository,
-                systemAlertRepository, planRepository, paymentSettingsRepository);
+                systemAlertRepository, planRepository, paymentSettingsRepository,
+                reportFlagRepository);
     }
 
     @Test

@@ -66,6 +66,41 @@ export interface ReportSummary {
   userId: string | null;
   createdAt: string;
   updatedAt: string;
+  overrideScore: number | null;
+  overrideRiskLevel: string | null;
+  overrideHardStop: boolean | null;
+  overrideNote: string | null;
+  overriddenByEmail: string | null;
+  overriddenAt: string | null;
+}
+
+export interface ReportOverrideRequest {
+  overrideScore?: number | null;
+  overrideRiskLevel?: string | null;
+  overrideHardStop?: boolean | null;
+  note: string;
+  clear: boolean;
+}
+
+export interface ReportFlagDTO {
+  id: string;
+  reportId: string;
+  reportEntityName: string;
+  userId: string;
+  userEmail: string;
+  reason: string;
+  note: string | null;
+  status: "open" | "resolved" | "dismissed";
+  resolvedByEmail: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+export interface ReportFlagsResponse {
+  flags: ReportFlagDTO[];
+  total: number;
+  page: number;
+  size: number;
 }
 
 export interface PillarDTO {
@@ -197,6 +232,15 @@ export const deleteReport = (id: string) =>
 
 export const retryReport = (id: string) =>
   api.post(`/admin/reports/${id}/retry`).then(r => r.data);
+
+export const overrideReport = (id: string, body: ReportOverrideRequest) =>
+  api.patch<ReportSummary>(`/admin/reports/${id}/override`, body).then(r => r.data);
+
+export const getReportFlags = (page = 0, size = 20, status?: string, reportId?: string) =>
+  api.get<ReportFlagsResponse>("/admin/report-flags", { params: { page, size, status, reportId } }).then(r => r.data);
+
+export const resolveReportFlag = (id: string, status: "resolved" | "dismissed", resolutionNote?: string) =>
+  api.patch<ReportFlagDTO>(`/admin/report-flags/${id}`, { status, resolutionNote }).then(r => r.data);
 
 export const getAdminJobs = (page = 0, size = 20, status?: string) =>
   api.get<JobsResponse>("/admin/jobs", { params: { page, size, status } }).then(r => r.data);

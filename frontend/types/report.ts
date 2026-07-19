@@ -64,6 +64,28 @@ export interface VerificationReport {
   selfReportHasWrittenContract?: boolean | null;
   // Set only when a contract has been uploaded and cross-check-verified — this is what actually moves P7's score.
   p7VerifiedContractId?: string | null;
+
+  // True once an admin has corrected this report — overallScore/riskLevel/
+  // hardStop above already reflect the correction, never the raw AI output.
+  corrected?: boolean;
+  correctionNote?: string | null;
+  correctedAt?: string | null;
+}
+
+export type FlagReason = "WRONG_SCORE" | "WRONG_INFO" | "SANCTIONS_FALSE_POSITIVE" | "OTHER";
+
+export interface FlagReportRequest {
+  reason: FlagReason;
+  note?: string;
+}
+
+export interface FlagReportResponse {
+  id: string;
+  reportId: string;
+  reason: FlagReason;
+  note: string | null;
+  status: "open" | "resolved" | "dismissed";
+  createdAt: string;
 }
 
 export interface SelfReportDealInfoRequest {
@@ -93,6 +115,8 @@ export interface ReportListItem {
   quickScanDone?: boolean;
   createdAt: string;
   updatedAt?: string;
+  corrected?: boolean;
+  correctionNote?: string | null;
 }
 
 export interface ReportStatusResponse {
