@@ -9,6 +9,9 @@ export interface User {
   phone?: string;
   taxId?: string;
   planName?: string;
+  // Deferred plan change — both unset when there's no pending change.
+  pendingPlanName?: string | null;
+  pendingPlanEffectiveAt?: string | null;
 }
 
 export interface MeResponse extends User {

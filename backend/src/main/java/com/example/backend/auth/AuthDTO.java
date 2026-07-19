@@ -204,6 +204,10 @@ public class AuthDTO {
         private String theme;
         private String language;
         private Boolean aiOptimization;
+        // Deferred plan change — see PaymentService.schedulePlanChange. Both
+        // null when there's no pending change.
+        private String pendingPlanName;
+        private java.time.Instant pendingPlanEffectiveAt;
     }
 
 }

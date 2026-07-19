@@ -34,6 +34,13 @@ export interface PublicPlan {
   monthlyQuota: number;
 }
 
+/** Response for scheduling/cancelling a deferred plan change. */
+export interface ScheduledPlanChangeResponse {
+  currentPlanName: string | null;
+  pendingPlanName: string | null; // null once cancelled
+  effectiveAt: string | number | null; // null once cancelled
+}
+
 export interface InvoiceSummary {
   invoiceId: string;
   invoiceNo: string;

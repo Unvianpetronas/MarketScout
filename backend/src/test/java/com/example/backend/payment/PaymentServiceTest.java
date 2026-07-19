@@ -393,6 +393,110 @@ class PaymentServiceTest {
         verify(subscriptionRepository).saveAll(java.util.List.of(oldSub));
     }
 
+    // ── deferred plan change ─────────────────────────────────────────────
+
+    @Test
+    void schedulePlanChange_withActiveSubscription_setsPendingPlan_doesNotCharge() {
+        Users user = new Users();
+        user.setId(USER_ID);
+        Plan starter = new Plan();
+        starter.setId(1);
+        starter.setName("starter");
+        Plan pro = new Plan();
+        pro.setId(2);
+        pro.setName("pro");
+        Instant periodEnd = Instant.now().plusSeconds(86400 * 10);
+        Subscription active = Subscription.builder().status("active").plan(starter).currentPeriodEnd(periodEnd).build();
+
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(planRepository.findByNameIgnoreCase("pro")).thenReturn(Optional.of(pro));
+        when(subscriptionRepository.findByUser_IdAndStatus(USER_ID, "active")).thenReturn(java.util.List.of(active));
+
+        PaymentDTO.ScheduledPlanChangeResponse resp = service.schedulePlanChange(USER_ID, "pro");
+
+        assertThat(resp.getPendingPlanName()).isEqualTo("pro");
+        assertThat(resp.getEffectiveAt()).isEqualTo(periodEnd);
+        assertThat(user.getPendingPlan().getName()).isEqualTo("pro");
+        assertThat(user.getPendingPlanRequestedAt()).isNotNull();
+        verify(usersRepository).save(user);
+        // Must never create a checkout/payment order for a deferred change.
+        verifyNoInteractions(invoiceRepository, vietqrRepository, planPurchaseRepository);
+    }
+
+    @Test
+    void schedulePlanChange_noActiveSubscription_throws() {
+        Users user = new Users();
+        user.setId(USER_ID);
+        Plan pro = new Plan();
+        pro.setId(2);
+        pro.setName("pro");
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(planRepository.findByNameIgnoreCase("pro")).thenReturn(Optional.of(pro));
+        when(subscriptionRepository.findByUser_IdAndStatus(USER_ID, "active")).thenReturn(java.util.List.of());
+
+        assertThatThrownBy(() -> service.schedulePlanChange(USER_ID, "pro"))
+                .isInstanceOf(AppException.class);
+    }
+
+    @Test
+    void schedulePlanChange_sameAsCurrentPlan_throws() {
+        Users user = new Users();
+        user.setId(USER_ID);
+        Plan pro = new Plan();
+        pro.setId(2);
+        pro.setName("pro");
+        Subscription active = Subscription.builder().status("active").plan(pro).currentPeriodEnd(Instant.now()).build();
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(planRepository.findByNameIgnoreCase("pro")).thenReturn(Optional.of(pro));
+        when(subscriptionRepository.findByUser_IdAndStatus(USER_ID, "active")).thenReturn(java.util.List.of(active));
+
+        assertThatThrownBy(() -> service.schedulePlanChange(USER_ID, "pro"))
+                .isInstanceOf(AppException.class);
+    }
+
+    @Test
+    void schedulePlanChange_calledTwice_latestChoiceWins() {
+        Users user = new Users();
+        user.setId(USER_ID);
+        Plan starter = new Plan();
+        starter.setId(1);
+        starter.setName("starter");
+        Plan pro = new Plan();
+        pro.setId(2);
+        pro.setName("pro");
+        Plan enterprise = new Plan();
+        enterprise.setId(3);
+        enterprise.setName("enterprise");
+        Subscription active = Subscription.builder().status("active").plan(starter).currentPeriodEnd(Instant.now()).build();
+
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(planRepository.findByNameIgnoreCase("pro")).thenReturn(Optional.of(pro));
+        when(planRepository.findByNameIgnoreCase("enterprise")).thenReturn(Optional.of(enterprise));
+        when(subscriptionRepository.findByUser_IdAndStatus(USER_ID, "active")).thenReturn(java.util.List.of(active));
+
+        service.schedulePlanChange(USER_ID, "pro");
+        service.schedulePlanChange(USER_ID, "enterprise");
+
+        assertThat(user.getPendingPlan().getName()).isEqualTo("enterprise");
+    }
+
+    @Test
+    void cancelScheduledPlanChange_clearsPendingPlan() {
+        Users user = new Users();
+        user.setId(USER_ID);
+        Plan pro = new Plan();
+        pro.setName("pro");
+        user.setPendingPlan(pro);
+        user.setPendingPlanRequestedAt(Instant.now());
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+
+        PaymentDTO.ScheduledPlanChangeResponse resp = service.cancelScheduledPlanChange(USER_ID);
+
+        assertThat(resp.getPendingPlanName()).isNull();
+        assertThat(user.getPendingPlan()).isNull();
+        assertThat(user.getPendingPlanRequestedAt()).isNull();
+    }
+
     // ── helpers ────────────────────────────────────────────────────────
 
     private VietqrPayment pendingQr(BigDecimal amount) {

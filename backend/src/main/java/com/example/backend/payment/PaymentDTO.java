@@ -45,6 +45,21 @@ public class PaymentDTO {
         private Instant    expiresAt;
     }
 
+    // ── Deferred plan change ─────────────────────────────────────────────
+
+    @Data @NoArgsConstructor @AllArgsConstructor
+    public static class SchedulePlanChangeRequest {
+        @jakarta.validation.constraints.NotBlank
+        private String plan;
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class ScheduledPlanChangeResponse {
+        private String  currentPlanName;
+        private String  pendingPlanName; // null once cancelled
+        private Instant effectiveAt;     // null once cancelled
+    }
+
     // ── Status poll ────────────────────────────────────────────────────
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder

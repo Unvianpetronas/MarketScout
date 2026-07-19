@@ -2,12 +2,62 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, X, Zap, Shield, Star, ArrowRight, ChevronDown, ChevronUp, Globe } from "lucide-react";
+import { Check, X, Zap, Shield, Star, ArrowRight, ChevronDown, ChevronUp, Globe, Clock, XCircle } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
-import { getPublicPlans, getPricePerCredit } from "@/services/payment.service";
+import { getPublicPlans, getPricePerCredit, schedulePlanChange, cancelScheduledPlanChange } from "@/services/payment.service";
 import { PublicPlan } from "@/types/payment";
 import { PLANS, FAQS } from "./plans-data";
+
+function formatDate(v: string | number | null | undefined) {
+  if (!v) return "";
+  const d = new Date(v);
+  return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function ScheduleChangeModal({
+  fromPlan, toPlanId, onClose, onScheduled,
+}: { fromPlan: string; toPlanId: string; onClose: () => void; onScheduled: () => void }) {
+  const { t } = useLanguage();
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleConfirm = async () => {
+    setSubmitting(true);
+    try {
+      const resp = await schedulePlanChange(toPlanId);
+      toast.success(t("pricing.schedule.toastSuccess", { plan: resp.pendingPlanName ?? toPlanId }));
+      onScheduled();
+      onClose();
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || t("pricing.schedule.toastError"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+        <h3 className="text-base font-bold text-gray-900 mb-2">{t("pricing.schedule.modalTitle")}</h3>
+        <p className="text-sm text-gray-500 mb-6">
+          {t("pricing.schedule.modalDesc", { from: fromPlan, to: toPlanId })}
+        </p>
+        <div className="flex gap-3">
+          <button onClick={handleConfirm} disabled={submitting}
+            className="flex-1 py-3 gradient-brand text-white font-bold rounded-xl hover:opacity-90 text-sm disabled:opacity-60">
+            {submitting ? t("pricing.schedule.confirming") : t("pricing.schedule.confirm")}
+          </button>
+          <button onClick={onClose} disabled={submitting}
+            className="flex-1 py-3 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 text-sm">
+            {t("pricing.schedule.cancel")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function PriceDisplay({ vnd, usd, isFree, isCustom, isDark }: { vnd: number; usd: number; isFree: boolean; isCustom?: boolean; isDark?: boolean }) {
   const { t } = useLanguage();
@@ -45,10 +95,12 @@ function FaqItem({ q, a }: { q: string; a: string }) {
 }
 
 export default function PricingPage() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user, refreshUser } = useAuth();
   const { t, lang, toggle } = useLanguage();
   const [livePlans, setLivePlans] = useState<PublicPlan[]>([]);
   const [pricePerCreditVnd, setPricePerCreditVnd] = useState<number | null>(null);
+  const [scheduleTarget, setScheduleTarget] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     getPublicPlans().then(setLivePlans).catch(() => undefined);
@@ -60,6 +112,30 @@ export default function PricingPage() {
     if (!live) return plan;
     return { ...plan, priceVnd: live.priceVnd, priceUsd: live.priceUsd };
   });
+
+  // A logged-in user already on a paid plan gets the deferred-change flow
+  // for any *different* plan (including down to Free) — no charge now, the
+  // current plan/quota keep running until the cycle ends. Enterprise always
+  // goes to "contact sales" regardless. Free/logged-out users check out
+  // immediately (no already-paid time to protect).
+  const currentPlanName = user?.planName?.toLowerCase();
+  const hasActivePaidPlan = isAuthenticated && !!currentPlanName && currentPlanName !== "free";
+
+  const isDeferred = (planId: string) =>
+    hasActivePaidPlan && planId !== "enterprise" && planId !== currentPlanName;
+
+  const handleCancelPending = async () => {
+    setCancelling(true);
+    try {
+      await cancelScheduledPlanChange();
+      toast.success(t("pricing.schedule.cancelled"));
+      await refreshUser();
+    } catch {
+      toast.error(t("pricing.schedule.toastError"));
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#FAFBFA]">
@@ -116,6 +192,25 @@ export default function PricingPage() {
           </p>
         </div>
 
+        {/* ── Pending plan change banner ── */}
+        {user?.pendingPlanName && (
+          <div className="flex items-center justify-between gap-4 bg-purple-50 border border-purple-200 rounded-2xl px-6 py-4 mb-8">
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-purple-500 shrink-0" />
+              <p className="text-sm text-purple-800">
+                {t("pricing.schedule.banner", {
+                  plan: user.pendingPlanName,
+                  date: formatDate(user.pendingPlanEffectiveAt),
+                })}
+              </p>
+            </div>
+            <button onClick={handleCancelPending} disabled={cancelling}
+              className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 hover:text-purple-900 shrink-0 disabled:opacity-50">
+              <XCircle className="w-3.5 h-3.5" /> {t("pricing.schedule.cancelPending")}
+            </button>
+          </div>
+        )}
+
         {/* ── Plans Grid ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-16 stagger">
           {plans.map((plan) => (
@@ -139,10 +234,17 @@ export default function PricingPage() {
                 <p className="text-xs mt-2 font-semibold" style={{ color: plan.accentColor }}>{t(`pricing.plan.${plan.id}.quotaLabel`)}</p>
               </div>
 
-              <Link href={plan.href}
-                className={`block w-full py-3 rounded-xl text-sm font-bold text-center transition-all mb-5 ${plan.ctaStyle}`}>
-                {t(`pricing.plan.${plan.id}.cta`)} →
-              </Link>
+              {isDeferred(plan.id) ? (
+                <button onClick={() => setScheduleTarget(plan.id)}
+                  className={`block w-full py-3 rounded-xl text-sm font-bold text-center transition-all mb-5 ${plan.ctaStyle}`}>
+                  {t(`pricing.plan.${plan.id}.cta`)} →
+                </button>
+              ) : (
+                <Link href={plan.href}
+                  className={`block w-full py-3 rounded-xl text-sm font-bold text-center transition-all mb-5 ${plan.ctaStyle}`}>
+                  {t(`pricing.plan.${plan.id}.cta`)} →
+                </Link>
+              )}
 
               <div className="flex-1 space-y-2">
                 {Array.from({ length: plan.featureCount }).map((_, i) => (
@@ -241,6 +343,15 @@ export default function PricingPage() {
           </div>
         </div>
       </footer>
+
+      {scheduleTarget && user?.planName && (
+        <ScheduleChangeModal
+          fromPlan={user.planName}
+          toPlanId={scheduleTarget}
+          onClose={() => setScheduleTarget(null)}
+          onScheduled={refreshUser}
+        />
+      )}
     </div>
   );
 }

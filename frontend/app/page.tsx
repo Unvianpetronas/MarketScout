@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { LinkedinIcon, FacebookIcon, GithubIcon } from "@/components/icons/social-icons";
 import { useLanguage } from "@/providers/language-provider";
+import { Reveal } from "@/components/shared/reveal";
 
 const TEAM = [
   {
@@ -292,10 +293,12 @@ export default function LandingPage() {
       {/* Features */}
       <section id="features" className="bg-gray-50 py-16 scroll-mt-16">
         <div className="max-w-5xl mx-auto px-4">
-          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
-            {t("landing.features.title")}
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Reveal>
+            <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
+              {t("landing.features.title")}
+            </h2>
+          </Reveal>
+          <Reveal stagger className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {FEATURES.map((feat) => (
               <div key={feat.titleKey} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mb-4">
@@ -305,20 +308,20 @@ export default function LandingPage() {
                 <p className="text-sm text-gray-500">{t(feat.descKey)}</p>
               </div>
             ))}
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* Team */}
       <section id="team" className="py-20 max-w-6xl mx-auto px-4 scroll-mt-16">
-        <div className="text-center max-w-2xl mx-auto mb-12">
+        <Reveal className="text-center max-w-2xl mx-auto mb-12">
           <span className="inline-block text-xs font-semibold tracking-widest text-[#00A859] uppercase bg-emerald-50 border border-[#00A859]/20 rounded-full px-3 py-1 mb-4">
             {t("landing.team.badge")}
           </span>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">{t("landing.team.title")}</h2>
           <p className="text-gray-500">{t("landing.team.subtitle")}</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+        </Reveal>
+        <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
           {TEAM.map((member) => (
             <div
               key={member.name}
@@ -337,14 +340,14 @@ export default function LandingPage() {
               </div>
             </div>
           ))}
-        </div>
+        </Reveal>
       </section>
 
       {/* The Powerhouse: MarketScout AI Agent */}
       <section id="powerhouse" className="py-20 bg-gradient-to-br from-[#0F2A1C] to-[#081810] scroll-mt-16">
         <div className="max-w-6xl mx-auto px-4 grid lg:grid-cols-2 gap-12 items-center">
           {/* Left column */}
-          <div>
+          <Reveal variant="left">
             <span className="inline-block text-xs font-semibold tracking-widest text-[#5EEAD4] uppercase border border-[#5EEAD4]/30 rounded-full px-3 py-1 mb-4">
               {t("landing.powerhouse.badge")}
             </span>
@@ -381,10 +384,10 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </Reveal>
 
           {/* Right column - AI Agent panel mockup */}
-          <div className="bg-[#0F2A1C] border border-[#00D26A]/20 rounded-2xl p-6 shadow-2xl">
+          <Reveal variant="right" className="bg-[#0F2A1C] border border-[#00D26A]/20 rounded-2xl p-6 shadow-2xl">
             <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-[#00D26A]/15 flex items-center justify-center shrink-0">
@@ -447,14 +450,14 @@ export default function LandingPage() {
                 <p className="text-sm font-bold text-white">{t("landing.powerhouse.latencyValue")}</p>
               </div>
             </div>
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* The 8 Pillars of Deep Verification */}
       <section id="pillars" className="py-20 bg-gradient-to-b from-[#EAF3ED] to-[#DCEEE3] scroll-mt-16">
         <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center max-w-2xl mx-auto mb-14">
+          <Reveal className="text-center max-w-2xl mx-auto mb-14">
             <span className="inline-block text-xs font-semibold tracking-widest text-[#00A859] uppercase bg-white border border-[#00A859]/20 rounded-full px-3 py-1 mb-4">
               {t("landing.pillars.badge")}
             </span>
@@ -464,9 +467,9 @@ export default function LandingPage() {
             <p className="text-gray-500">
               {t("landing.pillars.subtitle")}
             </p>
-          </div>
+          </Reveal>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <Reveal stagger className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {PILLARS.map((pillar) => (
               <div
                 key={pillar.code}
@@ -486,13 +489,13 @@ export default function LandingPage() {
                 </div>
               </div>
             ))}
-          </div>
+          </Reveal>
         </div>
       </section>
 
       {/* CTA */}
       <section className="px-4 py-16 bg-white">
-        <div className="max-w-5xl mx-auto bg-gradient-to-br from-[#10301E] to-[#0A1F14] rounded-3xl p-10 md:p-16 text-center shadow-xl">
+        <Reveal variant="scale" className="max-w-5xl mx-auto bg-gradient-to-br from-[#10301E] to-[#0A1F14] rounded-3xl p-10 md:p-16 text-center shadow-xl">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             {t("landing.cta.title")}
           </h2>
@@ -513,7 +516,7 @@ export default function LandingPage() {
               {t("landing.cta.viewFramework")}
             </Link>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* Footer */}

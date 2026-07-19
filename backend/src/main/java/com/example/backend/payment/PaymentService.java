@@ -157,6 +157,62 @@ public class PaymentService {
         }
     }
 
+    // ── Deferred plan change ─────────────────────────────────────────────
+    // SePay can't auto-charge, so a plan change requested while a paid
+    // subscription is still running is recorded (not charged) here and only
+    // takes effect — with a fresh checkout — once the current cycle ends
+    // (see SubscriptionLifecycleService). Upgrading off Free (no active paid
+    // subscription) skips this entirely and checks out immediately via
+    // createPlanCheckout above — there's no already-paid time to protect.
+
+    @Transactional
+    public PaymentDTO.ScheduledPlanChangeResponse schedulePlanChange(UUID userId, String planName) {
+        Users user = usersRepository.findById(userId)
+                .orElseThrow(() -> new AppException(AppException.ErrorCode.USER_NOT_FOUND));
+        Plan targetPlan = planRepository.findByNameIgnoreCase(planName)
+                .orElseThrow(() -> new AppException(AppException.ErrorCode.BAD_REQUEST, "Gói không hợp lệ"));
+
+        Subscription active = subscriptionRepository.findByUser_IdAndStatus(userId, "active")
+                .stream().findFirst()
+                .orElseThrow(() -> new AppException(AppException.ErrorCode.BAD_REQUEST,
+                        "Bạn chưa có gói trả phí đang hoạt động — hãy mua gói trực tiếp."));
+
+        if (active.getPlan() != null && active.getPlan().getId().equals(targetPlan.getId())) {
+            throw new AppException(AppException.ErrorCode.BAD_REQUEST, "Bạn đang dùng gói này rồi.");
+        }
+
+        // Re-confirming overwrites any earlier pending choice — latest wins.
+        user.setPendingPlan(targetPlan);
+        user.setPendingPlanRequestedAt(Instant.now());
+        usersRepository.save(user);
+
+        log.info("Plan change scheduled — user={} from={} to={} effectiveAt={}",
+                userId, active.getPlan() != null ? active.getPlan().getName() : null,
+                targetPlan.getName(), active.getCurrentPeriodEnd());
+
+        return PaymentDTO.ScheduledPlanChangeResponse.builder()
+                .currentPlanName(active.getPlan() != null ? active.getPlan().getName() : null)
+                .pendingPlanName(targetPlan.getName())
+                .effectiveAt(active.getCurrentPeriodEnd())
+                .build();
+    }
+
+    @Transactional
+    public PaymentDTO.ScheduledPlanChangeResponse cancelScheduledPlanChange(UUID userId) {
+        Users user = usersRepository.findById(userId)
+                .orElseThrow(() -> new AppException(AppException.ErrorCode.USER_NOT_FOUND));
+        user.setPendingPlan(null);
+        user.setPendingPlanRequestedAt(null);
+        usersRepository.save(user);
+
+        log.info("Plan change cancelled — user={}", userId);
+        return PaymentDTO.ScheduledPlanChangeResponse.builder()
+                .currentPlanName(user.getPlan() != null ? user.getPlan().getName() : null)
+                .pendingPlanName(null)
+                .effectiveAt(null)
+                .build();
+    }
+
     // ── Shared order creation ──────────────────────────────────────────
 
     private Users requireUserForOrder(UUID userId) {
