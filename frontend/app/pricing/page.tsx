@@ -68,7 +68,7 @@ function PriceDisplay({ vnd, usd, isFree, isCustom, isDark }: { vnd: number; usd
   return (
     <div>
       <div className="flex items-end gap-1">
-        <span className={`text-4xl font-extrabold ${textColor}`}>{(vnd / 1000000).toFixed(1)}M</span>
+        <span className={`text-4xl font-extrabold ${textColor}`}>{new Intl.NumberFormat("vi-VN").format(vnd)}</span>
         <span className={`text-sm font-medium ${subColor} mb-1.5`}>VND</span>
       </div>
       <p className={`text-xs ${subColor}`}>({t("pricing.priceUsdSuffix", { usd })})</p>

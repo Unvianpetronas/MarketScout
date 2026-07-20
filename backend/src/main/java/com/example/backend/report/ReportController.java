@@ -168,7 +168,8 @@ public class ReportController {
         String json = report.getAiRecommendations();
         if (json == null || json.isBlank()) {
             List<PillarResult> pillars = pillarResultRepository.findByReportIdOrderByPillarNoAsc(id);
-            json = recommendationService.generate(report, pillars);
+            String language = reportRepository.findUserLanguageByReportId(id);
+            json = recommendationService.generate(report, pillars, language);
             report.setAiRecommendations(json);
             reportRepository.save(report);
         }
