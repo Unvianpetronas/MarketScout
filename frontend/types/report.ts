@@ -32,11 +32,12 @@ export interface PillarResult {
   evidences?: Evidence[];
 }
 
-// Matches backend Evidence: { type: PASS|WARN|FAIL, text, source }
+// Matches backend Evidence: { type: PASS|WARN|FAIL, text, source, url }
 export interface Evidence {
   type?: string;
   text?: string;
   source?: string;
+  url?: string;
 }
 
 export interface VerificationReport {

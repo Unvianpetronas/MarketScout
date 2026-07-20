@@ -19,6 +19,10 @@ public class FactJson {
         private Double ageYears;
         private Boolean hasLegalRepresentative;
         private String industryMatch;      // MATCH | PARTIAL | NO_MATCH
+        // Ground truth from P1Data, not Gemini-interpreted — lets the rubric link
+        // each evidence line back to the exact registry record it came from.
+        private String registrationId;     // MST (VN) or LEI (international)
+        private String registrationType;   // MST_VN | LEI_INTL
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
@@ -29,6 +33,7 @@ public class FactJson {
         private Boolean hasSsl;
         private String socialMediaScore;   // LOW | MEDIUM | HIGH
         private List<String> facebookPages; // candidate URLs — unverified, see P2Data
+        private String domain;              // ground truth from P2Data — lets the rubric link evidence to the site/RDAP record
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
@@ -64,6 +69,9 @@ public class FactJson {
         private Boolean isPersonalAccountRequested;
         private Boolean bicVerified;
         private String accountType;         // CORPORATE | PERSONAL | UNKNOWN
+        // Ground truth from P6Data — lets the rubric link a sanctions hit to its
+        // OpenSanctions entity profile page for manual review.
+        private String matchedEntityId;
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder

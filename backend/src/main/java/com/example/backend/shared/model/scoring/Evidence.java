@@ -13,4 +13,5 @@ public class Evidence {
     private String type;   // PASS | WARN | FAIL
     private String text;
     private String source;
+    private String url;    // clickable link to the source record, when one is known
 }
