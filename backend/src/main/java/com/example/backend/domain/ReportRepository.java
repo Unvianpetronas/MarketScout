@@ -18,6 +18,11 @@ public interface ReportRepository extends JpaRepository<Report, UUID> {
     List<Report> findByStatusOrderByUpdatedAtDesc(String status);
     List<Report> findByUserIdAndSourceOrderByCreatedAtDesc(UUID userId, String source);
 
+    // Single-column fetch (no lazy-load risk) — used by the async AI agents to
+    // pick the response language without needing an open Hibernate session.
+    @Query("SELECT r.user.language FROM Report r WHERE r.id = :reportId")
+    String findUserLanguageByReportId(@Param("reportId") UUID reportId);
+
     // ── Admin queries ─────────────────────────────────────────────────
     long countByCreatedAtBetween(Instant start, Instant end);
 

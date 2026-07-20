@@ -17,30 +17,35 @@ import { getReport, getReportRecommendations, patchDealInfo, exportReportPdf, fl
 import { getContract, unlinkContract, listContractLinks } from "@/services/contract.service";
 import { VerificationReport, PillarResult, ReportRecommendations, FlagReason, isProcessingStatus } from "@/types/report";
 import { LinkResponse, ContractSummary } from "@/types/contract";
+import { useLanguage } from "@/providers/language-provider";
 
-const FLAG_REASONS: { value: FlagReason; label: string }[] = [
-  { value: "WRONG_SCORE", label: "Điểm/đánh giá rủi ro không đúng" },
-  { value: "WRONG_INFO", label: "Thông tin công ty sai (địa chỉ, MST, website...)" },
-  { value: "SANCTIONS_FALSE_POSITIVE", label: "Báo nhầm trừng phạt (sanctions false positive)" },
-  { value: "OTHER", label: "Lý do khác" },
-];
+function getFlagReasons(t: (key: string) => string): { value: FlagReason; label: string }[] {
+  return [
+    { value: "WRONG_SCORE", label: t("report.flagReasonWrongScore") },
+    { value: "WRONG_INFO", label: t("report.flagReasonWrongInfo") },
+    { value: "SANCTIONS_FALSE_POSITIVE", label: t("report.flagReasonSanctionsFalsePositive") },
+    { value: "OTHER", label: t("report.flagReasonOther") },
+  ];
+}
 
 function FlagReportModal({ reportId, onClose, onSubmitted }: {
   reportId: string; onClose: () => void; onSubmitted: () => void;
 }) {
+  const { t } = useLanguage();
   const [reason, setReason] = useState<FlagReason>("WRONG_SCORE");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const flagReasons = getFlagReasons(t);
 
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
       await flagReport(reportId, { reason, note: note.trim() || undefined });
-      toast.success("Đã gửi báo cáo — đội ngũ MarketScout sẽ xem xét sớm.");
+      toast.success(t("report.flagSubmittedToast"));
       onSubmitted();
       onClose();
     } catch {
-      toast.error("Không thể gửi báo cáo lúc này.");
+      toast.error(t("report.flagSubmitErrorToast"));
     } finally {
       setSubmitting(false);
     }
@@ -54,45 +59,45 @@ function FlagReportModal({ reportId, onClose, onSubmitted }: {
             <div className="w-8 h-8 bg-red-50 rounded-xl flex items-center justify-center">
               <Flag className="w-4 h-4 text-red-500" />
             </div>
-            <h3 className="text-sm font-bold text-gray-900">Báo kết quả sai</h3>
+            <h3 className="text-sm font-bold text-gray-900">{t("report.flagModalTitle")}</h3>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
           </button>
         </div>
         <p className="text-xs text-gray-400 mb-4 ml-10">
-          Đội ngũ MarketScout sẽ xem xét thủ công. Việc này không thay đổi điểm ngay lập tức.
+          {t("report.flagModalSubtitle")}
         </p>
 
-        <label className="text-xs text-gray-500 font-semibold block mb-1.5">Lý do</label>
+        <label className="text-xs text-gray-500 font-semibold block mb-1.5">{t("report.flagReasonLabel")}</label>
         <select
           value={reason}
           onChange={(e) => setReason(e.target.value as FlagReason)}
           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mb-3"
         >
-          {FLAG_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          {flagReasons.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
         </select>
 
-        <label className="text-xs text-gray-500 font-semibold block mb-1.5">Chi tiết (không bắt buộc)</label>
+        <label className="text-xs text-gray-500 font-semibold block mb-1.5">{t("report.flagDetailLabel")}</label>
         <textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           maxLength={2000}
           rows={4}
-          placeholder="Mô tả cụ thể điều bạn cho là sai..."
+          placeholder={t("report.flagDetailPlaceholder")}
           className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 mb-4 resize-none"
         />
 
         <div className="flex items-center justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700">
-            Huỷ
+            {t("report.cancelBtn")}
           </button>
           <button
             onClick={handleSubmit}
             disabled={submitting}
             className="px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl disabled:opacity-60"
           >
-            {submitting ? "Đang gửi..." : "Gửi báo cáo"}
+            {submitting ? t("report.flagSubmitting") : t("report.flagSubmitBtn")}
           </button>
         </div>
       </div>
@@ -110,10 +115,10 @@ const PILLAR_ICONS: Record<number, React.ElementType> = {
 };
 
 // Trust-based color for the OVERALL score: higher = more trustworthy = green.
-function trustStyle(score: number) {
-  if (score >= 75) return { color: "#00D26A", bg: "#E6F9F0", textClass: "text-emerald-700", label: "Tin cậy cao" };
-  if (score >= 40) return { color: "#F59E0B", bg: "#FFF8E7", textClass: "text-amber-700", label: "Cần thận trọng" };
-  return { color: "#EF4444", bg: "#FFF1F0", textClass: "text-red-700", label: "Rủi ro cao" };
+function trustStyle(score: number, t: (key: string) => string) {
+  if (score >= 75) return { color: "#00D26A", bg: "#E6F9F0", textClass: "text-emerald-700", label: t("report.trustHigh") };
+  if (score >= 40) return { color: "#F59E0B", bg: "#FFF8E7", textClass: "text-amber-700", label: t("report.trustCaution") };
+  return { color: "#EF4444", bg: "#FFF1F0", textClass: "text-red-700", label: t("report.trustHighRisk") };
 }
 
 // Color/badge for a pillar driven by its STATUS (PASS/WARN/FAIL/SKIP),
@@ -144,7 +149,8 @@ function EvidenceRow({ ev }: { ev: { type?: string; text?: string; source?: stri
 }
 
 function ScoreGaugeLight({ score }: { score: number }) {
-  const { color, label, textClass } = trustStyle(score);
+  const { t } = useLanguage();
+  const { color, label, textClass } = trustStyle(score, t);
   const circumference = 2 * Math.PI * 52;
   const dashOffset = circumference - (circumference * score) / 100;
 
@@ -181,6 +187,7 @@ function parseFindings(raw: string | undefined): string[] {
 }
 
 function PillarCard({ pillar }: { pillar: PillarResult }) {
+  const { t } = useLanguage();
   const st = pillarStatusStyle(pillar.status);
   const isNa = st.na || pillar.score == null;
   const score = pillar.score ?? 0;
@@ -196,7 +203,7 @@ function PillarCard({ pillar }: { pillar: PillarResult }) {
             <Icon className="w-4.5 h-4.5" style={{ color: st.color }} />
           </div>
           <div>
-            <p className="text-[10px] text-gray-400 font-mono uppercase">Trụ cột {pillar.pillarNo}</p>
+            <p className="text-[10px] text-gray-400 font-mono uppercase">{t("report.pillarLabel", { n: pillar.pillarNo })}</p>
             <h3 className="text-sm font-bold text-gray-900 mt-0.5">{pillar.pillarName}</h3>
           </div>
         </div>
@@ -206,7 +213,7 @@ function PillarCard({ pillar }: { pillar: PillarResult }) {
           ) : (
             <>
               <div className="text-2xl font-extrabold" style={{ color: st.color }}>{score}</div>
-              <div className="text-[10px] text-gray-400">điểm</div>
+              <div className="text-[10px] text-gray-400">{t("report.scoreUnit")}</div>
             </>
           )}
         </div>
@@ -220,10 +227,10 @@ function PillarCard({ pillar }: { pillar: PillarResult }) {
 
       <div className="flex items-center justify-between">
         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${st.badge}`}>
-          {isNa ? "N/A — Chưa đủ dữ liệu" : st.label}
+          {isNa ? t("report.naInsufficientData") : st.label}
         </span>
         {pillar.confidence && !isNa && (
-          <span className="text-[11px] text-gray-400">Độ tin cậy: {pillar.confidence}</span>
+          <span className="text-[11px] text-gray-400">{t("report.confidencePrefix", { value: pillar.confidence })}</span>
         )}
       </div>
 
@@ -234,7 +241,7 @@ function PillarCard({ pillar }: { pillar: PillarResult }) {
         </ul>
       ) : isNa ? (
         <p className="mt-3 border-t border-gray-50 pt-3 text-xs text-gray-400">
-          {findings[0] || "Không tìm thấy dữ liệu từ nguồn để kiểm chứng trụ cột này."}
+          {findings[0] || t("report.noPillarEvidence")}
         </p>
       ) : null}
     </div>
@@ -266,6 +273,7 @@ function RecGroup({ title, icon: Icon, items, color, bg }: {
 }
 
 function AiRecommendations({ recs, loading }: { recs: ReportRecommendations | null; loading: boolean }) {
+  const { t } = useLanguage();
   const hasContent = recs && (
     (recs.actionItems?.length ?? 0) > 0 ||
     (recs.infoToProvide?.length ?? 0) > 0 ||
@@ -279,24 +287,24 @@ function AiRecommendations({ recs, loading }: { recs: ReportRecommendations | nu
         <div className="w-8 h-8 bg-[#E6F9F0] rounded-xl flex items-center justify-center">
           <Sparkles className="w-4 h-4 text-[#00843F]" />
         </div>
-        <h3 className="text-sm font-bold text-gray-900">Khuyến nghị từ AI</h3>
+        <h3 className="text-sm font-bold text-gray-900">{t("report.aiRecTitle")}</h3>
         <span className="text-[10px] font-bold text-[#00843F] bg-[#E6F9F0] px-2 py-0.5 rounded-full uppercase tracking-wider">
           AI
         </span>
       </div>
       <p className="text-xs text-gray-400 mb-4 ml-10">
-        Các bước nên làm, thông tin cần bổ sung và cần xác minh — ngoài phần Deal Safety.
+        {t("report.aiRecSubtitle")}
       </p>
 
       {loading ? (
         <div className="flex items-center gap-3 text-sm text-gray-400 p-4 bg-gray-50 rounded-xl">
           <div className="w-4 h-4 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin" />
-          AI đang phân tích và soạn khuyến nghị...
+          {t("report.aiRecLoading")}
         </div>
       ) : !hasContent ? (
         <div className="flex items-center gap-3 text-sm text-gray-400 p-4 bg-gray-50 rounded-xl">
           <Info className="w-4 h-4 shrink-0" />
-          Chưa tạo được khuyến nghị cho báo cáo này.
+          {t("report.aiRecEmpty")}
         </div>
       ) : (
         <>
@@ -307,11 +315,11 @@ function AiRecommendations({ recs, loading }: { recs: ReportRecommendations | nu
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <RecGroup title="Nên làm gì" icon={ListChecks} items={recs?.actionItems}
+            <RecGroup title={t("report.recActionItems")} icon={ListChecks} items={recs?.actionItems}
               color="#00843F" bg="#E6F9F0" />
-            <RecGroup title="Cần cung cấp thêm" icon={Send} items={recs?.infoToProvide}
+            <RecGroup title={t("report.recInfoToProvide")} icon={Send} items={recs?.infoToProvide}
               color="#2563EB" bg="#EFF4FF" />
-            <RecGroup title="Cần xác minh" icon={FileSearch} items={recs?.infoToVerify}
+            <RecGroup title={t("report.recInfoToVerify")} icon={FileSearch} items={recs?.infoToVerify}
               color="#9333EA" bg="#F6EEFE" />
           </div>
         </>
@@ -325,6 +333,7 @@ type PaymentMethodSafety = "SAFE" | "MODERATE" | "RISKY";
 function TransactionInfoCard({
   report, onReportUpdate,
 }: { report: VerificationReport; onReportUpdate: (r: VerificationReport) => void }) {
+  const { t } = useLanguage();
   const [showModal, setShowModal] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "verified" | "mismatch"; text: string } | null>(null);
   // Keyed by contract id so a stale filename can never render for a moment
@@ -361,7 +370,7 @@ function TransactionInfoCard({
       if (latest.verificationStatus === "MISMATCH") {
         setStatusMessage({
           type: "mismatch",
-          text: `⚠ Hợp đồng "${latest.fileName}" không khớp với ${report.entityName} — dữ liệu chỉ mang tính tham khảo, không ảnh hưởng điểm`,
+          text: t("report.contractMismatchAfterUploadToast", { fileName: latest.fileName, entityName: report.entityName }),
         });
       }
     }).catch(() => {});
@@ -378,9 +387,9 @@ function TransactionInfoCard({
         hasWrittenContract,
       });
       onReportUpdate(updated);
-      toast.success("Đã lưu thông tin giao dịch.");
+      toast.success(t("report.dealInfoSavedToast"));
     } catch {
-      toast.error("Không thể lưu thông tin giao dịch.");
+      toast.error(t("report.dealInfoSaveErrorToast"));
     } finally {
       setSaving(false);
     }
@@ -390,10 +399,10 @@ function TransactionInfoCard({
     setShowModal(false);
     setStatusMessage(
       result.verificationStatus === "VERIFIED"
-        ? { type: "verified", text: `✓ Đã xác minh qua ${contract.fileName}` }
+        ? { type: "verified", text: t("report.contractVerifiedToast", { fileName: contract.fileName }) }
         : {
             type: "mismatch",
-            text: `⚠ Hợp đồng không khớp với ${report.entityName} — dữ liệu chỉ mang tính tham khảo, không ảnh hưởng điểm`,
+            text: t("report.contractMismatchAfterLinkToast", { entityName: report.entityName }),
           }
     );
     try {
@@ -408,7 +417,7 @@ function TransactionInfoCard({
       setStatusMessage(null);
       onReportUpdate(await getReport(report.id));
     } catch {
-      toast.error("Không thể bỏ liên kết hợp đồng.");
+      toast.error(t("report.contractUnlinkErrorToast"));
     }
   };
 
@@ -418,10 +427,10 @@ function TransactionInfoCard({
         <div className="w-8 h-8 bg-purple-50 rounded-xl flex items-center justify-center">
           <FileText className="w-4 h-4 text-purple-500" />
         </div>
-        <h3 className="text-sm font-bold text-gray-900">Thông tin giao dịch</h3>
+        <h3 className="text-sm font-bold text-gray-900">{t("report.transactionInfoTitle")}</h3>
       </div>
       <p className="text-xs text-gray-400 mb-4 ml-10">
-        Tự khai báo — chỉ tính điểm khi có hợp đồng thật đã tải lên và khớp với đối tác đang thẩm định.
+        {t("report.transactionInfoSubtitle")}
       </p>
 
       {(verifiedFileName || statusMessage) && (
@@ -430,29 +439,29 @@ function TransactionInfoCard({
             : statusMessage?.type === "verified" ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
             : "bg-amber-50 text-amber-700 border border-amber-200"
         }`}>
-          <span>{verifiedFileName ? `✓ Đã xác minh qua ${verifiedFileName}` : statusMessage?.text}</span>
+          <span>{verifiedFileName ? t("report.contractVerifiedToast", { fileName: verifiedFileName }) : statusMessage?.text}</span>
           {verifiedFileName && (
-            <button onClick={handleUnlink} className="text-xs underline shrink-0">Bỏ liên kết</button>
+            <button onClick={handleUnlink} className="text-xs underline shrink-0">{t("report.unlinkBtn")}</button>
           )}
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Phương thức thanh toán</label>
+          <label className="text-xs text-gray-500 block mb-1">{t("report.paymentMethodLabel")}</label>
           <select
             value={form.paymentMethodSafety}
             onChange={(e) => setForm((f) => ({ ...f, paymentMethodSafety: e.target.value }))}
             className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5"
           >
-            <option value="">— Chọn —</option>
-            <option value="SAFE">An toàn (L/C, escrow)</option>
-            <option value="MODERATE">Trung bình (T/T một phần)</option>
-            <option value="RISKY">Rủi ro cao (trả trước 100%)</option>
+            <option value="">{t("report.selectPlaceholder")}</option>
+            <option value="SAFE">{t("report.paymentSafe")}</option>
+            <option value="MODERATE">{t("report.paymentModerate")}</option>
+            <option value="RISKY">{t("report.paymentRisky")}</option>
           </select>
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Đặt cọc trước (%)</label>
+          <label className="text-xs text-gray-500 block mb-1">{t("report.depositLabel")}</label>
           <input
             type="number" min={0} max={100}
             value={form.depositPercentage}
@@ -461,7 +470,7 @@ function TransactionInfoCard({
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500 block mb-1">Giá trị giao dịch (USD)</label>
+          <label className="text-xs text-gray-500 block mb-1">{t("report.dealValueLabel")}</label>
           <input
             type="number" min={0}
             value={form.dealValueUsd}
@@ -473,22 +482,22 @@ function TransactionInfoCard({
 
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500">Đã có hợp đồng thành văn?</span>
+          <span className="text-xs text-gray-500">{t("report.hasWrittenContractQuestion")}</span>
           <button
             onClick={() => setShowModal(true)}
             className="px-3 py-1 text-xs font-semibold rounded-full bg-[#E6F9F0] text-[#00843F]"
-          >Có</button>
+          >{t("report.yesBtn")}</button>
           <button
             onClick={() => saveSelfReport(false)}
             className="px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-500"
-          >Không</button>
+          >{t("report.noBtn")}</button>
         </div>
         <button
           onClick={() => saveSelfReport(report.selfReportHasWrittenContract ?? null)}
           disabled={saving}
           className="px-3 py-1.5 text-xs font-bold text-white rounded-lg bg-gray-800 disabled:opacity-60"
         >
-          {saving ? "Đang lưu..." : "Lưu"}
+          {saving ? t("report.savingBtn") : t("report.saveBtn")}
         </button>
       </div>
 
@@ -506,6 +515,7 @@ function TransactionInfoCard({
 export default function ReportDetailPage({ params }: Props) {
   const { id } = use(params);
   const router = useRouter();
+  const { t } = useLanguage();
   const [report, setReport] = useState<VerificationReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRescan, setIsRescan] = useState(false);
@@ -531,7 +541,7 @@ export default function ReportDetailPage({ params }: Props) {
             timer = setTimeout(load, 3000);
           }
         })
-        .catch(() => { if (!cancelled) toast.error("Không tải được báo cáo."); })
+        .catch(() => { if (!cancelled) toast.error(t("report.loadReportError")); })
         .finally(() => { if (!cancelled) setIsLoading(false); });
     };
     load();
@@ -566,7 +576,7 @@ export default function ReportDetailPage({ params }: Props) {
     try {
       await exportReportPdf(report.id);
     } catch {
-      toast.error("Không thể xuất báo cáo PDF.");
+      toast.error(t("report.exportErrorToast"));
     } finally {
       setIsExporting(false);
     }
@@ -600,13 +610,13 @@ export default function ReportDetailPage({ params }: Props) {
                   Dashboard
                 </Link>
                 <span className="text-gray-200">/</span>
-                <Link href="/reports" className="text-sm text-gray-400 hover:text-gray-700">Báo cáo</Link>
+                <Link href="/reports" className="text-sm text-gray-400 hover:text-gray-700">{t("report.breadcrumbReports")}</Link>
                 <span className="text-gray-200">/</span>
                 <span className="text-sm font-medium text-gray-700 font-mono">{id.slice(0, 8).toUpperCase()}</span>
                 {isProcessingStatus(report?.status) && (
                   <span className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                    Đang quét
+                    {t("report.scanningBadge")}
                   </span>
                 )}
               </div>
@@ -617,7 +627,7 @@ export default function ReportDetailPage({ params }: Props) {
                   className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-60"
                 >
                   <Download className={`w-4 h-4 ${isExporting ? "animate-pulse" : ""}`} />
-                  {isExporting ? "Đang xuất..." : "Xuất báo cáo"}
+                  {isExporting ? t("report.exportingBtn") : t("report.exportBtn")}
                 </button>
                 <button
                   onClick={handleRescan}
@@ -625,7 +635,7 @@ export default function ReportDetailPage({ params }: Props) {
                   className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-60"
                 >
                   <RefreshCw className={`w-4 h-4 ${isRescan ? "animate-spin" : ""}`} />
-                  Quét lại
+                  {t("report.rescanBtn")}
                 </button>
                 <button
                   onClick={() => setShowFlagModal(true)}
@@ -633,7 +643,7 @@ export default function ReportDetailPage({ params }: Props) {
                   className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-colors shadow-sm disabled:opacity-60 disabled:text-gray-400"
                 >
                   <Flag className="w-4 h-4" />
-                  {justFlagged ? "Đã gửi báo cáo" : "Báo kết quả sai"}
+                  {justFlagged ? t("report.flaggedBtn") : t("report.flagModalTitle")}
                 </button>
               </div>
             </div>
@@ -641,12 +651,12 @@ export default function ReportDetailPage({ params }: Props) {
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-24 gap-4">
                 <div className="w-12 h-12 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin" />
-                <p className="text-sm text-gray-400">Đang tải báo cáo...</p>
+                <p className="text-sm text-gray-400">{t("report.loadingReport")}</p>
               </div>
             ) : !report ? (
               <div className="text-center py-24">
                 <XCircle className="w-12 h-12 text-gray-200 mx-auto mb-3" />
-                <p className="text-gray-500">Không tìm thấy báo cáo.</p>
+                <p className="text-gray-500">{t("report.notFound")}</p>
               </div>
             ) : (
               <div className="space-y-6 stagger">
@@ -658,7 +668,7 @@ export default function ReportDetailPage({ params }: Props) {
                       <ShieldCheck className="w-4.5 h-4.5 text-purple-600" />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-purple-800">Kết quả này đã được đội ngũ MarketScout điều chỉnh thủ công</p>
+                      <p className="text-sm font-bold text-purple-800">{t("report.correctedBanner")}</p>
                       {report.correctionNote && (
                         <p className="text-sm text-purple-700/80 mt-0.5">{report.correctionNote}</p>
                       )}
@@ -684,7 +694,7 @@ export default function ReportDetailPage({ params }: Props) {
                           )}
                           {report.taxId && (
                             <span className="text-xs font-mono text-gray-500 bg-gray-50 px-3 py-1 rounded-full">
-                              Tax: {report.taxId}
+                              {t("report.taxPrefix")} {report.taxId}
                             </span>
                           )}
                           {report.website && (
@@ -700,11 +710,11 @@ export default function ReportDetailPage({ params }: Props) {
                     <div className="shrink-0">
                       {report.hardStop ? (
                         <span className="flex items-center gap-2 text-sm font-bold text-red-700 bg-red-50 border border-red-200 px-4 py-2 rounded-xl">
-                          <XCircle className="w-4 h-4" /> Hard Stop
+                          <XCircle className="w-4 h-4" /> {t("report.hardStopBadge")}
                         </span>
                       ) : (
                         <span className="flex items-center gap-2 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl">
-                          <CheckCircle2 className="w-4 h-4" /> Không có Hard Stop
+                          <CheckCircle2 className="w-4 h-4" /> {t("report.noHardStopBadge")}
                         </span>
                       )}
                     </div>
@@ -718,9 +728,9 @@ export default function ReportDetailPage({ params }: Props) {
                       <XCircle className="w-5 h-5 text-red-500" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-bold text-red-700 mb-1">⛔ HARD STOP — Cần xem xét ngay</p>
+                      <p className="text-sm font-bold text-red-700 mb-1">{t("report.hardStopAlertTitle")}</p>
                       <p className="text-sm text-red-600/80">
-                        Phát hiện vấn đề tuân thủ nghiêm trọng. Đề xuất tạm dừng mọi giao dịch với đơn vị này cho đến khi hoàn tất thẩm tra.
+                        {t("report.hardStopAlertBody")}
                       </p>
                     </div>
                   </div>
@@ -729,12 +739,12 @@ export default function ReportDetailPage({ params }: Props) {
                 {/* ── Score + Deal Safety ── */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex flex-col items-center">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Điểm tin cậy tổng</p>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">{t("report.overallScoreLabel")}</p>
                     <ScoreGaugeLight score={avgScore} />
                     <div className="mt-4 w-full space-y-1.5">
                       {[
-                        { label: "Đánh giá", value: report.riskLevel },
-                        { label: "Trạng thái", value: report.status },
+                        { label: t("report.riskLevelLabel"), value: report.riskLevel ? t(`report.riskLevel.${report.riskLevel}`) : undefined },
+                        { label: t("report.statusLabel"), value: report.status },
                       ].map(({ label, value }) => (
                         <div key={label} className="flex items-center justify-between text-xs">
                           <span className="text-gray-400">{label}</span>
@@ -749,7 +759,7 @@ export default function ReportDetailPage({ params }: Props) {
                       <div className="w-8 h-8 bg-purple-50 rounded-xl flex items-center justify-center">
                         <Shield className="w-4 h-4 text-purple-500" />
                       </div>
-                      <h3 className="text-sm font-bold text-gray-900">Khuyến nghị Deal Safety</h3>
+                      <h3 className="text-sm font-bold text-gray-900">{t("report.dealSafetyTitle")}</h3>
                     </div>
                     {dealSafety ? (
                       <>
@@ -757,14 +767,14 @@ export default function ReportDetailPage({ params }: Props) {
                           <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                           <div>
                             <p className="text-sm font-bold text-amber-800 mb-1">
-                              {dealSafety.warningLabel || "CẦN CHÚ Ý — Rủi ro cao"}
+                              {dealSafety.warningLabel || t("report.dealSafetyDefaultWarning")}
                             </p>
                             <p className="text-sm text-amber-700">{dealSafety.recommendation}</p>
                           </div>
                         </div>
                         {dealSafety.requiredProtocols && dealSafety.requiredProtocols.length > 0 && (
                           <div>
-                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">Giao thức bắt buộc:</p>
+                            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">{t("report.requiredProtocolsLabel")}</p>
                             <ul className="space-y-2">
                               {dealSafety.requiredProtocols.map((p, i) => (
                                 <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
@@ -779,7 +789,7 @@ export default function ReportDetailPage({ params }: Props) {
                     ) : (
                       <div className="flex items-center gap-3 text-sm text-gray-400 p-4 bg-gray-50 rounded-xl">
                         <Info className="w-4 h-4 shrink-0" />
-                        Chưa có phân tích Deal Safety.
+                        {t("report.noDealSafety")}
                       </div>
                     )}
                   </div>
@@ -792,17 +802,17 @@ export default function ReportDetailPage({ params }: Props) {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h2 className="text-lg font-extrabold text-gray-900">Phân tích 8 Trụ cột</h2>
-                      <p className="text-sm text-gray-400">Thẩm định toàn diện theo từng chiều kiểm tra</p>
+                      <h2 className="text-lg font-extrabold text-gray-900">{t("report.pillarsTitle")}</h2>
+                      <p className="text-sm text-gray-400">{t("report.pillarsSubtitle")}</p>
                     </div>
                     <span className="text-xs text-gray-400 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-xl">
-                      {pillars.length}/8 trụ cột
+                      {t("report.pillarsCount", { n: pillars.length })}
                     </span>
                   </div>
                   {pillars.length === 0 ? (
                     <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
                       <Clock className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-                      <p className="text-gray-400 text-sm">Đang phân tích dữ liệu các trụ cột...</p>
+                      <p className="text-gray-400 text-sm">{t("report.pillarsLoading")}</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -818,15 +828,15 @@ export default function ReportDetailPage({ params }: Props) {
                 <div className="bg-gradient-to-r from-[#0A1A12] to-[#0D2218] rounded-2xl p-6 flex items-center justify-between">
                   <div>
                     <p className="text-[#5FD48A] text-xs font-bold uppercase tracking-widest mb-1">AI Copilot</p>
-                    <h3 className="text-white font-bold text-base mb-1">Có câu hỏi về báo cáo này?</h3>
-                    <p className="text-[#7BAA8C] text-sm">AI của chúng tôi sẵn sàng giải thích chi tiết từng trụ cột.</p>
+                    <h3 className="text-white font-bold text-base mb-1">{t("report.copilotTitle")}</h3>
+                    <p className="text-[#7BAA8C] text-sm">{t("report.copilotSubtitle")}</p>
                   </div>
                   <Link
                     href={`/chat?reportId=${id}`}
                     className="flex items-center gap-2 px-5 py-2.5 gradient-brand text-white font-bold rounded-xl hover:opacity-90 transition-opacity shrink-0"
                   >
                     <MessageSquare className="w-4 h-4" />
-                    Hỏi AI →
+                    {t("report.copilotCta")}
                   </Link>
                 </div>
 

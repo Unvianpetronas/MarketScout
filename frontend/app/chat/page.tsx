@@ -197,9 +197,11 @@ function ChatContent() {
   const userInitials = (user?.fullName || "U")
       .split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
 
+  // Opening the assistant always starts a fresh conversation — history is still
+  // listed in the sidebar for the user to pick from, but never auto-selected.
   useEffect(() => {
     getSessions()
-        .then((s) => { setSessions(s); if (s.length > 0) setActiveSession(s[0]); setIsLoadingSessions(false); })
+        .then((s) => { setSessions(s); setIsLoadingSessions(false); })
         .catch(() => setIsLoadingSessions(false));
   }, []);
 
