@@ -84,7 +84,9 @@ public class FactExtractor {
             // null so the rubric marks the pillar N/A (SKIP) instead of scoring it
             // 0/FAIL — "couldn't verify" must not look like "failed verification".
 
-            // P1
+            // P1 — registrationId/registrationType come straight from P1Data (ground
+            // truth), not Gemini interpretation, so the rubric can link evidence back
+            // to the exact registry record it came from.
             if (p1 != null && p1.isFound()) {
                 var p1n = node.path("p1");
                 f.setP1(FactJson.P1Facts.builder()
@@ -92,6 +94,8 @@ public class FactExtractor {
                     .ageYears(doubleVal(p1n, "age_years"))
                     .hasLegalRepresentative(boolVal(p1n, "has_legal_representative"))
                     .industryMatch(text(p1n, "industry_match"))
+                    .registrationId(p1.getRegistrationId())
+                    .registrationType(p1.getRegistrationType())
                     .build());
             }
 
@@ -107,6 +111,7 @@ public class FactExtractor {
                     .hasSsl(boolVal(p2n, "has_ssl"))
                     .socialMediaScore(text(p2n, "social_media_score"))
                     .facebookPages(p2.getFacebookPages())
+                    .domain(p2.getDomain())
                     .build());
             }
 
@@ -153,6 +158,7 @@ public class FactExtractor {
                     .isPersonalAccountRequested(boolVal(p6n, "is_personal_account_requested"))
                     .bicVerified(boolVal(p6n, "bic_verified"))
                     .accountType(text(p6n, "account_type"))
+                    .matchedEntityId(p6.getMatchedEntityId())
                     .build());
             }
 
@@ -194,13 +200,15 @@ public class FactExtractor {
         if (p1 != null && p1.isFound()) {
             f.setP1(FactJson.P1Facts.builder()
                 .status(p1.getStatus()).ageYears(p1.getAgeYears())
-                .hasLegalRepresentative(p1.getHasLegalRepresentative()).build());
+                .hasLegalRepresentative(p1.getHasLegalRepresentative())
+                .registrationId(p1.getRegistrationId()).registrationType(p1.getRegistrationType()).build());
         }
         if (p2 != null && p2.isFound()) {
             f.setP2(FactJson.P2Facts.builder()
                 .hasOfficialWebsite(p2.getHasOfficialWebsite()).domainAgeMonths(p2.getDomainAgeMonths())
                 .usesFreeEmail(p2.getUsesFreeEmail()).hasSsl(p2.getHasSsl())
-                .socialMediaScore(p2.getSocialMediaScore()).facebookPages(p2.getFacebookPages()).build());
+                .socialMediaScore(p2.getSocialMediaScore()).facebookPages(p2.getFacebookPages())
+                .domain(p2.getDomain()).build());
         }
         if (p3 != null && p3.isFound()) {
             f.setP3(FactJson.P3Facts.builder()
@@ -219,7 +227,8 @@ public class FactExtractor {
                 .dataSource(p5.getDataSource()).build());
         }
         if (p6 != null && p6.isFound()) {
-            f.setP6(FactJson.P6Facts.builder().isSanctionHit(p6.isSanctioned()).build());
+            f.setP6(FactJson.P6Facts.builder().isSanctionHit(p6.isSanctioned())
+                .matchedEntityId(p6.getMatchedEntityId()).build());
         }
         if (p7 != null && p7.isFound()) {
             f.setP7(FactJson.P7Facts.builder()

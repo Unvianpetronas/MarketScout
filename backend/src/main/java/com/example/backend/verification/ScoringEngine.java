@@ -81,7 +81,8 @@ public class ScoringEngine {
             report.setUpdatedAt(Instant.now());
             reportRepository.save(report);
 
-            ScoringResult result = runPipeline(input, reportId, report, sseCallback);
+            String language = usersRepository.findById(userId).map(Users::getLanguage).orElse(null);
+            ScoringResult result = runPipeline(input, reportId, report, sseCallback, language);
 
             // Persist
             report.setOverallScore(result.isHardStop() ? (short) 0 : (short) Math.round(result.getOverallScore()));
@@ -140,7 +141,7 @@ public class ScoringEngine {
     }
 
     private ScoringResult runPipeline(CompanyInput input, UUID reportId, Report report,
-                                       Consumer<String> sseCallback) {
+                                       Consumer<String> sseCallback, String language) {
         emit(sseCallback, "crawler", "thinking", "Đang kiểm tra danh sách trừng phạt...");
 
         // Step 1: P6 FIRST and sequential. A sanctioned company is a hard-stop, so
@@ -154,7 +155,7 @@ public class ScoringEngine {
                 .hardStopReason("Nằm trong danh sách trừng phạt: " + p6.getSanctionSource())
                 .riskLevel("Nghiêm trọng").status("HARD_STOP")
                 .pillars(List.of(rubricLoader.getRubric().scoreP6(
-                    FactJson.P6Facts.builder().isSanctionHit(true).build())))
+                    FactJson.P6Facts.builder().isSanctionHit(true).build(), null, language)))
                 .build();
         }
 
@@ -196,14 +197,14 @@ public class ScoringEngine {
         var rubric = rubricLoader.getRubric();
         FactJson.P7Facts p7Facts = contractP7Mapper.resolve(report);
         List<PillarScore> pillars = List.of(
-            rubric.scoreP1(facts.getP1()),
-            rubric.scoreP2(facts.getP2()),
-            rubric.scoreP3(facts.getP3()),
-            rubric.scoreP4(facts.getP4()),
-            rubric.scoreP5(facts.getP5()),
-            rubric.scoreP6(facts.getP6(), p6.getErrorMsg()),
-            rubric.scoreP7(p7Facts != null ? p7Facts : facts.getP7()),
-            rubric.scoreP8(facts.getP8())
+            rubric.scoreP1(facts.getP1(), language),
+            rubric.scoreP2(facts.getP2(), language),
+            rubric.scoreP3(facts.getP3(), language),
+            rubric.scoreP4(facts.getP4(), language),
+            rubric.scoreP5(facts.getP5(), language),
+            rubric.scoreP6(facts.getP6(), p6.getErrorMsg(), language),
+            rubric.scoreP7(p7Facts != null ? p7Facts : facts.getP7(), language),
+            rubric.scoreP8(facts.getP8(), language)
         );
 
         // Step 5: Overall score
@@ -252,9 +253,10 @@ public class ScoringEngine {
         Report report = reportRepository.findById(reportId)
             .orElseThrow(() -> new RuntimeException("Report not found: " + reportId));
         List<PillarResult> existing = pillarResultRepository.findByReportIdOrderByPillarNoAsc(reportId);
+        String language = reportRepository.findUserLanguageByReportId(reportId);
 
         var rubric = rubricLoader.getRubric();
-        PillarScore p7Score = rubric.scoreP7(contractP7Mapper.resolve(report));
+        PillarScore p7Score = rubric.scoreP7(contractP7Mapper.resolve(report), language);
 
         List<PillarScore> pillars = new ArrayList<>();
         boolean hadP7Row = false;

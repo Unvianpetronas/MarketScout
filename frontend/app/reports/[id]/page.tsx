@@ -133,7 +133,7 @@ function pillarStatusStyle(status: string | undefined) {
   }
 }
 
-function EvidenceRow({ ev }: { ev: { type?: string; text?: string; source?: string } }) {
+function EvidenceRow({ ev }: { ev: { type?: string; text?: string; source?: string; url?: string } }) {
   const t = (ev.type || "").toUpperCase();
   const Icon = t === "PASS" ? CheckCircle2 : t === "FAIL" ? XCircle : AlertTriangle;
   const cls = t === "PASS" ? "text-emerald-500" : t === "FAIL" ? "text-red-400" : "text-amber-500";
@@ -142,7 +142,14 @@ function EvidenceRow({ ev }: { ev: { type?: string; text?: string; source?: stri
       <Icon className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${cls}`} />
       <span>
         {ev.text}
-        {ev.source && <span className="text-gray-300"> · {ev.source}</span>}
+        {ev.source && (
+          ev.url ? (
+            <a href={ev.url} target="_blank" rel="noopener noreferrer"
+              className="text-[#00D26A] hover:underline"> · {ev.source} <ExternalLink className="w-2.5 h-2.5 inline-block mb-0.5" /></a>
+          ) : (
+            <span className="text-gray-300"> · {ev.source}</span>
+          )
+        )}
       </span>
     </li>
   );
