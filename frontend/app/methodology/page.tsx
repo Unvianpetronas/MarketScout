@@ -7,6 +7,7 @@ import {
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
 import { useLanguage } from "@/providers/language-provider";
+import { Reveal } from "@/components/shared/reveal";
 
 interface PillarDoc {
   no: number;
@@ -119,7 +120,7 @@ export default function MethodologyPage() {
             </div>
 
             {/* ── How scoring works ── */}
-            <div className="bg-gradient-to-r from-[#0A1A12] to-[#0D2218] rounded-2xl p-6 mb-8">
+            <Reveal className="bg-gradient-to-r from-[#0A1A12] to-[#0D2218] rounded-2xl p-6 mb-8">
               <p className="text-[#5FD48A] text-xs font-bold uppercase tracking-widest mb-2">{t("methodology.scoringLabel")}</p>
               <p className="text-white/90 text-sm leading-relaxed mb-3">
                 {t("methodology.scoringIntro")}{" "}
@@ -134,20 +135,20 @@ export default function MethodologyPage() {
                 <span className="font-bold text-red-300">Hard Stop</span>
                 {t("methodology.sanctionsOutro")}
               </p>
-            </div>
+            </Reveal>
 
             {/* ── Pillar docs ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Reveal className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {PILLARS.map((p) => <PillarDocCard key={p.no} p={p} />)}
-            </div>
+            </Reveal>
 
             {/* ── Confidence note ── */}
-            <div className="mt-8 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+            <Reveal className="mt-8 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
               <h3 className="text-sm font-bold text-gray-900 mb-2">{t("methodology.confidenceTitle")}</h3>
               <p className="text-sm text-gray-600">
                 {t("methodology.confidenceDesc")}
               </p>
-            </div>
+            </Reveal>
 
           </main>
         </div>

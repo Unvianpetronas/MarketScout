@@ -54,19 +54,12 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit -p tsconfig.json
 
+      - name: Lint
+        run: npm run lint
+
       - name: Run tests
         run: npm test
 
       - name: Build
         run: npm run build
 
-      # `npm run lint` is intentionally NOT a blocking step here: as of
-      # 2026-07-19 it already fails on ~13 pre-existing errors (mostly
-      # react-hooks/set-state-in-effect on fetch-on-mount pages) across
-      # files unrelated to any single change, predating this CI pipeline.
-      # Surfaced non-blocking so it's visible without turning CI permanently
-      # red on unrelated debt. Fix the underlying issues, then flip this back
-      # into a real "Lint" step above.
-      - name: Lint (non-blocking — see comment above)
-        run: npm run lint
-        continue-on-error: true

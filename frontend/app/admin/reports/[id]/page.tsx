@@ -54,7 +54,7 @@ export default function AdminReportDetailPage({ params }: Props) {
     }
   };
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { Promise.resolve().then(load); }, [id]);
 
   const handleSaveOverride = async () => {
     if (!note.trim()) { toast.error("Cần ghi lý do điều chỉnh."); return; }

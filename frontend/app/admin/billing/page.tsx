@@ -38,7 +38,7 @@ export default function AdminBillingPage() {
     }
   };
 
-  useEffect(() => { fetchPlans(); }, []);
+  useEffect(() => { Promise.resolve().then(fetchPlans); }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

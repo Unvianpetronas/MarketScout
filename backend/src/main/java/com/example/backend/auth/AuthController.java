@@ -90,6 +90,12 @@ public class AuthController {
         return ResponseEntity.ok(userService.refresh(req.getRefreshToken()));
     }
 
+    @PostMapping("/google")
+    public ResponseEntity<AuthDTO.LoginResponse> googleLogin(@Valid @RequestBody AuthDTO.GoogleLoginRequest req) {
+        logger.info("Google login attempt");
+        return ResponseEntity.ok(userService.loginWithGoogle(req.getCredential()));
+    }
+
     // User clicks link in email → backend verifies → redirect to frontend
     @GetMapping("/verify-email")
     public void verifyEmail(@RequestParam String token, HttpServletResponse response) throws IOException {

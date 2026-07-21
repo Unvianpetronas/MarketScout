@@ -52,7 +52,7 @@ export default function AdminOverviewPage() {
     }
   };
 
-  useEffect(() => { fetchOverview(); }, []);
+  useEffect(() => { Promise.resolve().then(fetchOverview); }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

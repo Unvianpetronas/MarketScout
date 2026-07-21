@@ -47,6 +47,7 @@ public class ChatService {
     private final ChatMessageRepository  messageRepo;
     private final UsersRepository        usersRepo;
     private final ReportRepository       reportRepo;
+    private final PillarResultRepository pillarResultRepo;
     private final GeminiService          geminiService;
     private final QuotaService           quotaService;
     private final IntentDetector         intentDetector;
@@ -221,7 +222,7 @@ public class ChatService {
             case "VERIFY_PARTNER" -> handleVerify(userId, intent, req, emitter, 1);
             case "COMPARE_PARTNERS" -> handleCompare(userId, intent, req, emitter);
             case "EXPLAIN_REPORT" -> handleExplainReport(userId, req, emitter);
-            default -> handleGeneralQA(intent, req, emitter);
+            default -> handleGeneralQA(userId, intent, req, emitter);
         };
     }
 
@@ -579,12 +580,20 @@ public class ChatService {
     private String handleCompare(UUID userId, IntentResult intent, ReportDTO.ChatMessageRequest req,
                                 SseEmitter emitter) throws Exception {
         String sessionKey = sessionKeyOf(userId, req);
-        String message = req.getMessage();
-        String[] parts = message.split(" vs | VS | và | and ");
-        String company1 = parts.length > 0 ? parts[0].trim() : intent.getCompanyName();
-        String company2 = parts.length > 1 ? parts[1].trim() : "";
 
-        if (company1 == null || company1.isBlank() || company2.isBlank()) {
+        // Prefer the LLM-extracted pair (no command-prefix leakage); the raw split
+        // is only the fallback for when intent detection itself fell back.
+        String company1, company2;
+        if (intent.getCompanyNames() != null && intent.getCompanyNames().size() >= 2) {
+            company1 = intent.getCompanyNames().get(0);
+            company2 = intent.getCompanyNames().get(1);
+        } else {
+            String[] parts = parseCompareNames(req.getMessage());
+            company1 = parts.length > 0 ? parts[0] : intent.getCompanyName();
+            company2 = parts.length > 1 ? parts[1] : "";
+        }
+
+        if (company1 == null || company1.isBlank() || company2 == null || company2.isBlank()) {
             String msg = "Bạn muốn so sánh 2 công ty nào? Ví dụ: \"Công ty A vs Công ty B\".";
             sendEvent(emitter, AgentEvent.done("manager", msg, null));
             return msg;
@@ -604,6 +613,20 @@ public class ChatService {
             "pending", true, "companyNames", List.of(company1, company2),
             "quotaCost", 2, "quotaRemaining", quotaRemaining)));
         return confirmMsg;
+    }
+
+    /**
+     * Fallback compare-name parser: strips leading command words ("so sánh giúp mình...")
+     * before splitting on the separator, so the prefix never leaks into company 1.
+     */
+    static String[] parseCompareNames(String message) {
+        if (message == null) return new String[0];
+        String cleaned = message.trim().replaceFirst(
+            "(?iu)^(hãy\\s+|vui lòng\\s+|please\\s+)?(so sánh|compare)\\s*(giúp|giùm|hộ)?\\s*(mình|tôi|em|me)?\\s*", "");
+        return java.util.Arrays.stream(cleaned.split("(?iu)\\s+vs\\.?\\s+|\\s+và\\s+|\\s+and\\s+|\\s+với\\s+"))
+            .map(String::trim)
+            .filter(s -> !s.isBlank())
+            .toArray(String[]::new);
     }
 
     /** Runs two Deep Verify pipelines in parallel — only reached after user confirmation. */
@@ -729,11 +752,8 @@ public class ChatService {
             var reportOpt = reportRepo.findById(req.getReportId())
                 .filter(r -> r.getUser().getId().equals(userId));
             if (reportOpt.isPresent()) {
-                Report r = reportOpt.get();
-                reportContext = "Báo cáo thẩm định: " + r.getEntityName()
-                    + " | Điểm tổng: " + r.getOverallScore()
-                    + " | Trạng thái: " + r.getStatus()
-                    + " | Mức rủi ro: " + r.getRiskLevel();
+                reportContext = buildReportContext(reportOpt.get(),
+                    pillarResultRepo.findByReportIdOrderByPillarNoAsc(req.getReportId()));
             }
         }
 
@@ -745,14 +765,90 @@ public class ChatService {
         return reply;
     }
 
-    private String handleGeneralQA(IntentResult intent, ReportDTO.ChatMessageRequest req,
+    /**
+     * Full report context for EXPLAIN_REPORT: the AI is asked "why is my score low?",
+     * so it must see the per-pillar breakdown (score/status/findings), not just the
+     * overall number — otherwise it can only answer vaguely.
+     */
+    static String buildReportContext(Report r, List<PillarResult> pillars) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Báo cáo thẩm định: ").append(r.getEntityName())
+          .append(" | Điểm tổng: ").append(r.getOverallScore())
+          .append(" | Trạng thái: ").append(r.getStatus())
+          .append(" | Mức rủi ro: ").append(r.getRiskLevel());
+        if (Boolean.TRUE.equals(r.getHardStop())) {
+            sb.append(" | HARD STOP: có (dính danh sách trừng phạt)");
+        }
+        if (pillars != null && !pillars.isEmpty()) {
+            sb.append("\nChi tiết từng trụ cột:");
+            for (PillarResult p : pillars) {
+                sb.append("\n- P").append(p.getPillarNo());
+                if (p.getPillarName() != null && !p.getPillarName().isBlank()) {
+                    sb.append(" ").append(p.getPillarName());
+                }
+                sb.append(": ").append(p.getScore() != null ? p.getScore() + "/100" : "chưa chấm");
+                if (p.getStatus() != null) sb.append(" (").append(p.getStatus()).append(")");
+                if (p.getFindings() != null && !p.getFindings().isBlank()) {
+                    String findings = p.getFindings().trim();
+                    // Cap per-pillar findings so 8 pillars stay well inside the prompt budget
+                    if (findings.length() > 400) findings = findings.substring(0, 400) + "...";
+                    sb.append(" — ").append(findings);
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /** How many recent messages GENERAL_QA replays to Gemini as conversation context. */
+    private static final int GENERAL_QA_HISTORY_LIMIT = 12;
+
+    private String handleGeneralQA(UUID userId, IntentResult intent, ReportDTO.ChatMessageRequest req,
                                   SseEmitter emitter) throws Exception {
-        String reply = intent.getReply() != null ? intent.getReply()
-            : geminiService.chat(List.of(new GeminiService.GeminiMessage("user", req.getMessage())));
+        List<GeminiService.GeminiMessage> history = buildChatHistory(userId, req);
+
+        String reply;
+        if (history.size() > 1) {
+            // Follow-up in an ongoing conversation: intent.getReply() was generated
+            // WITHOUT history ("thế so với CIF thì sao?" would be answered blind),
+            // so spend one extra Gemini call to answer with the real context.
+            reply = geminiService.chat(history);
+        } else {
+            reply = intent.getReply() != null ? intent.getReply()
+                : geminiService.chat(List.of(new GeminiService.GeminiMessage("user", req.getMessage())));
+        }
 
         log.info("handleGeneralQA reply string length: {}", reply != null ? reply.length() : "null");
         sendEvent(emitter, AgentEvent.done("result", reply, null));
         return reply;
+    }
+
+    /**
+     * Recent session messages as Gemini history. The current user message is already
+     * saved (processMessage saves it before handleIntent runs), so it arrives as the
+     * last entry. Falls back to just the current message for sessionless calls.
+     */
+    private List<GeminiService.GeminiMessage> buildChatHistory(UUID userId, ReportDTO.ChatMessageRequest req) {
+        List<GeminiService.GeminiMessage> single =
+            List.of(new GeminiService.GeminiMessage("user", req.getMessage()));
+
+        ChatSession session = resolveSession(userId, req.getSessionId());
+        if (session == null) return single;
+
+        List<ChatMessage> messages = messageRepo.findBySession_IdOrderByCreatedAtAsc(session.getId());
+        if (messages.isEmpty()) return single;
+
+        List<ChatMessage> recent = messages.size() > GENERAL_QA_HISTORY_LIMIT
+            ? messages.subList(messages.size() - GENERAL_QA_HISTORY_LIMIT, messages.size())
+            : messages;
+
+        List<GeminiService.GeminiMessage> history = new java.util.ArrayList<>();
+        for (ChatMessage m : recent) {
+            // Gemini expects the conversation to open with a user turn — drop a
+            // leading assistant message the window may have cut in front of.
+            if (history.isEmpty() && !"user".equals(m.getRole())) continue;
+            history.add(new GeminiService.GeminiMessage(m.getRole(), m.getContent()));
+        }
+        return history.isEmpty() ? single : history;
     }
 
     private void sendEvent(SseEmitter emitter, AgentEvent event) throws Exception {

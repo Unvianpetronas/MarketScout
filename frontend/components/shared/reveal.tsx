@@ -5,11 +5,11 @@ import { useEffect, useRef, useState } from "react";
 type RevealVariant = "up" | "left" | "right" | "scale";
 
 /**
- * Scroll-triggered entrance — fades/slides an element in the first time it
- * crosses into the viewport (IntersectionObserver), then leaves it alone.
- * Reveals once and never re-hides on scroll-up, so re-reading a page never
- * flickers content away. Respects prefers-reduced-motion via CSS (see
- * globals.css) rather than skipping the observer, so no extra branching here.
+ * Scroll-triggered entrance — fades/slides an element in every time it crosses
+ * into the viewport (IntersectionObserver), and re-hides it once it fully
+ * leaves, so the popup effect replays on scroll-up as well as scroll-down.
+ * Respects prefers-reduced-motion via CSS (see globals.css) rather than
+ * skipping the observer, so no extra branching here.
  */
 export function Reveal({
   children,
@@ -30,10 +30,7 @@ export function Reveal({
     if (!el) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
+        setVisible(entry.isIntersecting);
       },
       { threshold: 0.15, rootMargin: "0px 0px -80px 0px" }
     );

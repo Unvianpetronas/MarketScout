@@ -57,7 +57,7 @@ export default function AdminCustomersPage() {
     }
   };
 
-  useEffect(() => { fetchUsers(); }, [page, searchQuery]);
+  useEffect(() => { Promise.resolve().then(fetchUsers); }, [page, searchQuery]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

@@ -37,7 +37,7 @@ export default function AdminHistoryPage() {
     }
   };
 
-  useEffect(() => { fetchLogs(); }, [page]);
+  useEffect(() => { Promise.resolve().then(fetchLogs); }, [page]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

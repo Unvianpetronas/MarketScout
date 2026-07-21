@@ -47,6 +47,14 @@ public class AuthDTO {
         private Boolean aiOptimization;
     }
 
+    // ── Google Sign-In ────────────────────────────────────────────
+    // `credential` is the ID token (JWT) returned by Google Identity Services.
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class GoogleLoginRequest {
+        @NotBlank
+        private String credential;
+    }
+
     // ── Register ──────────────────────────────────────────────────
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class RegisterRequest {
