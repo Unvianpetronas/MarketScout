@@ -41,3 +41,12 @@ CREATE TABLE IF NOT EXISTS report_flags (
 );
 CREATE INDEX IF NOT EXISTS idx_report_flags_report ON report_flags (report_id);
 CREATE INDEX IF NOT EXISTS idx_report_flags_status ON report_flags (status);
+
+-- Defensive: if report_flags was created by an earlier, partial version of this
+-- script (before resolve/dismiss existed), the CREATE TABLE IF NOT EXISTS above
+-- is a no-op and would NOT add these columns — so PATCH /admin/report-flags/{id}
+-- (resolve/dismiss) fails on a missing resolved_by/resolved_at. Add them idempotently.
+ALTER TABLE report_flags ADD COLUMN IF NOT EXISTS note        text;
+ALTER TABLE report_flags ADD COLUMN IF NOT EXISTS status      varchar(20) NOT NULL DEFAULT 'open';
+ALTER TABLE report_flags ADD COLUMN IF NOT EXISTS resolved_by uuid REFERENCES users (id);
+ALTER TABLE report_flags ADD COLUMN IF NOT EXISTS resolved_at timestamptz;
