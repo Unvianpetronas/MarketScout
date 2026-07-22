@@ -1,11 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
-import { BarChart2, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { toast } from "sonner";
 import { register as registerApi } from "@/services/auth.service";
+import { useAuth } from "@/providers/auth-provider";
+
+// Google Identity Services, injected at runtime via the GSI <script>.
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string;
+            callback: (resp: { credential: string }) => void;
+          }) => void;
+          renderButton: (parent: HTMLElement, options: Record<string, unknown>) => void;
+        };
+      };
+    };
+  }
+}
+
+// Inlined at build time. Empty until a Google OAuth client ID is configured —
+// keeps the Google button hidden so the page works without it.
+const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
 interface RegisterFormData {
   fullName: string;
@@ -16,8 +39,13 @@ interface RegisterFormData {
 }
 
 export default function RegisterPage() {
+  const { loginWithGoogle } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const googleBtnRef = useRef<HTMLDivElement>(null);
+  // Holds the latest credential handler so the GSI callback (registered once)
+  // always calls the current loginWithGoogle without re-initializing GSI.
+  const onGoogleCredential = useRef<(credential: string) => void>(() => {});
 
   const {
     register,
@@ -46,6 +74,62 @@ export default function RegisterPage() {
     }
   };
 
+  // Keep the ref pointing at the latest handler (fresh loginWithGoogle) without
+  // re-initializing Google Identity Services. loginWithGoogle auto-creates a
+  // free-plan account on first sign-in, so this doubles as sign-up.
+  useEffect(() => {
+    onGoogleCredential.current = async (credential: string) => {
+      setIsLoading(true);
+      try {
+        await loginWithGoogle(credential);
+      } catch (err: unknown) {
+        const message =
+          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          "Google sign-up failed. Please try again.";
+        toast.error(message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  });
+
+  // Load Google Identity Services and render its official Sign-In button.
+  useEffect(() => {
+    if (!googleClientId) return;
+
+    const renderGoogleButton = () => {
+      if (!window.google || !googleBtnRef.current) return;
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (resp) => onGoogleCredential.current(resp.credential),
+      });
+      googleBtnRef.current.innerHTML = "";
+      window.google.accounts.id.renderButton(googleBtnRef.current, {
+        type: "standard",
+        theme: "outline",
+        size: "large",
+        text: "signup_with",
+        width: 340,
+      });
+    };
+
+    if (window.google) {
+      renderGoogleButton();
+      return;
+    }
+    const existing = document.getElementById("google-gsi");
+    if (existing) {
+      existing.addEventListener("load", renderGoogleButton);
+      return () => existing.removeEventListener("load", renderGoogleButton);
+    }
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.id = "google-gsi";
+    script.onload = renderGoogleButton;
+    document.body.appendChild(script);
+  }, []);
+
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -73,9 +157,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-md">
         <div className="flex items-center gap-2 mb-6">
-          <div className="w-8 h-8 rounded-full bg-[#00D26A] flex items-center justify-center">
-            <BarChart2 className="w-4 h-4 text-white" />
-          </div>
+          <Logo className="w-8 h-8" />
           <span className="font-bold text-gray-900">MarketScout</span>
         </div>
 
@@ -170,6 +252,23 @@ export default function RegisterPage() {
             Create Account
           </button>
         </form>
+
+        {/* Google Sign-Up — only shown once a Google OAuth client ID is
+            configured; the button itself is rendered by Google Identity
+            Services into the div below. Signing up with Google auto-creates a
+            free-plan account, so no separate registration step is needed. */}
+        {googleClientId && (
+          <>
+            <div className="my-6 flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">
+                Or sign up with
+              </span>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+            <div ref={googleBtnRef} className="flex justify-center" />
+          </>
+        )}
 
         <p className="text-center text-sm text-gray-500 mt-6">
           Already have an account?{" "}

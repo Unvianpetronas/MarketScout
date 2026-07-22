@@ -6,6 +6,7 @@ import {
   MessageSquare, Search, Shield, Settings, Plus, ChevronLeft, ChevronRight,
   LogOut, FileText, Globe, Star, LayoutDashboard, Home, BookOpen
 } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
 import { useState } from "react";
@@ -68,9 +69,7 @@ export function Sidebar({ active }: { active?: string }) {
       {/* ── Logo ── */}
       <div className="flex items-center justify-between px-4 py-5 border-b border-gray-100">
         <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 gradient-brand rounded-xl flex items-center justify-center shrink-0 shadow-sm">
-            <Search className="w-4 h-4 text-white" strokeWidth={2.5} />
-          </div>
+          <Logo className="w-9 h-9" />
           {!collapsed && (
             <span className="font-extrabold text-gray-900 text-[17px] tracking-tight truncate animate-fade-in">
               MarketScout

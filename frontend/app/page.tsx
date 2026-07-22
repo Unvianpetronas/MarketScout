@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Search,
-  BarChart2,
   CheckCircle2,
   Shield,
   Globe,
@@ -23,6 +22,7 @@ import {
   FileSignature,
   Building2,
 } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { LinkedinIcon, FacebookIcon, GithubIcon } from "@/components/icons/social-icons";
 import { useLanguage } from "@/providers/language-provider";
 import { Reveal } from "@/components/shared/reveal";
@@ -183,9 +183,7 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white/95 backdrop-blur z-50">
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[#00D26A] flex items-center justify-center">
-            <BarChart2 className="w-4 h-4 text-white" />
-          </div>
+          <Logo className="w-8 h-8" />
           <span className="font-bold text-gray-900 text-lg">MarketScout</span>
         </Link>
 
@@ -527,9 +525,7 @@ export default function LandingPage() {
             {/* Brand column */}
             <div className="md:col-span-1">
               <Link href="/" className="flex items-center gap-2 mb-4">
-                <div className="w-8 h-8 rounded-full bg-[#00D26A] flex items-center justify-center">
-                  <BarChart2 className="w-4 h-4 text-black" />
-                </div>
+                <Logo className="w-8 h-8" />
                 <span className="font-bold text-white text-lg">MarketScout</span>
               </Link>
               <p className="text-xs font-semibold tracking-widest text-[#00D26A] uppercase mb-3">

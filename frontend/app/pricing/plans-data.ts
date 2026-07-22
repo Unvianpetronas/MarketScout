@@ -15,6 +15,7 @@ export const PLANS = [
     id: "free",
     priceVnd: 0,
     priceUsd: 0,
+    monthlyQuota: 5,
     isFree: true,
     isPopular: false,
     href: "/register",
@@ -28,6 +29,7 @@ export const PLANS = [
     id: "starter",
     priceVnd: 2000000,
     priceUsd: 80,
+    monthlyQuota: 30,
     isFree: false,
     isPopular: false,
     href: "/checkout?plan=starter",
@@ -41,6 +43,7 @@ export const PLANS = [
     id: "pro",
     priceVnd: 5800000,
     priceUsd: 230,
+    monthlyQuota: 100,
     isFree: false,
     isPopular: true,
     href: "/checkout?plan=pro",
@@ -54,6 +57,7 @@ export const PLANS = [
     id: "enterprise",
     priceVnd: 0, // Custom
     priceUsd: 0,
+    monthlyQuota: null, // Unlimited — rendered as a static label, not a number
     isFree: false,
     isPopular: false,
     isCustom: true,

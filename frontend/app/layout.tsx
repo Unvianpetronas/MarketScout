@@ -36,6 +36,7 @@ const sora = Sora({
 export const metadata: Metadata = {
   title: "MarketScout — Trade Partner Verification",
   description: "Verify your international trade partners with AI-powered intelligence.",
+  icons: { icon: "/logo.png" },
 };
 
 export default function RootLayout({

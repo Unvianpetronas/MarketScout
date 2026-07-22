@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Search, LogOut, User, BarChart2 } from "lucide-react";
+import { Bell, Search, LogOut, User } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { useAuth } from "@/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 
@@ -13,9 +14,7 @@ export function AppNav() {
   return (
     <nav className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-white sticky top-0 z-50">
       <Link href="/dashboard" className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-full bg-[#00D26A] flex items-center justify-center">
-          <BarChart2 className="w-4 h-4 text-white" />
-        </div>
+        <Logo className="w-8 h-8" />
         <span className="font-bold text-gray-900 text-lg">MarketScout</span>
       </Link>
 

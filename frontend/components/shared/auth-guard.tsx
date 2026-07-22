@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
+import { Logo } from "@/components/brand/logo";
 
 export function AuthGuard({
   children,
@@ -26,9 +27,7 @@ export function AuthGuard({
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#00D26A] flex items-center justify-center animate-pulse">
-            <span className="text-white font-bold text-sm">MS</span>
-          </div>
+          <Logo className="w-10 h-10 animate-pulse" />
           <p className="text-gray-500 text-sm">Loading...</p>
         </div>
       </div>

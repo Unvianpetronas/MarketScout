@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, X, Zap, Shield, Star, ArrowRight, ChevronDown, ChevronUp, Globe, Clock, XCircle } from "lucide-react";
+import { Check, X, Zap, Star, ArrowRight, ChevronDown, ChevronUp, Globe, Clock, XCircle } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { toast } from "sonner";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
@@ -111,8 +112,16 @@ export default function PricingPage() {
   const plans = PLANS.map((plan) => {
     const live = livePlans.find((p) => p.name.toLowerCase() === plan.id.toLowerCase());
     if (!live) return plan;
-    return { ...plan, priceVnd: live.priceVnd, priceUsd: live.priceUsd };
+    // Price AND quota both come from the admin-editable live plan (same source
+    // the checkout charges/grants), so the pricing card can never drift from
+    // what a buyer actually gets. Enterprise keeps its static "Unlimited" label.
+    return { ...plan, priceVnd: live.priceVnd, priceUsd: live.priceUsd, monthlyQuota: live.monthlyQuota };
   });
+
+  // Free-plan quota, used by the FAQ + bottom-CTA copy so those numbers track
+  // the live plan just like the cards do.
+  const freeQuota = plans.find((p) => p.id === "free")?.monthlyQuota;
+  const freeQuotaVar = freeQuota != null ? { n: freeQuota } : undefined;
 
   // A logged-in user already on a paid plan gets the deferred-change flow
   // for any *different* plan (including down to Free) — no charge now, the
@@ -143,9 +152,7 @@ export default function PricingPage() {
       {/* ── Navbar ── */}
       <nav className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-100 px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl gradient-brand flex items-center justify-center">
-            <Shield className="w-4 h-4 text-white" />
-          </div>
+          <Logo className="w-8 h-8" />
           <div>
             <span className="font-extrabold text-gray-900 text-sm">MarketScout</span>
             <span className="text-[#00D26A] text-xs font-semibold ml-1.5">B2B INTELLIGENCE</span>
@@ -232,7 +239,7 @@ export default function PricingPage() {
                 </div>
                 <p className={`text-xs mb-4 ${(plan as { isDark?: boolean }).isDark ? "text-gray-400" : "text-gray-400"}`}>{t(`pricing.plan.${plan.id}.tagline`)}</p>
                 <PriceDisplay vnd={plan.priceVnd} usd={plan.priceUsd} isFree={plan.isFree} isCustom={(plan as { isCustom?: boolean }).isCustom} isDark={(plan as { isDark?: boolean }).isDark} />
-                <p className="text-xs mt-2 font-semibold" style={{ color: plan.accentColor }}>{t(`pricing.plan.${plan.id}.quotaLabel`)}</p>
+                <p className="text-xs mt-2 font-semibold" style={{ color: plan.accentColor }}>{t(`pricing.plan.${plan.id}.quotaLabel`, plan.monthlyQuota != null ? { n: plan.monthlyQuota } : undefined)}</p>
               </div>
 
               {isDeferred(plan.id) ? (
@@ -251,7 +258,7 @@ export default function PricingPage() {
                 {Array.from({ length: plan.featureCount }).map((_, i) => (
                   <div key={`f-${i}`} className="flex items-start gap-2">
                     <Check className="w-4 h-4 shrink-0 mt-0.5" style={{ color: plan.accentColor }} />
-                    <span className={`text-xs ${(plan as { isDark?: boolean }).isDark ? "text-gray-300" : "text-gray-600"}`}>{t(`pricing.plan.${plan.id}.feature.${i}`)}</span>
+                    <span className={`text-xs ${(plan as { isDark?: boolean }).isDark ? "text-gray-300" : "text-gray-600"}`}>{t(`pricing.plan.${plan.id}.feature.${i}`, plan.monthlyQuota != null ? { n: plan.monthlyQuota } : undefined)}</span>
                   </div>
                 ))}
                 {Array.from({ length: plan.noFeatureCount }).map((_, i) => (
@@ -310,7 +317,7 @@ export default function PricingPage() {
           <h2 className="text-2xl font-extrabold text-gray-900 text-center mb-8">{t("pricing.faqTitle")}</h2>
           <div className="space-y-3">
             {FAQS.map((key) => (
-              <FaqItem key={key} q={t(`pricing.faq.${key}.q`)} a={t(`pricing.faq.${key}.a`)} />
+              <FaqItem key={key} q={t(`pricing.faq.${key}.q`)} a={t(`pricing.faq.${key}.a`, freeQuotaVar)} />
             ))}
           </div>
         </Reveal>
@@ -322,7 +329,7 @@ export default function PricingPage() {
           <div className="flex items-center justify-center gap-3">
             <Link href="/register"
               className="flex items-center gap-2 px-6 py-3 gradient-brand text-white font-bold rounded-xl hover:opacity-90 text-sm">
-              <Zap className="w-4 h-4" /> {t("pricing.bottomCta.tryFree")}
+              <Zap className="w-4 h-4" /> {t("pricing.bottomCta.tryFree", freeQuotaVar)}
             </Link>
             <a href="mailto:unviantruong26@gmail.com"
               className="flex items-center gap-2 px-6 py-3 border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 text-sm">
