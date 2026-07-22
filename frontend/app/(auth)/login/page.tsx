@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { Eye, EyeOff, Mail, Lock, Navigation, ArrowLeft, Globe } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, ArrowLeft, Globe } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { toast } from "sonner";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
@@ -149,9 +150,7 @@ export default function LoginPage() {
         <div>
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-[#1A3A28] flex items-center justify-center">
-              <Navigation className="w-6 h-6 text-white" />
-            </div>
+            <Logo className="w-12 h-12" />
             <span className="text-white font-bold text-xl tracking-tight">MarketScout</span>
           </div>
 
@@ -255,9 +254,7 @@ export default function LoginPage() {
 
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-2 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-[#1A3A28] flex items-center justify-center">
-              <Navigation className="w-5 h-5 text-white" />
-            </div>
+            <Logo className="w-10 h-10" />
             <span className="font-bold text-gray-900">MarketScout</span>
           </div>
 

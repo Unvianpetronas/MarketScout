@@ -35,7 +35,15 @@ public interface ReportRepository extends JpaRepository<Report, UUID> {
     @Query("SELECT r.entityName, COUNT(r) FROM Report r GROUP BY r.entityName ORDER BY COUNT(r) DESC")
     List<Object[]> findTopEntities(Pageable pageable);
 
-    @Query("SELECT r FROM Report r JOIN FETCH r.user WHERE " +
+    // NB: a paginated @Query with JOIN FETCH needs an explicit countQuery — the
+    // auto-derived count would be "COUNT(r) ... JOIN FETCH", which is invalid
+    // HQL and blows up the endpoint at runtime. The count query drops the fetch.
+    @Query(value = "SELECT r FROM Report r JOIN FETCH r.user WHERE " +
+           "(:entityName IS NULL OR LOWER(r.entityName) LIKE LOWER(CONCAT('%', :entityName, '%'))) AND " +
+           "(:status IS NULL OR r.status = :status) AND " +
+           "(:riskLevel IS NULL OR r.riskLevel = :riskLevel) AND " +
+           "(:userId IS NULL OR r.user.id = :userId)",
+           countQuery = "SELECT COUNT(r) FROM Report r WHERE " +
            "(:entityName IS NULL OR LOWER(r.entityName) LIKE LOWER(CONCAT('%', :entityName, '%'))) AND " +
            "(:status IS NULL OR r.status = :status) AND " +
            "(:riskLevel IS NULL OR r.riskLevel = :riskLevel) AND " +

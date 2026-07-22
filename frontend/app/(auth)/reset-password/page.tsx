@@ -4,7 +4,8 @@ import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { useSearchParams, useRouter } from "next/navigation";
-import { BarChart2, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { toast } from "sonner";
 import { resetPassword } from "@/services/auth.service";
 
@@ -51,9 +52,7 @@ function ResetPasswordContent() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-md">
         <div className="flex items-center gap-2 mb-8">
-          <div className="w-8 h-8 rounded-full bg-[#00D26A] flex items-center justify-center">
-            <BarChart2 className="w-4 h-4 text-white" />
-          </div>
+          <Logo className="w-8 h-8" />
           <span className="font-bold text-gray-900">MarketScout</span>
         </div>
 

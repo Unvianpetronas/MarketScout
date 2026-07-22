@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart2, Shield, ArrowLeft } from "lucide-react";
+import { Shield, ArrowLeft } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { useLanguage } from "@/providers/language-provider";
 
 const SECTIONS_VI = [
@@ -263,9 +264,7 @@ export default function PrivacyPolicyPage() {
       {/* Nav */}
       <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white/95 backdrop-blur z-50">
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-[#00D26A] flex items-center justify-center">
-            <BarChart2 className="w-4 h-4 text-white" />
-          </div>
+          <Logo className="w-8 h-8" />
           <span className="font-bold text-gray-900 text-lg">MarketScout</span>
         </Link>
         <Link

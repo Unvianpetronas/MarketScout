@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart2, Users, Database, CreditCard, History, Terminal, Shield, ArrowLeft, FileWarning } from "lucide-react";
+import { BarChart2, Users, Database, CreditCard, History, Terminal, ArrowLeft, FileWarning } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { useLanguage } from "@/providers/language-provider";
 
 export type AdminNavId = "overview" | "customers" | "quota" | "billing" | "reports" | "history" | "logs";
@@ -33,9 +34,7 @@ export function AdminShell({ active, children }: { active: AdminNavId; children:
       <aside className="w-60 shrink-0 flex flex-col bg-[#0D1117] border-r border-white/5">
         <div className="p-5 border-b border-white/5">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl gradient-brand flex items-center justify-center">
-              <Shield className="w-4 h-4 text-white" />
-            </div>
+            <Logo className="w-9 h-9" />
             <div>
               <p className="text-sm font-bold text-white">MarketScout</p>
               <p className="text-[10px] text-[#00D26A] font-bold uppercase tracking-widest">{t("admin.shell.superAdmin")}</p>

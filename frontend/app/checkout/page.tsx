@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Copy, List, ArrowLeft, Minus, Plus, CheckCircle2, Clock } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 import { toast } from "sonner";
 
 import { createTopup, createPlanCheckout, getTopupStatus, getPublicPlans, getPricePerCredit } from "@/services/payment.service";
@@ -11,6 +12,7 @@ import { getMyQuota } from "@/services/quota.service";
 import { TopupResponse, TopupStatus, PublicPlan } from "@/types/payment";
 import { useLanguage } from "@/providers/language-provider";
 import { useAuth } from "@/providers/auth-provider";
+import { AuthGuard } from "@/components/shared/auth-guard";
 
 const formatVnd = (n: number) => new Intl.NumberFormat("vi-VN").format(n);
 
@@ -431,9 +433,7 @@ function CheckoutContent() {
       {/* Navbar */}
       <nav className="px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="neu-btn w-9 h-9 rounded-2xl flex items-center justify-center">
-            <span className="text-[#00B85D] font-bold text-sm">M</span>
-          </div>
+          <Logo className="w-9 h-9" />
           <div>
             <span className="text-[#3A362E] font-bold text-sm">MarketScout</span>
             <span className="text-[#00843F] text-xs ml-2 font-semibold">B2B INTELLIGENCE</span>
@@ -464,7 +464,9 @@ export default function CheckoutPage() {
         </div>
       }
     >
-      <CheckoutContent />
+      <AuthGuard>
+        <CheckoutContent />
+      </AuthGuard>
     </Suspense>
   );
 }
