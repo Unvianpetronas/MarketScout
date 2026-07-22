@@ -6,6 +6,7 @@ import { Check, X, Zap, Shield, Star, ArrowRight, ChevronDown, ChevronUp, Globe,
 import { toast } from "sonner";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
+import { Reveal } from "@/components/shared/reveal";
 import { getPublicPlans, getPricePerCredit, schedulePlanChange, cancelScheduledPlanChange } from "@/services/payment.service";
 import { PublicPlan } from "@/types/payment";
 import { PLANS, FAQS } from "./plans-data";
@@ -265,7 +266,7 @@ export default function PricingPage() {
         </div>
 
         {/* ── Add-on Quota ── */}
-        <div className="bg-[#0A1A12] rounded-2xl p-8 mb-16 flex items-center justify-between gap-6">
+        <Reveal variant="scale" className="bg-[#0A1A12] rounded-2xl p-8 mb-16 flex items-center justify-between gap-6">
           <div>
             <span className="text-[10px] font-bold text-[#00D26A] uppercase tracking-widest border border-[#00D26A]/30 rounded px-2 py-0.5">
               {t("pricing.addon.badge")}
@@ -286,10 +287,10 @@ export default function PricingPage() {
               <Zap className="w-4 h-4" /> {t("pricing.addon.cta")}
             </Link>
           </div>
-        </div>
+        </Reveal>
 
         {/* ── Trust Signals ── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
+        <Reveal stagger className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
           {[
             { icon: "🔒", key: "security" },
             { icon: "💯", key: "refund" },
@@ -302,17 +303,17 @@ export default function PricingPage() {
               <p className="text-xs text-gray-400">{t(`pricing.trust.${key}.desc`)}</p>
             </div>
           ))}
-        </div>
+        </Reveal>
 
         {/* ── FAQ ── */}
-        <div className="max-w-2xl mx-auto">
+        <Reveal className="max-w-2xl mx-auto">
           <h2 className="text-2xl font-extrabold text-gray-900 text-center mb-8">{t("pricing.faqTitle")}</h2>
           <div className="space-y-3">
             {FAQS.map((key) => (
               <FaqItem key={key} q={t(`pricing.faq.${key}.q`)} a={t(`pricing.faq.${key}.a`)} />
             ))}
           </div>
-        </div>
+        </Reveal>
 
         {/* ── Bottom CTA ── */}
         <div className="mt-16 text-center animate-fade-in-up">

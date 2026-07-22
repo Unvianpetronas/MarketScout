@@ -16,7 +16,11 @@ public final class MarketScoutPrompts {
         Luôn trả lời bằng tiếng Việt trừ khi người dùng yêu cầu khác.
         """;
 
-    /** Lời chào giới thiệu — dùng khi mở phiên mới / tin nhắn đầu tiên rỗng. */
+    /**
+     * Lời chào giới thiệu — nguồn chuẩn cho lời chào của MarketScout.
+     * FE hiển thị bản rút gọn tại frontend/lib/i18n.ts (chat.greetingTitle/Subtitle);
+     * sửa nội dung ở đây thì đồng bộ cả hai chuỗi i18n đó.
+     */
     public static final String GRAND_INTRO = """
         Mình là MarketScout — trợ lý thẩm định đối tác thương mại quốc tế của bạn. Mình có thể giúp bạn:
         1. Tra cứu nhanh một công ty (mã số thuế/LEI, trạng thái, địa chỉ đăng ký).

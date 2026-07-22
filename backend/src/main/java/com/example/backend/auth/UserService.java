@@ -30,6 +30,7 @@ public class UserService {
     private final RefreshTokenService refreshTokenService;
     private final EmailVerificationService emailVerificationService;
     private final PasswordResetService passwordResetService;
+    private final GoogleTokenVerifier googleTokenVerifier;
 
     // ── Register ──────────────────────────────────────────────────
     @Transactional
@@ -112,6 +113,74 @@ public class UserService {
         user.setLastLoginAt(Instant.now());
         usersRepository.save(user);
 
+        return buildLoginResponse(user);
+    }
+
+    // ── Login with Google ─────────────────────────────────────────
+    // Verifies the Google ID token, then logs the matching user in — creating a
+    // free-plan account on first sign-in. Google-provisioned accounts have a
+    // random unusable password hash (they authenticate via Google), so email is
+    // pre-verified and no verification email is sent.
+    @Transactional
+    public AuthDTO.LoginResponse loginWithGoogle(String credential) {
+        GoogleTokenVerifier.GoogleProfile profile = googleTokenVerifier.verify(credential);
+        String email = profile.email().trim().toLowerCase();
+
+        Users user = usersRepository.findByEmail(email)
+                .orElseGet(() -> createGoogleUser(email, profile.name()));
+
+        if (!user.getIsActive()) {
+            throw new RuntimeException("Account has been deactivated");
+        }
+
+        // Google has proven ownership of this email, so trust it as verified —
+        // covers an existing password account that never clicked the verify link.
+        if (!Boolean.TRUE.equals(user.getEmailVerified())) {
+            user.setEmailVerified(true);
+        }
+
+        user.setLastLoginAt(Instant.now());
+        usersRepository.save(user);
+
+        return buildLoginResponse(user);
+    }
+
+    private Users createGoogleUser(String email, String fullName) {
+        Users user = Users.builder()
+                .email(email)
+                .passwordHash(passwordEncoder.encode(java.util.UUID.randomUUID().toString()))
+                .fullName(fullName)
+                .role("user")
+                .quotaRemaining(2)
+                .quotaUsedThisCycle(0)
+                .cycleResetAt(Instant.now().plus(30, ChronoUnit.DAYS))
+                .isActive(true)
+                .emailVerified(true)
+                .theme("system")
+                .language("vi")
+                .aiOptimization(true)
+                .createdAt(Instant.now())
+                .plan(planRepository.findByNameIgnoreCase("free").orElseThrow())
+                .build();
+        usersRepository.save(user);
+
+        Subscription sub = Subscription.builder()
+                .user(user)
+                .plan(planRepository.findByNameIgnoreCase("free").orElseThrow())
+                .status("active")
+                .billingCycle("monthly")
+                .currentPeriodStart(Instant.now())
+                .currentPeriodEnd(Instant.now().plus(30, ChronoUnit.DAYS))
+                .createdAt(Instant.now())
+                .build();
+        subscriptionRepository.save(sub);
+
+        return user;
+    }
+
+    // Issues a fresh access + refresh token and packs the user's profile into a
+    // LoginResponse — shared by password login and Google login.
+    private AuthDTO.LoginResponse buildLoginResponse(Users user) {
         String token = jwtService.generateToken(
                 user.getId(), user.getEmail(), user.getRole().toUpperCase(Locale.ROOT), user.getFullName());
         String refreshToken = refreshTokenService.create(user.getId());

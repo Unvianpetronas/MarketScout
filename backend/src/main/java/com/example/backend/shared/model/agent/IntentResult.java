@@ -23,6 +23,10 @@ public class IntentResult {
     private String country;
     private String taxId;
 
+    // For COMPARE_PARTNERS — both company names, extracted by the LLM so
+    // "so sánh giúp mình A và B" doesn't leak the command prefix into name 1
+    private java.util.List<String> companyNames;
+
     // For EXPLAIN_REPORT — already provided in request
     // For GENERAL_QA — direct reply
     private String reply;

@@ -37,6 +37,7 @@ class ChatServiceTest {
     @Mock private ChatMessageRepository messageRepo;
     @Mock private UsersRepository usersRepo;
     @Mock private ReportRepository reportRepo;
+    @Mock private com.example.backend.domain.PillarResultRepository pillarResultRepo;
     @Mock private GeminiService geminiService;
     @Mock private QuotaService quotaService;
     @Mock private IntentDetector intentDetector;
@@ -53,9 +54,9 @@ class ChatServiceTest {
     @BeforeEach
     void setUp() {
         chatService = new ChatService(sessionRepo, messageRepo, usersRepo, reportRepo,
-            geminiService, quotaService, intentDetector, findPartnersService, quickScanService,
-            scoringEngine, dealSafetyAgent, contractLinkService, companyResolverService,
-            cacheService, new ObjectMapper());
+            pillarResultRepo, geminiService, quotaService, intentDetector, findPartnersService,
+            quickScanService, scoringEngine, dealSafetyAgent, contractLinkService,
+            companyResolverService, cacheService, new ObjectMapper());
         lenient().when(companyResolverService.getPendingClarification(any())).thenReturn(Optional.empty());
     }
 
@@ -187,5 +188,87 @@ class ChatServiceTest {
 
         assertThat(data).containsEntry("pending", true);
         assertThat(data).doesNotContainKey("candidates");
+    }
+
+    // ── parseCompareNames: command-prefix stripping ─────────────────────────
+
+    @Test
+    void parseCompareNames_stripsVietnameseCommandPrefix() {
+        String[] parts = ChatService.parseCompareNames("so sánh giúp mình Vinamilk và TH True Milk");
+        assertThat(parts).containsExactly("Vinamilk", "TH True Milk");
+    }
+
+    @Test
+    void parseCompareNames_handlesVsSeparator() {
+        String[] parts = ChatService.parseCompareNames("Công ty A vs Công ty B");
+        assertThat(parts).containsExactly("Công ty A", "Công ty B");
+    }
+
+    @Test
+    void parseCompareNames_stripsEnglishComparePrefix() {
+        String[] parts = ChatService.parseCompareNames("compare Samsung and LG");
+        assertThat(parts).containsExactly("Samsung", "LG");
+    }
+
+    @Test
+    void parseCompareNames_plainPairWithoutPrefix() {
+        String[] parts = ChatService.parseCompareNames("Hòa Phát với Hoa Sen");
+        assertThat(parts).containsExactly("Hòa Phát", "Hoa Sen");
+    }
+
+    @Test
+    void parseCompareNames_nullMessage_returnsEmpty() {
+        assertThat(ChatService.parseCompareNames(null)).isEmpty();
+    }
+
+    // ── buildReportContext: pillar breakdown for EXPLAIN_REPORT ────────────
+
+    @Test
+    void buildReportContext_includesPillarScoresAndFindings() {
+        com.example.backend.domain.Report report = new com.example.backend.domain.Report();
+        report.setEntityName("ABC Corp");
+        report.setOverallScore((short) 42);
+        report.setStatus("COMPLETED");
+        report.setRiskLevel("HIGH");
+
+        com.example.backend.domain.PillarResult p1 = new com.example.backend.domain.PillarResult();
+        p1.setPillarNo((short) 1);
+        p1.setPillarName("Pháp lý");
+        p1.setScore((short) 30);
+        p1.setStatus("FAIL");
+        p1.setFindings("Không tìm thấy đăng ký kinh doanh");
+
+        String ctx = ChatService.buildReportContext(report, List.of(p1));
+
+        assertThat(ctx).contains("ABC Corp").contains("42").contains("HIGH");
+        assertThat(ctx).contains("P1 Pháp lý").contains("30/100").contains("FAIL")
+            .contains("Không tìm thấy đăng ký kinh doanh");
+    }
+
+    @Test
+    void buildReportContext_truncatesLongFindings() {
+        com.example.backend.domain.Report report = new com.example.backend.domain.Report();
+        report.setEntityName("ABC Corp");
+
+        com.example.backend.domain.PillarResult p = new com.example.backend.domain.PillarResult();
+        p.setPillarNo((short) 2);
+        p.setFindings("x".repeat(1000));
+
+        String ctx = ChatService.buildReportContext(report, List.of(p));
+
+        assertThat(ctx).contains("x".repeat(400) + "...");
+        assertThat(ctx).doesNotContain("x".repeat(401));
+    }
+
+    @Test
+    void buildReportContext_noPillars_stillHasSummaryLine() {
+        com.example.backend.domain.Report report = new com.example.backend.domain.Report();
+        report.setEntityName("ABC Corp");
+        report.setHardStop(true);
+
+        String ctx = ChatService.buildReportContext(report, List.of());
+
+        assertThat(ctx).contains("ABC Corp").contains("HARD STOP");
+        assertThat(ctx).doesNotContain("Chi tiết từng trụ cột");
     }
 }

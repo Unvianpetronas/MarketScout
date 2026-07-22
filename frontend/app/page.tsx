@@ -26,6 +26,7 @@ import {
 import { LinkedinIcon, FacebookIcon, GithubIcon } from "@/components/icons/social-icons";
 import { useLanguage } from "@/providers/language-provider";
 import { Reveal } from "@/components/shared/reveal";
+import { CountUp } from "@/components/shared/count-up";
 
 const TEAM = [
   {
@@ -277,15 +278,15 @@ export default function LandingPage() {
         <div className="flex items-center justify-center gap-8 flex-wrap text-sm text-gray-500">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-[#00D26A]" />
-            <span><strong className="text-gray-900">500+</strong> {t("landing.hero.statCompanies")}</span>
+            <span><strong className="text-gray-900"><CountUp end={500} suffix="+" /></strong> {t("landing.hero.statCompanies")}</span>
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-[#00D26A]" />
-            <span><strong className="text-gray-900">99.8%</strong> {t("landing.hero.statAccuracy")}</span>
+            <span><strong className="text-gray-900"><CountUp end={99.8} decimals={1} suffix="%" /></strong> {t("landing.hero.statAccuracy")}</span>
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-[#00D26A]" />
-            <span><strong className="text-gray-900">190+</strong> {t("landing.hero.statCountries")}</span>
+            <span><strong className="text-gray-900"><CountUp end={190} suffix="+" /></strong> {t("landing.hero.statCountries")}</span>
           </div>
         </div>
       </section>

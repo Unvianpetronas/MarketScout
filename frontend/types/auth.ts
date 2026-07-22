@@ -27,6 +27,10 @@ export interface LoginResponse {
   aiOptimization?: boolean;
 }
 
+export interface GoogleLoginRequest {
+  credential: string;
+}
+
 export interface RegisterRequest {
   email: string;
   password: string;

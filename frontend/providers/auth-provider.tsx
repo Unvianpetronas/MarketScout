@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { User } from "@/types/user";
 import { LoginRequest } from "@/types/auth";
-import { login as loginApi, logout as logoutApi, getMe } from "@/services/auth.service";
+import { login as loginApi, loginWithGoogle as loginWithGoogleApi, logout as logoutApi, getMe } from "@/services/auth.service";
+import { LoginResponse } from "@/types/auth";
 import { setTokens, getAccessToken, getRefreshToken, setAccessToken, setRefreshToken, clearTokens } from "@/lib/token-storage";
 
 interface AuthContextType {
@@ -13,6 +14,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (data: LoginRequest, rememberMe?: boolean) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -76,8 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, []);
 
-  const login = async (data: LoginRequest, rememberMe = false) => {
-    const response = await loginApi(data);
+  const applyLoginResponse = (response: LoginResponse, rememberMe: boolean) => {
     setTokens(response.token, response.refreshToken, rememberMe);
     setUser({
       id: response.id,
@@ -90,6 +91,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       emailVerified: true,
     });
     router.push("/dashboard");
+  };
+
+  const login = async (data: LoginRequest, rememberMe = false) => {
+    const response = await loginApi(data);
+    applyLoginResponse(response, rememberMe);
+  };
+
+  const loginWithGoogle = async (credential: string) => {
+    const response = await loginWithGoogleApi({ credential });
+    applyLoginResponse(response, true);
   };
 
   const logout = async () => {
@@ -111,6 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         login,
+        loginWithGoogle,
         logout,
         refreshUser,
       }}

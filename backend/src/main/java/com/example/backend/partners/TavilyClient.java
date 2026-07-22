@@ -135,7 +135,9 @@ public class TavilyClient {
                 leads.add(LeadResult.builder()
                     .companyName(title)
                     .website(url)
-                    .description(content.length() > 200 ? content.substring(0, 200) : content)
+                    // 500 chars (was 200): LeadExtractor reads these snippets to pull
+                    // real company names out — 200 was often cutting the list off.
+                    .description(content.length() > 500 ? content.substring(0, 500) : content)
                     .source("Tavily")
                     // Requested market, not independently verified per company —
                     // Tavily returns no structured geo field. FindPartnersService's

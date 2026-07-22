@@ -25,6 +25,7 @@
 		<jjwt.version>0.12.6</jjwt.version>
 		<springdoc.version>3.0.1</springdoc.version>
 		<modelmapper.version>3.2.1</modelmapper.version>
+		<google-api-client.version>2.7.0</google-api-client.version>
 	</properties>
 
 	<dependencies>
@@ -106,6 +107,15 @@
 			<artifactId>jjwt-gson</artifactId>
 			<version>${jjwt.version}</version>
 			<scope>runtime</scope>
+		</dependency>
+
+		<!-- Google Sign-In — verify the Google ID token (JWT) offline via
+             GoogleIdTokenVerifier for the "Login with Google" flow. Uses its own
+             Gson-based JSON (GsonFactory), independent of Spring's Jackson. -->
+		<dependency>
+			<groupId>com.google.api-client</groupId>
+			<artifactId>google-api-client</artifactId>
+			<version>${google-api-client.version}</version>
 		</dependency>
 
 

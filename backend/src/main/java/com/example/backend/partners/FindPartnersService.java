@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 public class FindPartnersService {
 
     private final TavilyClient tavilyClient;
+    private final LeadExtractor leadExtractor;
     private final CrawlerP1Router crawlerP1;
     private final CrawlerP6 crawlerP6;
     private final CacheService cacheService;
@@ -54,9 +55,29 @@ public class FindPartnersService {
             "Đang tìm " + (intent.getProduct() != null ? intent.getProduct() : "đối tác") +
             (intent.getMarket() != null ? " tại " + intent.getMarket() : "") + "..."));
 
-        // Step 1: Tavily search
-        List<LeadResult> leads = tavilyClient.searchLeads(intent.getIntent(), intent.getProduct(), intent.getMarket());
-        log.info("Tavily returned {} leads", leads.size());
+        // Step 1: Tavily search — returns web PAGES (title/url/snippet), not companies
+        List<LeadResult> rawResults = tavilyClient.searchLeads(intent.getIntent(), intent.getProduct(), intent.getMarket());
+        log.info("Tavily returned {} raw results", rawResults.size());
+
+        // Step 1b: Gemini extracts the real company names mentioned in those pages —
+        // a "Top 10 importers" directory page becomes 10 real leads instead of one
+        // lead named after the headline. Falls back to the raw title-based list if
+        // extraction returns nothing (Gemini down / no companies found).
+        emit(sseCallback, AgentEvent.thinking("manager", "Đang lọc ra các công ty thật từ kết quả tìm kiếm..."));
+        List<LeadResult> extracted = leadExtractor.extract(rawResults, intent.getProduct(), intent.getMarket());
+        List<LeadResult> leads;
+        if (extracted.isEmpty()) {
+            leads = rawResults;
+            log.info("Lead extraction empty — falling back to {} raw title-based leads", rawResults.size());
+        } else {
+            leads = extracted;
+            // Country: extractor only sets it when actually determinable; fill the
+            // requested market as the search-scope default (same semantics as before).
+            leads.forEach(l -> {
+                if (l.getCountry() == null) l.setCountry(intent.getMarket());
+            });
+            log.info("Lead extraction produced {} real companies from {} raw results", leads.size(), rawResults.size());
+        }
 
         // Step 2: only screen the top-N leads against sanctions — capping how many
         // OpenSanctions queries one search can ever cost. The cap is applied BEFORE

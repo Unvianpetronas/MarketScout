@@ -41,10 +41,15 @@ public class IntentDetector {
             "role": "BUYER",
             "companyName": null,
             "country": null,
-            "taxId": null
+            "taxId": null,
+            "companyNames": null
           },
           "reply": null
         }
+
+        Với COMPARE_PARTNERS: điền "companyNames" là mảng ĐÚNG tên 2 công ty cần so sánh,
+        KHÔNG kèm các từ lệnh như "so sánh", "giúp mình", "compare".
+        Ví dụ "so sánh giúp mình Vinamilk và TH True Milk" → "companyNames": ["Vinamilk", "TH True Milk"].
 
         Với GENERAL_QA, điền "reply" với câu trả lời ngắn gọn theo đúng giọng MarketScout ở trên.
         """;
@@ -67,6 +72,14 @@ public class IntentDetector {
                 result.setCompanyName(nullIfNull(params.path("companyName").asText(null)));
                 result.setCountry(nullIfNull(params.path("country").asText(null)));
                 result.setTaxId(nullIfNull(params.path("taxId").asText(null)));
+                if (params.path("companyNames").isArray()) {
+                    java.util.List<String> names = new java.util.ArrayList<>();
+                    params.path("companyNames").forEach(n -> {
+                        String v = nullIfNull(n.asText(null));
+                        if (v != null) names.add(v.trim());
+                    });
+                    if (!names.isEmpty()) result.setCompanyNames(names);
+                }
             }
             result.setReply(nullIfNull(node.path("reply").asText(null)));
             log.info("Intent detected: {} for message: {}", result.getIntent(), userMessage);

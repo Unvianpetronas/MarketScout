@@ -49,7 +49,7 @@ export default function AdminQuotaPage() {
     }
   };
 
-  useEffect(() => { fetchPlans(); fetchTopupPrice(); }, []);
+  useEffect(() => { Promise.resolve().then(() => { fetchPlans(); fetchTopupPrice(); }); }, []);
 
   const handleSaveTopupPrice = async () => {
     const price = Number(topupPriceEdit);

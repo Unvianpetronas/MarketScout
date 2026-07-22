@@ -3,6 +3,7 @@ import { getRefreshToken } from "@/lib/token-storage";
 import {
   LoginRequest,
   LoginResponse,
+  GoogleLoginRequest,
   RegisterRequest,
   RegisterResponse,
   ForgotPasswordRequest,
@@ -16,6 +17,11 @@ import { MeResponse, UpdateProfileRequest } from "@/types/user";
 
 export const login = async (data: LoginRequest): Promise<LoginResponse> => {
   const response = await api.post<LoginResponse>("/auth/login", data);
+  return response.data;
+};
+
+export const loginWithGoogle = async (data: GoogleLoginRequest): Promise<LoginResponse> => {
+  const response = await api.post<LoginResponse>("/auth/google", data);
   return response.data;
 };
 

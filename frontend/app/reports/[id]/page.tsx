@@ -559,11 +559,13 @@ export default function ReportDetailPage({ params }: Props) {
   // Generate AI next-step recommendations once the report has loaded.
   useEffect(() => {
     if (!report || isProcessingStatus(report.status)) return;
-    setRecsLoading(true);
-    getReportRecommendations(id)
-      .then(setRecs)
-      .catch(() => setRecs(null))
-      .finally(() => setRecsLoading(false));
+    Promise.resolve().then(() => {
+      setRecsLoading(true);
+      getReportRecommendations(id)
+        .then(setRecs)
+        .catch(() => setRecs(null))
+        .finally(() => setRecsLoading(false));
+    });
   }, [report, id]);
 
   // A rescan is a brand-new Deep Verify run (fresh quota spend), not an in-place

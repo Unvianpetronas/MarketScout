@@ -63,7 +63,7 @@ export default function ReportsPage() {
     }
   };
 
-  useEffect(() => { fetchReports(); }, []);
+  useEffect(() => { Promise.resolve().then(fetchReports); }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

@@ -41,7 +41,7 @@ function FlagsQueue() {
     }
   };
 
-  useEffect(() => { fetchFlags(); }, [statusFilter]);
+  useEffect(() => { Promise.resolve().then(fetchFlags); }, [statusFilter]);
 
   const handleResolve = async (id: string, status: "resolved" | "dismissed") => {
     setActingId(id);
@@ -61,7 +61,7 @@ function FlagsQueue() {
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <FileWarning className="w-4 h-4 text-red-500" />
-          <h2 className="text-sm font-bold text-gray-900">Hàng chờ "Báo kết quả sai"</h2>
+          <h2 className="text-sm font-bold text-gray-900">Hàng chờ &ldquo;Báo kết quả sai&rdquo;</h2>
           <span className="text-xs font-bold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">{total}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -147,7 +147,7 @@ function ReportsTable() {
     }
   };
 
-  useEffect(() => { fetchReports(); }, [page, search]);
+  useEffect(() => { Promise.resolve().then(fetchReports); }, [page, search]);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
