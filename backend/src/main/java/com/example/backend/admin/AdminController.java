@@ -13,6 +13,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -174,7 +175,10 @@ public class AdminController {
     // GROUP 3 — REPORT MANAGEMENT
     // ═══════════════════════════════════════════════════════════════════
 
+    // Session-open (OSIV is disabled) so toReportSummary can read the lazy
+    // overriddenBy association during DTO mapping without a LazyInitException.
     @GetMapping("/reports")
+    @Transactional(readOnly = true)
     public ResponseEntity<Map<String, Object>> listReports(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -196,6 +200,7 @@ public class AdminController {
     }
 
     @GetMapping("/reports/{id}")
+    @Transactional(readOnly = true)
     public ResponseEntity<AdminDTO.ReportDetail> getReportDetail(@PathVariable UUID id) {
         Report r = reportRepository.findById(id)
                 .orElseThrow(() -> new AppException(AppException.ErrorCode.REPORT_NOT_FOUND));
@@ -280,7 +285,10 @@ public class AdminController {
     // GROUP 3b — REPORT FLAGS ("báo kết quả sai" queue)
     // ═══════════════════════════════════════════════════════════════════
 
+    // Session-open (OSIV is disabled) so toReportFlagDTO can read the lazy
+    // report/user/resolvedBy associations during DTO mapping.
     @GetMapping("/report-flags")
+    @Transactional(readOnly = true)
     public ResponseEntity<Map<String, Object>> listReportFlags(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -302,6 +310,7 @@ public class AdminController {
     }
 
     @PatchMapping("/report-flags/{id}")
+    @Transactional
     public ResponseEntity<AdminDTO.ReportFlagDTO> resolveReportFlag(
             @PathVariable UUID id,
             @RequestBody AdminDTO.ReportFlagResolveRequest req,
