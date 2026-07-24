@@ -1,13 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Search,
   CheckCircle2,
-  Shield,
-  Globe,
-  Zap,
   Mail,
   MapPin,
   Bot,
@@ -24,6 +21,8 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { LinkedinIcon, FacebookIcon, GithubIcon } from "@/components/icons/social-icons";
+import { FlagVN, FlagGB } from "@/components/icons/flag-icons";
+import { WhyMarketScout } from "@/components/landing/why-marketscout";
 import { useLanguage } from "@/providers/language-provider";
 import { Reveal } from "@/components/shared/reveal";
 import { CountUp } from "@/components/shared/count-up";
@@ -90,24 +89,6 @@ function TeamAvatar({ avatar, initials, gradient, name }: { avatar: string; init
     />
   );
 }
-
-const FEATURES = [
-  {
-    icon: Shield,
-    titleKey: "landing.feature.pillars.title",
-    descKey: "landing.feature.pillars.desc",
-  },
-  {
-    icon: Globe,
-    titleKey: "landing.feature.countries.title",
-    descKey: "landing.feature.countries.desc",
-  },
-  {
-    icon: Zap,
-    titleKey: "landing.feature.instant.title",
-    descKey: "landing.feature.instant.desc",
-  },
-];
 
 const PILLARS = [
   {
@@ -176,8 +157,36 @@ const PILLARS = [
   },
 ];
 
+const NAV_ITEMS = [
+  { id: "verify", href: "/verify", labelKey: "landing.nav.verifyNow" },
+  { id: "team", href: "#team", labelKey: "landing.nav.team" },
+  { id: "powerhouse", href: "#powerhouse", labelKey: "landing.nav.aiAgent" },
+  { id: "pillars", href: "#pillars", labelKey: "landing.nav.pillars" },
+  { id: "pricing", href: "/pricing", labelKey: "landing.nav.pricing" },
+] as const;
+
+const SPY_SECTIONS = ["team", "powerhouse", "pillars"];
+
 export default function LandingPage() {
   const { t, lang, toggle } = useLanguage();
+  const [activeSection, setActiveSection] = useState<string>("");
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) setActiveSection(entry.target.id);
+        });
+      },
+      { rootMargin: "-45% 0px -50% 0px", threshold: 0 }
+    );
+    SPY_SECTIONS.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       {/* Nav */}
@@ -187,22 +196,26 @@ export default function LandingPage() {
           <span className="font-bold text-gray-900 text-lg">MarketScout</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-6">
-          <Link href="/verify" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-            {t("landing.nav.verifyNow")}
-          </Link>
-          <Link href="#team" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-            {t("landing.nav.team")}
-          </Link>
-          <Link href="#powerhouse" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-            {t("landing.nav.aiAgent")}
-          </Link>
-          <Link href="#pillars" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-            {t("landing.nav.pillars")}
-          </Link>
-          <Link href="/pricing" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-            {t("landing.nav.pricing")}
-          </Link>
+        <div className="hidden md:flex items-center gap-8">
+          {NAV_ITEMS.map((item) => {
+            const isActive = activeSection === item.id;
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                className={`group relative py-1 text-sm transition-colors ${
+                  isActive ? "text-[#00D26A] font-medium" : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {t(item.labelKey)}
+                <span
+                  className={`absolute left-0 -bottom-0.5 h-0.5 rounded-full bg-[#00D26A] transition-all duration-300 ${
+                    isActive ? "w-full" : "w-0 group-hover:w-full"
+                  }`}
+                />
+              </Link>
+            );
+          })}
         </div>
 
         <div className="flex items-center gap-3">
@@ -211,9 +224,21 @@ export default function LandingPage() {
             title={t("lang.switchTo")}
             className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <Globe className="w-4 h-4" />
-            <span className="font-medium">{lang === "vi" ? "VI" : "EN"}</span>
+            {lang === "vi" ? (
+              <FlagGB className="w-5 h-auto rounded-[2px] shadow-sm" />
+            ) : (
+              <FlagVN className="w-5 h-auto rounded-[2px] shadow-sm" />
+            )}
+            <span className="font-medium">{lang === "vi" ? "EN" : "VI"}</span>
           </button>
+
+          <a
+            href="mailto:unviantruong26@gmail.com"
+            className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-[#00D26A] border border-[#00D26A] rounded-lg hover:bg-[#00D26A]/10 transition-colors"
+          >
+            <Mail className="w-4 h-4" />
+            {t("landing.nav.contact")}
+          </a>
 
           <Link
             href="/login"
@@ -289,27 +314,8 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Features */}
-      <section id="features" className="bg-gray-50 py-16 scroll-mt-16">
-        <div className="max-w-5xl mx-auto px-4">
-          <Reveal>
-            <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
-              {t("landing.features.title")}
-            </h2>
-          </Reveal>
-          <Reveal stagger className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {FEATURES.map((feat) => (
-              <div key={feat.titleKey} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mb-4">
-                  <feat.icon className="w-5 h-5 text-[#00D26A]" />
-                </div>
-                <h3 className="text-base font-bold text-gray-900 mb-2">{t(feat.titleKey)}</h3>
-                <p className="text-sm text-gray-500">{t(feat.descKey)}</p>
-              </div>
-            ))}
-          </Reveal>
-        </div>
-      </section>
+      {/* Why MarketScout — numeral-led impact section */}
+      <WhyMarketScout />
 
       {/* Team */}
       <section id="team" className="py-20 max-w-6xl mx-auto px-4 scroll-mt-16">
