@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ViewTransition } from "react";
 import { Geist, Geist_Mono, Source_Serif_4, Inter, Sora } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
@@ -54,7 +55,7 @@ export default function RootLayout({
       <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>
         <AuthProvider>
           <LanguageProvider>
-            {children}
+            <ViewTransition>{children}</ViewTransition>
             <Toaster position="top-right" />
           </LanguageProvider>
         </AuthProvider>

@@ -371,12 +371,28 @@
   }
 }
 
-/* ── Route/page transition (used by app/template.tsx) ── */
-@keyframes pageEnter {
-  from { opacity: 0; transform: translateY(8px) scale(0.992); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+/* ── Route/page transition — native View Transitions (next.config viewTransition) ──
+   Old page fades+lifts out gently while the new one fades+settles in, so
+   navigation crossfades instead of hard-cutting. Asymmetric timing: the old
+   view leaves a touch quicker so it doesn't compete with the arriving one. */
+::view-transition-old(root) {
+  animation: 260ms cubic-bezier(0.16, 1, 0.3, 1) both pageLeave;
 }
-.page-transition {
-  animation: pageEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: opacity, transform;
+::view-transition-new(root) {
+  animation: 420ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both pageEnter;
+}
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pageLeave {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+  }
 }
