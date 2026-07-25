@@ -193,7 +193,7 @@ export default function LandingPage() {
       <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white/95 backdrop-blur z-50">
         <Link href="/" className="flex items-center gap-2">
           <Logo className="w-8 h-8" />
-          <span className="font-bold text-gray-900 text-lg">MarketScout</span>
+          <span className="font-display font-bold text-gray-900 text-lg">MarketScout</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-8">
@@ -204,12 +204,12 @@ export default function LandingPage() {
                 key={item.id}
                 href={item.href}
                 className={`group relative py-1 text-sm transition-colors ${
-                  isActive ? "text-[#00D26A] font-medium" : "text-gray-600 hover:text-gray-900"
+                  isActive ? "text-[#059669] font-medium" : "text-gray-600 hover:text-gray-900"
                 }`}
               >
                 {t(item.labelKey)}
                 <span
-                  className={`absolute left-0 -bottom-0.5 h-0.5 rounded-full bg-[#00D26A] transition-all duration-300 ${
+                  className={`absolute left-0 -bottom-0.5 h-0.5 rounded-full bg-[#059669] transition-all duration-300 ${
                     isActive ? "w-full" : "w-0 group-hover:w-full"
                   }`}
                 />
@@ -234,7 +234,7 @@ export default function LandingPage() {
 
           <a
             href="mailto:unviantruong26@gmail.com"
-            className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-[#00D26A] border border-[#00D26A] rounded-lg hover:bg-[#00D26A]/10 transition-colors"
+            className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-[#059669] border border-[#059669] rounded-lg hover:bg-[#059669]/10 transition-colors"
           >
             <Mail className="w-4 h-4" />
             {t("landing.nav.contact")}
@@ -242,7 +242,7 @@ export default function LandingPage() {
 
           <Link
             href="/login"
-            className="px-5 py-2.5 bg-[#00D26A] text-white text-sm font-semibold rounded-lg hover:bg-[#00b85d] transition-colors"
+            className="px-5 py-2.5 bg-[#059669] text-white text-sm font-semibold rounded-lg hover:bg-[#047857] transition-colors"
           >
             {t("landing.nav.partnerLogin")}
           </Link>
@@ -252,14 +252,14 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="max-w-5xl mx-auto px-4 py-20 text-center">
         <div className="inline-block mb-4">
-          <span className="text-xs font-semibold tracking-widest text-[#00D26A] uppercase border border-[#00D26A]/30 rounded-full px-3 py-1">
+          <span className="text-xs font-semibold tracking-widest text-[#059669] uppercase border border-[#059669]/30 rounded-full px-3 py-1">
             {t("landing.hero.badge")}
           </span>
         </div>
 
         <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
           {t("landing.hero.titlePrefix")}{" "}
-          <span className="text-[#00D26A]">{t("landing.hero.titleHighlight")}</span> {t("landing.hero.titleSuffix")}
+          <span className="text-[#059669]">{t("landing.hero.titleHighlight")}</span> {t("landing.hero.titleSuffix")}
         </h1>
 
         <p className="text-lg text-gray-500 max-w-2xl mx-auto mb-10">
@@ -291,7 +291,7 @@ export default function LandingPage() {
           </select>
           <button
             type="submit"
-            className="px-6 py-2.5 bg-[#00D26A] text-white font-semibold rounded-xl hover:bg-[#00b85d] transition-colors text-sm"
+            className="px-6 py-2.5 bg-[#059669] text-white font-semibold rounded-xl hover:bg-[#047857] transition-colors text-sm"
           >
             {t("landing.nav.verifyNow")}
           </button>
@@ -300,15 +300,15 @@ export default function LandingPage() {
         {/* Trust stats */}
         <div className="flex items-center justify-center gap-8 flex-wrap text-sm text-gray-500">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-[#00D26A]" />
+            <CheckCircle2 className="w-4 h-4 text-[#059669]" />
             <span><strong className="text-gray-900"><CountUp end={500} suffix="+" /></strong> {t("landing.hero.statCompanies")}</span>
           </div>
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-[#00D26A]" />
+            <CheckCircle2 className="w-4 h-4 text-[#059669]" />
             <span><strong className="text-gray-900"><CountUp end={99.8} decimals={1} suffix="%" /></strong> {t("landing.hero.statAccuracy")}</span>
           </div>
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-[#00D26A]" />
+            <CheckCircle2 className="w-4 h-4 text-[#059669]" />
             <span><strong className="text-gray-900"><CountUp end={190} suffix="+" /></strong> {t("landing.hero.statCountries")}</span>
           </div>
         </div>
@@ -320,7 +320,7 @@ export default function LandingPage() {
       {/* Team */}
       <section id="team" className="py-20 max-w-6xl mx-auto px-4 scroll-mt-16">
         <Reveal className="text-center max-w-2xl mx-auto mb-12">
-          <span className="inline-block text-xs font-semibold tracking-widest text-[#00A859] uppercase bg-emerald-50 border border-[#00A859]/20 rounded-full px-3 py-1 mb-4">
+          <span className="inline-block text-xs font-semibold tracking-widest text-[#059669] uppercase bg-emerald-50 border border-[#059669]/20 rounded-full px-3 py-1 mb-4">
             {t("landing.team.badge")}
           </span>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">{t("landing.team.title")}</h2>
@@ -334,12 +334,12 @@ export default function LandingPage() {
             >
               <TeamAvatar avatar={member.avatar} initials={member.initials} gradient={member.gradient} name={member.name} />
               <p className="font-bold text-gray-900">{member.name}</p>
-              <p className="text-xs font-bold text-[#00A859] uppercase tracking-wide mb-2">
+              <p className="text-xs font-bold text-[#059669] uppercase tracking-wide mb-2">
                 {t(member.roleKey)}
               </p>
               <p className="text-sm text-gray-500 mb-4 flex-1">{t(member.bioKey)}</p>
               <div className="flex items-center gap-3 pt-3 border-t border-gray-50">
-                <a href="#" aria-label={t("landing.team.socialLinkedin", { name: member.name })} className="text-gray-400 hover:text-[#00D26A] transition-colors">
+                <a href="#" aria-label={t("landing.team.socialLinkedin", { name: member.name })} className="text-gray-400 hover:text-[#059669] transition-colors">
                   <LinkedinIcon className="w-4 h-4" />
                 </a>
               </div>
@@ -349,7 +349,7 @@ export default function LandingPage() {
       </section>
 
       {/* The Powerhouse: MarketScout AI Agent */}
-      <section id="powerhouse" className="py-20 bg-gradient-to-br from-[#0F2A1C] to-[#081810] scroll-mt-16">
+      <section id="powerhouse" className="py-20 bg-gradient-to-br from-[#16203a] to-[#080c18] scroll-mt-16">
         <div className="max-w-6xl mx-auto px-4 grid lg:grid-cols-2 gap-12 items-center">
           {/* Left column */}
           <Reveal variant="left">
@@ -358,7 +358,7 @@ export default function LandingPage() {
             </span>
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4 leading-tight">
               {t("landing.powerhouse.titlePrefix")}{" "}
-              <span className="bg-gradient-to-r from-[#00D26A] to-[#5EEAD4] bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-[#059669] to-[#5EEAD4] bg-clip-text text-transparent">
                 {t("landing.powerhouse.titleHighlight")}
               </span>
             </h2>
@@ -367,8 +367,8 @@ export default function LandingPage() {
             </p>
             <div className="space-y-6">
               <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-lg bg-[#00D26A]/10 flex items-center justify-center shrink-0">
-                  <Boxes className="w-5 h-5 text-[#00D26A]" />
+                <div className="w-10 h-10 rounded-lg bg-[#059669]/10 flex items-center justify-center shrink-0">
+                  <Boxes className="w-5 h-5 text-[#059669]" />
                 </div>
                 <div>
                   <h4 className="text-white font-semibold mb-1">{t("landing.powerhouse.feature1.title")}</h4>
@@ -378,8 +378,8 @@ export default function LandingPage() {
                 </div>
               </div>
               <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-lg bg-[#00D26A]/10 flex items-center justify-center shrink-0">
-                  <Network className="w-5 h-5 text-[#00D26A]" />
+                <div className="w-10 h-10 rounded-lg bg-[#059669]/10 flex items-center justify-center shrink-0">
+                  <Network className="w-5 h-5 text-[#059669]" />
                 </div>
                 <div>
                   <h4 className="text-white font-semibold mb-1">{t("landing.powerhouse.feature2.title")}</h4>
@@ -392,19 +392,19 @@ export default function LandingPage() {
           </Reveal>
 
           {/* Right column - AI Agent panel mockup */}
-          <Reveal variant="right" className="bg-[#0F2A1C] border border-[#00D26A]/20 rounded-2xl p-6 shadow-2xl">
+          <Reveal variant="right" className="bg-[#16203a] border border-[#059669]/20 rounded-2xl p-6 shadow-2xl">
             <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[#00D26A]/15 flex items-center justify-center shrink-0">
-                  <Bot className="w-5 h-5 text-[#00D26A]" />
+                <div className="w-10 h-10 rounded-lg bg-[#059669]/15 flex items-center justify-center shrink-0">
+                  <Bot className="w-5 h-5 text-[#059669]" />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-white">{t("landing.powerhouse.panelName")}</p>
                   <p className="text-xs text-gray-400">{t("landing.powerhouse.panelVersion")}</p>
                 </div>
               </div>
-              <span className="text-xs font-medium text-[#00D26A] border border-[#00D26A]/30 rounded-full px-3 py-1 flex items-center gap-1.5 whitespace-nowrap">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#00D26A] animate-pulse" />
+              <span className="text-xs font-medium text-[#059669] border border-[#059669]/30 rounded-full px-3 py-1 flex items-center gap-1.5 whitespace-nowrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-pulse" />
                 {t("landing.powerhouse.scanning")}
               </span>
             </div>
@@ -413,20 +413,20 @@ export default function LandingPage() {
               <span className="text-gray-400 font-semibold uppercase tracking-wide">
                 {t("landing.powerhouse.relationalMatches")}
               </span>
-              <span className="text-[#00D26A] font-bold">{t("landing.powerhouse.probability")}</span>
+              <span className="text-[#059669] font-bold">{t("landing.powerhouse.probability")}</span>
             </div>
 
             {/* Relational graph */}
-            <div className="bg-[#0A1F14] rounded-xl border border-white/5 p-5 mb-5">
+            <div className="bg-[#0e1526] rounded-xl border border-white/5 p-5 mb-5">
               <svg viewBox="0 0 300 100" className="w-full h-24">
-                <line x1="40" y1="50" x2="150" y2="25" stroke="#00D26A" strokeWidth="1" strokeOpacity="0.4" />
-                <line x1="40" y1="50" x2="150" y2="75" stroke="#00D26A" strokeWidth="1" strokeOpacity="0.4" />
+                <line x1="40" y1="50" x2="150" y2="25" stroke="#059669" strokeWidth="1" strokeOpacity="0.4" />
+                <line x1="40" y1="50" x2="150" y2="75" stroke="#059669" strokeWidth="1" strokeOpacity="0.4" />
                 <line x1="150" y1="25" x2="260" y2="50" stroke="#FBBF24" strokeWidth="1" strokeOpacity="0.7" strokeDasharray="4 2" />
-                <line x1="150" y1="75" x2="260" y2="50" stroke="#00D26A" strokeWidth="1" strokeOpacity="0.4" />
-                <circle cx="40" cy="50" r="6" fill="#00D26A" />
+                <line x1="150" y1="75" x2="260" y2="50" stroke="#059669" strokeWidth="1" strokeOpacity="0.4" />
+                <circle cx="40" cy="50" r="6" fill="#059669" />
                 <circle cx="150" cy="25" r="5" fill="#FBBF24" />
-                <circle cx="150" cy="75" r="5" fill="#00D26A" />
-                <circle cx="260" cy="50" r="6" fill="#00D26A" />
+                <circle cx="150" cy="75" r="5" fill="#059669" />
+                <circle cx="260" cy="50" r="6" fill="#059669" />
               </svg>
               <div className="flex items-center justify-between text-[10px] text-gray-400 uppercase tracking-wide mt-1 px-1">
                 <span>{t("landing.powerhouse.subjectEntity")}</span>
@@ -436,7 +436,7 @@ export default function LandingPage() {
 
             {/* AI insight */}
             <div className="mb-5">
-              <p className="text-xs font-semibold text-[#00D26A] uppercase tracking-wide mb-2">
+              <p className="text-xs font-semibold text-[#059669] uppercase tracking-wide mb-2">
                 {t("landing.powerhouse.insightsTitle")}
               </p>
               <p className="text-sm text-gray-300 leading-relaxed">
@@ -463,7 +463,7 @@ export default function LandingPage() {
       <section id="pillars" className="py-20 bg-gradient-to-b from-[#EAF3ED] to-[#DCEEE3] scroll-mt-16">
         <div className="max-w-6xl mx-auto px-4">
           <Reveal className="text-center max-w-2xl mx-auto mb-14">
-            <span className="inline-block text-xs font-semibold tracking-widest text-[#00A859] uppercase bg-white border border-[#00A859]/20 rounded-full px-3 py-1 mb-4">
+            <span className="inline-block text-xs font-semibold tracking-widest text-[#059669] uppercase bg-white border border-[#059669]/20 rounded-full px-3 py-1 mb-4">
               {t("landing.pillars.badge")}
             </span>
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
@@ -481,8 +481,8 @@ export default function LandingPage() {
                 className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex flex-col"
               >
                 <div className="flex items-start justify-between mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-[#00D26A]/10 flex items-center justify-center">
-                    <pillar.icon className="w-5 h-5 text-[#00A859]" />
+                  <div className="w-10 h-10 rounded-xl bg-[#059669]/10 flex items-center justify-center">
+                    <pillar.icon className="w-5 h-5 text-[#059669]" />
                   </div>
                   <span className="text-xs font-bold text-gray-300">{pillar.code}</span>
                 </div>
@@ -490,7 +490,7 @@ export default function LandingPage() {
                 <p className="text-sm text-gray-500 mb-4 flex-1">{t(pillar.descKey)}</p>
                 <div className="flex items-center justify-between gap-2 text-xs pt-4 border-t border-gray-100">
                   <span className="text-gray-400">{t(pillar.metaLabelKey)}</span>
-                  <span className="font-bold text-[#00A859] text-right">{t(pillar.metaValueKey)}</span>
+                  <span className="font-bold text-[#059669] text-right">{t(pillar.metaValueKey)}</span>
                 </div>
               </div>
             ))}
@@ -500,7 +500,7 @@ export default function LandingPage() {
 
       {/* CTA */}
       <section className="px-4 py-16 bg-white">
-        <Reveal variant="scale" className="max-w-5xl mx-auto bg-gradient-to-br from-[#10301E] to-[#0A1F14] rounded-3xl p-10 md:p-16 text-center shadow-xl">
+        <Reveal variant="scale" className="max-w-5xl mx-auto bg-gradient-to-br from-[#10301E] to-[#0e1526] rounded-3xl p-10 md:p-16 text-center shadow-xl">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             {t("landing.cta.title")}
           </h2>
@@ -510,7 +510,7 @@ export default function LandingPage() {
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <Link
               href="/verify"
-              className="px-8 py-3.5 bg-[#00D26A] text-black font-bold rounded-xl hover:bg-[#00b85d] transition-colors"
+              className="px-8 py-3.5 bg-[#059669] text-black font-bold rounded-xl hover:bg-[#047857] transition-colors"
             >
               {t("landing.cta.startScan")}
             </Link>
@@ -525,16 +525,16 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-[#081810] text-gray-400 pt-16 pb-8">
+      <footer className="bg-[#080c18] text-gray-400 pt-16 pb-8">
         <div className="max-w-6xl mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
             {/* Brand column */}
             <div className="md:col-span-1">
               <Link href="/" className="flex items-center gap-2 mb-4">
                 <Logo className="w-8 h-8" />
-                <span className="font-bold text-white text-lg">MarketScout</span>
+                <span className="font-display font-bold text-white text-lg">MarketScout</span>
               </Link>
-              <p className="text-xs font-semibold tracking-widest text-[#00D26A] uppercase mb-3">
+              <p className="text-xs font-semibold tracking-widest text-[#059669] uppercase mb-3">
                 {t("landing.footer.tagline")}
               </p>
               <p className="text-sm text-gray-400 mb-6 leading-relaxed">
@@ -585,11 +585,11 @@ export default function LandingPage() {
                 {t("landing.footer.hq.heading")}
               </h4>
               <div className="flex items-start gap-2 text-sm mb-3">
-                <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-[#00D26A]" />
+                <MapPin className="w-4 h-4 mt-0.5 shrink-0 text-[#059669]" />
                 <span>Mai Văn Vĩnh, Tân Hưng, Thành Phố Hồ Chí Minh</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <Mail className="w-4 h-4 shrink-0 text-[#00D26A]" />
+                <Mail className="w-4 h-4 shrink-0 text-[#059669]" />
                 <span>unviantruong26@gmail.com</span>
               </div>
             </div>

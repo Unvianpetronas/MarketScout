@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ViewTransition } from "react";
-import { Geist, Geist_Mono, Source_Serif_4, Inter, Sora } from "next/font/google";
+import { Geist, Geist_Mono, Source_Serif_4, Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/providers/auth-provider";
@@ -28,10 +28,11 @@ const inter = Inter({
   subsets: ["latin", "vietnamese"],
 });
 
-// Display font for headings (h1–h4)
-const sora = Sora({
-  variable: "--font-sora",
-  subsets: ["latin"],
+// Display font for headings + stat numbers — the MarketScout design-system face.
+const displayFont = Plus_Jakarta_Sans({
+  variable: "--font-display-face",
+  subsets: ["latin", "vietnamese"],
+  weight: ["500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -49,7 +50,7 @@ export default function RootLayout({
       <html
           lang="en"
           suppressHydrationWarning
-          className={`${geistSans.variable} ${geistMono.variable} ${sourceSerif.variable} ${inter.variable} ${sora.variable} h-full antialiased`}
+          className={`${geistSans.variable} ${geistMono.variable} ${sourceSerif.variable} ${inter.variable} ${displayFont.variable} h-full antialiased`}
       >
       <body className="min-h-full flex flex-col">
       <ThemeProvider attribute="class" defaultTheme="light" disableTransitionOnChange>

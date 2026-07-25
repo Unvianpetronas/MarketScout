@@ -246,9 +246,9 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
               {status === "paid" ? (
                 <div className="flex flex-col items-center text-center py-8">
                   <div className="relative mb-4">
-                    <span className="absolute inset-0 rounded-full bg-[#00D26A]/20 animate-ping" />
+                    <span className="absolute inset-0 rounded-full bg-[#059669]/20 animate-ping" />
                     <div className="relative w-16 h-16 rounded-full neu-inset flex items-center justify-center">
-                      <CheckCircle2 className="w-9 h-9 text-[#00B85D]" />
+                      <CheckCircle2 className="w-9 h-9 text-[#047857]" />
                     </div>
                   </div>
                   <h3 className="text-[#3A362E] text-2xl font-bold mb-1">{t("checkout.successTitle")}</h3>
@@ -258,7 +258,7 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
                       : t("checkout.planSuccessDesc", { count: successCount })}
                   </p>
                   <div className="neu-inset w-full max-w-xs px-4 py-3 mb-4 flex items-center justify-center gap-2 text-sm text-[#5A5545]">
-                    <Clock className="w-4 h-4 text-[#00B85D]" />
+                    <Clock className="w-4 h-4 text-[#047857]" />
                     {t("checkout.redirectIn")}
                     <span className="text-[#3A362E] font-bold tabular-nums">{redirectIn}s</span>
                   </div>
@@ -318,7 +318,7 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
                       <p className="text-xs text-[#8C8672] mb-1 uppercase tracking-wider font-semibold">{t("checkout.transferContent")}</p>
                       <div className="neu-inset px-3 py-3 flex items-center justify-between">
                         <span className="font-mono text-[#3A362E] text-base font-bold tracking-widest">{order.transferContent}</span>
-                        <button onClick={() => handleCopy(order.transferContent)} className="neu-btn w-8 h-8 rounded-xl flex items-center justify-center text-[#00B85D] shrink-0">
+                        <button onClick={() => handleCopy(order.transferContent)} className="neu-btn w-8 h-8 rounded-xl flex items-center justify-center text-[#047857] shrink-0">
                           <Copy className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -332,7 +332,7 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
                         <span className="text-xs text-[#8C8672]">{t("checkout.accountNo")}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-[#3A362E] font-mono font-bold">{order.accountNo}</span>
-                          <button onClick={() => handleCopy(order.accountNo)} className="text-[#8C8672] hover:text-[#00B85D] transition-colors">
+                          <button onClick={() => handleCopy(order.accountNo)} className="text-[#8C8672] hover:text-[#047857] transition-colors">
                             <Copy className="w-3.5 h-3.5" />
                           </button>
                         </div>
@@ -360,7 +360,7 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
 
             <div className="neu-surface-soft p-5 mb-5">
               <div className="flex items-center justify-between mb-3">
-                <span className="neu-inset text-[#00843F] text-xs font-bold px-2.5 py-1 rounded-full">
+                <span className="neu-inset text-[#047857] text-xs font-bold px-2.5 py-1 rounded-full">
                   {isTopup ? t("checkout.quotaTopupBadge") : t("checkout.planBadge")}
                 </span>
                 <List className="w-4 h-4 text-[#8C8672]" />
@@ -369,7 +369,7 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
               {isTopup ? (
                 <>
                   <h3 className="text-[#3A362E] text-xl font-bold mb-1">{quantity} {t("checkout.creditUnit")}{quantity > 1 && lang === "en" ? "s" : ""}</h3>
-                  <p className="text-[#00843F] text-sm mb-4">{t("checkout.payg")}</p>
+                  <p className="text-[#047857] text-sm mb-4">{t("checkout.payg")}</p>
                   <div className="space-y-2.5 mb-4 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-[#8C8672]">{t("checkout.unitPrice")}</span>
@@ -385,7 +385,7 @@ function VietQrCheckout({ mode, planKey }: { mode: "topup" | "plan"; planKey: st
                 <>
                   <h3 className="text-[#3A362E] text-xl font-bold mb-1">{planName}</h3>
                   {planInfo && (
-                    <p className="text-[#00843F] text-sm mb-4">{t("checkout.perMonth", { n: planInfo.monthlyQuota })}</p>
+                    <p className="text-[#047857] text-sm mb-4">{t("checkout.perMonth", { n: planInfo.monthlyQuota })}</p>
                   )}
                 </>
               )}
@@ -436,7 +436,7 @@ function CheckoutContent() {
           <Logo className="w-9 h-9" />
           <div>
             <span className="text-[#3A362E] font-bold text-sm">MarketScout</span>
-            <span className="text-[#00843F] text-xs ml-2 font-semibold">B2B INTELLIGENCE</span>
+            <span className="text-[#047857] text-xs ml-2 font-semibold">B2B INTELLIGENCE</span>
           </div>
         </div>
         <Link href="/dashboard" className="neu-btn text-[#5A5545] text-sm flex items-center gap-1.5 px-4 py-2 rounded-xl hover:text-[#3A362E] transition-colors">
@@ -459,7 +459,7 @@ export default function CheckoutPage() {
           style={{ background: "linear-gradient(160deg, #F5F3EE 0%, #EDEAE2 55%, #E7E2D6 100%)" }}
         >
           <div className="neu-btn w-12 h-12 rounded-full flex items-center justify-center">
-            <div className="w-5 h-5 border-2 border-[#00B85D]/30 border-t-[#00B85D] rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-[#047857]/30 border-t-[#047857] rounded-full animate-spin" />
           </div>
         </div>
       }

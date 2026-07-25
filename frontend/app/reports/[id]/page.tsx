@@ -116,7 +116,7 @@ const PILLAR_ICONS: Record<number, React.ElementType> = {
 
 // Trust-based color for the OVERALL score: higher = more trustworthy = green.
 function trustStyle(score: number, t: (key: string) => string) {
-  if (score >= 75) return { color: "#00D26A", bg: "#E6F9F0", textClass: "text-emerald-700", label: t("report.trustHigh") };
+  if (score >= 75) return { color: "#059669", bg: "#E7F6EF", textClass: "text-emerald-700", label: t("report.trustHigh") };
   if (score >= 40) return { color: "#F59E0B", bg: "#FFF8E7", textClass: "text-amber-700", label: t("report.trustCaution") };
   return { color: "#EF4444", bg: "#FFF1F0", textClass: "text-red-700", label: t("report.trustHighRisk") };
 }
@@ -126,7 +126,7 @@ function trustStyle(score: number, t: (key: string) => string) {
 // unverified one is a neutral grey "N/A" instead of a red "FAIL".
 function pillarStatusStyle(status: string | undefined) {
   switch ((status || "").toUpperCase()) {
-    case "PASS": return { color: "#00D26A", bg: "#E6F9F0", badge: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "PASS", na: false };
+    case "PASS": return { color: "#059669", bg: "#E7F6EF", badge: "bg-emerald-50 text-emerald-700 border-emerald-200", label: "PASS", na: false };
     case "WARN": return { color: "#F59E0B", bg: "#FFF8E7", badge: "bg-amber-50 text-amber-700 border-amber-200", label: "WARN", na: false };
     case "FAIL": return { color: "#EF4444", bg: "#FFF1F0", badge: "bg-red-50 text-red-700 border-red-200", label: "FAIL", na: false };
     default:     return { color: "#9CA3AF", bg: "#F3F4F6", badge: "bg-gray-100 text-gray-500 border-gray-200", label: "N/A", na: true };
@@ -145,7 +145,7 @@ function EvidenceRow({ ev }: { ev: { type?: string; text?: string; source?: stri
         {ev.source && (
           ev.url ? (
             <a href={ev.url} target="_blank" rel="noopener noreferrer"
-              className="text-[#00D26A] hover:underline"> · {ev.source} <ExternalLink className="w-2.5 h-2.5 inline-block mb-0.5" /></a>
+              className="text-[#059669] hover:underline"> · {ev.source} <ExternalLink className="w-2.5 h-2.5 inline-block mb-0.5" /></a>
           ) : (
             <span className="text-gray-300"> · {ev.source}</span>
           )
@@ -203,7 +203,7 @@ function PillarCard({ pillar }: { pillar: PillarResult }) {
   const findings = parseFindings(pillar.findings);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm card-hover">
+    <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-5 shadow-[0_2px_20px_rgba(16,22,43,0.03)] card-hover">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-start gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: st.bg }}>
@@ -260,7 +260,7 @@ function RecGroup({ title, icon: Icon, items, color, bg }: {
 }) {
   if (!items || items.length === 0) return null;
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-4">
+    <div className="bg-white rounded-xl border border-[rgba(16,22,43,0.06)] p-4">
       <div className="flex items-center gap-2 mb-3">
         <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: bg }}>
           <Icon className="w-4 h-4" style={{ color }} />
@@ -289,13 +289,13 @@ function AiRecommendations({ recs, loading }: { recs: ReportRecommendations | nu
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+    <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
       <div className="flex items-center gap-2 mb-1">
-        <div className="w-8 h-8 bg-[#E6F9F0] rounded-xl flex items-center justify-center">
-          <Sparkles className="w-4 h-4 text-[#00843F]" />
+        <div className="w-8 h-8 bg-[#E7F6EF] rounded-xl flex items-center justify-center">
+          <Sparkles className="w-4 h-4 text-[#047857]" />
         </div>
         <h3 className="text-sm font-bold text-gray-900">{t("report.aiRecTitle")}</h3>
-        <span className="text-[10px] font-bold text-[#00843F] bg-[#E6F9F0] px-2 py-0.5 rounded-full uppercase tracking-wider">
+        <span className="text-[10px] font-bold text-[#047857] bg-[#E7F6EF] px-2 py-0.5 rounded-full uppercase tracking-wider">
           AI
         </span>
       </div>
@@ -305,7 +305,7 @@ function AiRecommendations({ recs, loading }: { recs: ReportRecommendations | nu
 
       {loading ? (
         <div className="flex items-center gap-3 text-sm text-gray-400 p-4 bg-gray-50 rounded-xl">
-          <div className="w-4 h-4 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-[#059669]/20 border-t-[#059669] rounded-full animate-spin" />
           {t("report.aiRecLoading")}
         </div>
       ) : !hasContent ? (
@@ -317,13 +317,13 @@ function AiRecommendations({ recs, loading }: { recs: ReportRecommendations | nu
         <>
           {recs?.summary && (
             <div className="flex items-start gap-3 p-4 bg-[#F0FAF4] border border-emerald-100 rounded-xl mb-4">
-              <Sparkles className="w-5 h-5 text-[#00843F] shrink-0 mt-0.5" />
+              <Sparkles className="w-5 h-5 text-[#047857] shrink-0 mt-0.5" />
               <p className="text-sm text-emerald-800 font-medium">{recs.summary}</p>
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <RecGroup title={t("report.recActionItems")} icon={ListChecks} items={recs?.actionItems}
-              color="#00843F" bg="#E6F9F0" />
+              color="#047857" bg="#E7F6EF" />
             <RecGroup title={t("report.recInfoToProvide")} icon={Send} items={recs?.infoToProvide}
               color="#2563EB" bg="#EFF4FF" />
             <RecGroup title={t("report.recInfoToVerify")} icon={FileSearch} items={recs?.infoToVerify}
@@ -429,7 +429,7 @@ function TransactionInfoCard({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+    <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
       <div className="flex items-center gap-2 mb-1">
         <div className="w-8 h-8 bg-purple-50 rounded-xl flex items-center justify-center">
           <FileText className="w-4 h-4 text-purple-500" />
@@ -492,7 +492,7 @@ function TransactionInfoCard({
           <span className="text-xs text-gray-500">{t("report.hasWrittenContractQuestion")}</span>
           <button
             onClick={() => setShowModal(true)}
-            className="px-3 py-1 text-xs font-semibold rounded-full bg-[#E6F9F0] text-[#00843F]"
+            className="px-3 py-1 text-xs font-semibold rounded-full bg-[#E7F6EF] text-[#047857]"
           >{t("report.yesBtn")}</button>
           <button
             onClick={() => saveSelfReport(false)}
@@ -606,7 +606,7 @@ export default function ReportDetailPage({ params }: Props) {
 
   return (
     <AuthGuard>
-      <div className="flex h-screen overflow-hidden bg-[#FAFBFA]">
+      <div className="flex h-screen overflow-hidden bg-[#faf9f6]">
         <Sidebar active="reports" />
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           <main className="max-w-6xl mx-auto px-6 py-8">
@@ -633,7 +633,7 @@ export default function ReportDetailPage({ params }: Props) {
                 <button
                   onClick={handleExport}
                   disabled={isExporting}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-60"
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors shadow-[0_2px_20px_rgba(16,22,43,0.03)] disabled:opacity-60"
                 >
                   <Download className={`w-4 h-4 ${isExporting ? "animate-pulse" : ""}`} />
                   {isExporting ? t("report.exportingBtn") : t("report.exportBtn")}
@@ -641,7 +641,7 @@ export default function ReportDetailPage({ params }: Props) {
                 <button
                   onClick={handleRescan}
                   disabled={isRescan}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-60"
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 transition-colors shadow-[0_2px_20px_rgba(16,22,43,0.03)] disabled:opacity-60"
                 >
                   <RefreshCw className={`w-4 h-4 ${isRescan ? "animate-spin" : ""}`} />
                   {t("report.rescanBtn")}
@@ -649,7 +649,7 @@ export default function ReportDetailPage({ params }: Props) {
                 <button
                   onClick={() => setShowFlagModal(true)}
                   disabled={justFlagged}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-colors shadow-sm disabled:opacity-60 disabled:text-gray-400"
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition-colors shadow-[0_2px_20px_rgba(16,22,43,0.03)] disabled:opacity-60 disabled:text-gray-400"
                 >
                   <Flag className="w-4 h-4" />
                   {justFlagged ? t("report.flaggedBtn") : t("report.flagModalTitle")}
@@ -659,7 +659,7 @@ export default function ReportDetailPage({ params }: Props) {
 
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-24 gap-4">
-                <div className="w-12 h-12 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin" />
+                <div className="w-12 h-12 border-2 border-[#059669]/20 border-t-[#059669] rounded-full animate-spin" />
                 <p className="text-sm text-gray-400">{t("report.loadingReport")}</p>
               </div>
             ) : !report ? (
@@ -686,7 +686,7 @@ export default function ReportDetailPage({ params }: Props) {
                 )}
 
                 {/* ── Company Header ── */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-4">
                       <div className="w-14 h-14 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center text-gray-600 font-extrabold text-xl shrink-0">
@@ -708,7 +708,7 @@ export default function ReportDetailPage({ params }: Props) {
                           )}
                           {report.website && (
                             <a href={report.website} target="_blank" rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 text-xs text-[#00D26A] hover:underline bg-[#E6F9F0] px-3 py-1 rounded-full">
+                              className="flex items-center gap-1.5 text-xs text-[#059669] hover:underline bg-[#E7F6EF] px-3 py-1 rounded-full">
                               <ExternalLink className="w-3 h-3" />
                               {report.website}
                             </a>
@@ -747,7 +747,7 @@ export default function ReportDetailPage({ params }: Props) {
 
                 {/* ── Score + Deal Safety ── */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex flex-col items-center">
+                  <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)] flex flex-col items-center">
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">{t("report.overallScoreLabel")}</p>
                     <ScoreGaugeLight score={avgScore} />
                     <div className="mt-4 w-full space-y-1.5">
@@ -763,7 +763,7 @@ export default function ReportDetailPage({ params }: Props) {
                     </div>
                   </div>
 
-                  <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                  <div className="lg:col-span-2 bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
                     <div className="flex items-center gap-2 mb-4">
                       <div className="w-8 h-8 bg-purple-50 rounded-xl flex items-center justify-center">
                         <Shield className="w-4 h-4 text-purple-500" />
@@ -814,12 +814,12 @@ export default function ReportDetailPage({ params }: Props) {
                       <h2 className="text-lg font-extrabold text-gray-900">{t("report.pillarsTitle")}</h2>
                       <p className="text-sm text-gray-400">{t("report.pillarsSubtitle")}</p>
                     </div>
-                    <span className="text-xs text-gray-400 bg-gray-50 border border-gray-100 px-3 py-1.5 rounded-xl">
+                    <span className="text-xs text-gray-400 bg-gray-50 border border-[rgba(16,22,43,0.06)] px-3 py-1.5 rounded-xl">
                       {t("report.pillarsCount", { n: pillars.length })}
                     </span>
                   </div>
                   {pillars.length === 0 ? (
-                    <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center shadow-sm">
+                    <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-16 text-center shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
                       <Clock className="w-10 h-10 text-gray-200 mx-auto mb-3" />
                       <p className="text-gray-400 text-sm">{t("report.pillarsLoading")}</p>
                     </div>
@@ -834,7 +834,7 @@ export default function ReportDetailPage({ params }: Props) {
                 <AiRecommendations recs={recs} loading={recsLoading} />
 
                 {/* ── AI CTA ── */}
-                <div className="bg-gradient-to-r from-[#0A1A12] to-[#0D2218] rounded-2xl p-6 flex items-center justify-between">
+                <div className="bg-gradient-to-r from-[#0b1120] to-[#10162b] rounded-2xl p-6 flex items-center justify-between">
                   <div>
                     <p className="text-[#5FD48A] text-xs font-bold uppercase tracking-widest mb-1">AI Copilot</p>
                     <h3 className="text-white font-bold text-base mb-1">{t("report.copilotTitle")}</h3>

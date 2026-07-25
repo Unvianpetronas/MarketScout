@@ -20,7 +20,7 @@ const FAQS = [
   {
     categoryKey: "support.faq.1.category",
     icon: Shield,
-    color: "#00D26A",
+    color: "#059669",
     items: [
       { qKey: "support.faq.1.0.q", aKey: "support.faq.1.0.a" },
       { qKey: "support.faq.1.1.q", aKey: "support.faq.1.1.a" },
@@ -65,7 +65,7 @@ function FAQItem({ qKey, aKey }: { qKey: string; aKey: string }) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   return (
-    <div className="border-b border-gray-100 last:border-0">
+    <div className="border-b border-[rgba(16,22,43,0.06)] last:border-0">
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between py-4 text-left gap-3"
@@ -89,10 +89,10 @@ export default function SupportDeskPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white/95 backdrop-blur z-50">
+      <nav className="flex items-center justify-between px-6 py-4 border-b border-[rgba(16,22,43,0.06)] sticky top-0 bg-white/95 backdrop-blur z-50">
         <Link href="/" className="flex items-center gap-2">
           <Logo className="w-8 h-8" />
-          <span className="font-bold text-gray-900 text-lg">MarketScout</span>
+          <span className="font-display font-bold text-gray-900 text-lg">MarketScout</span>
         </Link>
         <Link
           href="/"
@@ -104,10 +104,10 @@ export default function SupportDeskPage() {
       </nav>
 
       {/* Header */}
-      <div className="bg-gradient-to-br from-[#0A1A12] to-[#0D2218] py-16">
+      <div className="bg-gradient-to-br from-[#0b1120] to-[#10162b] py-16">
         <div className="max-w-4xl mx-auto px-6 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-[#00D26A]/15 flex items-center justify-center mx-auto mb-4">
-            <MessageSquare className="w-6 h-6 text-[#00D26A]" />
+          <div className="w-12 h-12 rounded-2xl bg-[#059669]/15 flex items-center justify-center mx-auto mb-4">
+            <MessageSquare className="w-6 h-6 text-[#059669]" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">{t("support.heroTitle")}</h1>
           <p className="text-gray-400 text-base max-w-xl mx-auto">
@@ -122,10 +122,10 @@ export default function SupportDeskPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <a
             href="mailto:unviantruong26@gmail.com"
-            className="flex items-start gap-4 bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow group"
+            className="flex items-start gap-4 bg-white border border-[rgba(16,22,43,0.06)] rounded-2xl p-5 shadow-[0_2px_20px_rgba(16,22,43,0.03)] hover:shadow-md transition-shadow group"
           >
-            <div className="w-10 h-10 rounded-xl bg-[#E6F9F0] flex items-center justify-center shrink-0 group-hover:bg-[#00D26A] transition-colors">
-              <Mail className="w-5 h-5 text-[#00A859] group-hover:text-white transition-colors" />
+            <div className="w-10 h-10 rounded-xl bg-[#E7F6EF] flex items-center justify-center shrink-0 group-hover:bg-[#059669] transition-colors">
+              <Mail className="w-5 h-5 text-[#059669] group-hover:text-white transition-colors" />
             </div>
             <div>
               <p className="font-bold text-gray-900 text-sm mb-1">{t("support.emailUsLabel")}</p>
@@ -136,10 +136,10 @@ export default function SupportDeskPage() {
 
           <Link
             href="/chat"
-            className="flex items-start gap-4 bg-[#0D2218] border border-[#00D26A]/20 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow group"
+            className="flex items-start gap-4 bg-[#10162b] border border-[#059669]/20 rounded-2xl p-5 shadow-[0_2px_20px_rgba(16,22,43,0.03)] hover:shadow-md transition-shadow group"
           >
-            <div className="w-10 h-10 rounded-xl bg-[#00D26A]/15 flex items-center justify-center shrink-0 group-hover:bg-[#00D26A] transition-colors">
-              <MessageSquare className="w-5 h-5 text-[#00D26A] group-hover:text-white transition-colors" />
+            <div className="w-10 h-10 rounded-xl bg-[#059669]/15 flex items-center justify-center shrink-0 group-hover:bg-[#059669] transition-colors">
+              <MessageSquare className="w-5 h-5 text-[#059669] group-hover:text-white transition-colors" />
             </div>
             <div>
               <p className="font-bold text-white text-sm mb-1">{t("support.chatWithAiLabel")}</p>
@@ -152,20 +152,20 @@ export default function SupportDeskPage() {
         {/* Quick links */}
         <div className="bg-gray-50 rounded-2xl p-6">
           <h2 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-[#00A859]" />
+            <BookOpen className="w-4 h-4 text-[#059669]" />
             {t("support.usefulDocsTitle")}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Link href="/methodology" className="flex items-center gap-2.5 bg-white rounded-xl p-3.5 border border-gray-100 hover:border-[#00D26A] hover:bg-[#E6F9F0] transition-all text-sm font-medium text-gray-700 hover:text-[#00843F]">
-              <Shield className="w-4 h-4 text-[#00A859] shrink-0" />
+            <Link href="/methodology" className="flex items-center gap-2.5 bg-white rounded-xl p-3.5 border border-[rgba(16,22,43,0.06)] hover:border-[#059669] hover:bg-[#E7F6EF] transition-all text-sm font-medium text-gray-700 hover:text-[#047857]">
+              <Shield className="w-4 h-4 text-[#059669] shrink-0" />
               {t("support.linkMethodology")}
             </Link>
-            <Link href="/pricing" className="flex items-center gap-2.5 bg-white rounded-xl p-3.5 border border-gray-100 hover:border-[#00D26A] hover:bg-[#E6F9F0] transition-all text-sm font-medium text-gray-700 hover:text-[#00843F]">
-              <CreditCard className="w-4 h-4 text-[#00A859] shrink-0" />
+            <Link href="/pricing" className="flex items-center gap-2.5 bg-white rounded-xl p-3.5 border border-[rgba(16,22,43,0.06)] hover:border-[#059669] hover:bg-[#E7F6EF] transition-all text-sm font-medium text-gray-700 hover:text-[#047857]">
+              <CreditCard className="w-4 h-4 text-[#059669] shrink-0" />
               {t("support.linkPricing")}
             </Link>
-            <Link href="/privacy-policy" className="flex items-center gap-2.5 bg-white rounded-xl p-3.5 border border-gray-100 hover:border-[#00D26A] hover:bg-[#E6F9F0] transition-all text-sm font-medium text-gray-700 hover:text-[#00843F]">
-              <AlertTriangle className="w-4 h-4 text-[#00A859] shrink-0" />
+            <Link href="/privacy-policy" className="flex items-center gap-2.5 bg-white rounded-xl p-3.5 border border-[rgba(16,22,43,0.06)] hover:border-[#059669] hover:bg-[#E7F6EF] transition-all text-sm font-medium text-gray-700 hover:text-[#047857]">
+              <AlertTriangle className="w-4 h-4 text-[#059669] shrink-0" />
               {t("support.linkPrivacy")}
             </Link>
           </div>
@@ -178,7 +178,7 @@ export default function SupportDeskPage() {
             {FAQS.map((category) => {
               const Icon = category.icon;
               return (
-                <div key={category.categoryKey} className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                <div key={category.categoryKey} className="bg-white border border-[rgba(16,22,43,0.06)] rounded-2xl shadow-[0_2px_20px_rgba(16,22,43,0.03)] overflow-hidden">
                   <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-50"
                     style={{ backgroundColor: `${category.color}08` }}>
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center"
@@ -199,14 +199,14 @@ export default function SupportDeskPage() {
         </div>
 
         {/* Bottom CTA */}
-        <div className="bg-gradient-to-br from-[#0A1A12] to-[#0D2218] rounded-2xl p-8 text-center">
+        <div className="bg-gradient-to-br from-[#0b1120] to-[#10162b] rounded-2xl p-8 text-center">
           <h3 className="text-white font-bold text-lg mb-2">{t("support.stillNeedHelpTitle")}</h3>
           <p className="text-gray-400 text-sm mb-6 max-w-md mx-auto">
             {t("support.stillNeedHelpDesc")}
           </p>
           <a
             href="mailto:unviantruong26@gmail.com"
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#00D26A] text-white font-semibold rounded-xl hover:bg-[#00B85D] transition-colors text-sm"
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#059669] text-white font-semibold rounded-xl hover:bg-[#047857] transition-colors text-sm"
           >
             <Mail className="w-4 h-4" />
             {t("support.sendSupportEmail")}
@@ -215,14 +215,14 @@ export default function SupportDeskPage() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-gray-100 py-8 text-center text-sm text-gray-400">
+      <footer className="border-t border-[rgba(16,22,43,0.06)] py-8 text-center text-sm text-gray-400">
         <p>&copy; {new Date().getFullYear()} {t("support.footerCredit")}</p>
         <div className="flex items-center justify-center gap-4 mt-3 text-xs">
           <Link href="/terms-of-service" className="hover:text-gray-600 transition-colors">Terms of Service</Link>
           <span>·</span>
           <Link href="/privacy-policy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
           <span>·</span>
-          <Link href="/support-desk" className="text-[#00A859]">Support Desk</Link>
+          <Link href="/support-desk" className="text-[#059669]">Support Desk</Link>
         </div>
       </footer>
     </div>

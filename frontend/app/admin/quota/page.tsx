@@ -137,7 +137,7 @@ export default function AdminQuotaPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {isLoading ? (
             <div className="p-12 flex flex-col items-center">
-              <div className="w-10 h-10 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin mb-3" />
+              <div className="w-10 h-10 border-2 border-[#059669]/20 border-t-[#059669] rounded-full animate-spin mb-3" />
               <p className="text-sm text-gray-400">{t("admin.quota.loading")}</p>
             </div>
           ) : plans.length === 0 ? (
@@ -161,7 +161,7 @@ export default function AdminQuotaPage() {
                   const editValue = edits[plan.id] ?? plan.monthlyQuota.toString();
                   const isDirty = edits[plan.id] !== undefined && edits[plan.id] !== plan.monthlyQuota.toString();
                   return (
-                    <tr key={plan.id} className="hover:bg-[#FAFBFA] transition-colors">
+                    <tr key={plan.id} className="hover:bg-[#faf9f6] transition-colors">
                       <td className="px-5 py-4">
                         <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${getPlanStyle(plan.name)}`}>
                           {plan.name}

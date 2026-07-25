@@ -45,7 +45,7 @@ const EXAMPLE_QUERIES = [
 
 function getRiskColor(score: number | null | undefined) {
   if (!score && score !== 0) return "#9CA3AF";
-  if (score < 40) return "#00D26A";
+  if (score < 40) return "#059669";
   if (score < 70) return "#F59E0B";
   return "#EF4444";
 }
@@ -55,7 +55,7 @@ function ScoreRing({ score }: { score: number | null | undefined }) {
     <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-xs text-gray-300 shrink-0">—</div>
   );
   const color = getRiskColor(score);
-  const bg = score < 40 ? "#E6F9F0" : score < 70 ? "#FFF8E7" : "#FFF1F0";
+  const bg = score < 40 ? "#E7F6EF" : score < 70 ? "#FFF8E7" : "#FFF1F0";
   const r = 18; const circ = 2 * Math.PI * r;
   const offset = circ - (score / 100) * circ;
   return (
@@ -201,13 +201,13 @@ function VerifyContent() {
     <AuthGuard>
       {/* ── In-place verification progress overlay ── */}
       {isSearching && (
-        <div className="fixed inset-0 z-50 bg-[#0A1A12]/60 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-[#0b1120]/60 backdrop-blur-sm flex items-center justify-center p-6 animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center">
             <div className="w-16 h-16 mx-auto mb-5 relative">
-              <div className="absolute inset-0 rounded-full border-4 border-[#00D26A]/15" />
-              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#00D26A] animate-spin" />
+              <div className="absolute inset-0 rounded-full border-4 border-[#059669]/15" />
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-[#059669] animate-spin" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <Shield className="w-6 h-6 text-[#00D26A]" />
+                <Shield className="w-6 h-6 text-[#059669]" />
               </div>
             </div>
             <h3 className="text-lg font-extrabold text-gray-900 mb-1.5">
@@ -218,7 +218,7 @@ function VerifyContent() {
             </p>
             <div className="flex items-center justify-center gap-1.5 mb-5">
               {[0, 150, 300].map((d) => (
-                <span key={d} className="w-2 h-2 rounded-full bg-[#00D26A]"
+                <span key={d} className="w-2 h-2 rounded-full bg-[#059669]"
                   style={{ animation: `bounce 1.2s ${d}ms ease-in-out infinite` }} />
               ))}
             </div>
@@ -243,7 +243,7 @@ function VerifyContent() {
         />
       )}
 
-      <div className="flex h-screen overflow-hidden bg-[#FAFBFA]">
+      <div className="flex h-screen overflow-hidden bg-[#faf9f6]">
         <Sidebar active="verify" />
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           <div className="max-w-4xl mx-auto px-6 py-8">
@@ -252,7 +252,7 @@ function VerifyContent() {
             <div className="mb-8 animate-fade-in-up">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <p className="text-xs font-bold text-[#00D26A] uppercase tracking-widest mb-1">{t("verify.eyebrow")}</p>
+                  <p className="text-xs font-bold text-[#059669] uppercase tracking-widest mb-1">{t("verify.eyebrow")}</p>
                   <h1 className="text-3xl font-extrabold text-gray-900 mb-1">{t("verify.pageTitle")}</h1>
                   <p className="text-sm text-gray-400">{t("verify.pageSubtitle")}</p>
                 </div>
@@ -266,7 +266,7 @@ function VerifyContent() {
                       🔋 {t("profile.quotaRemaining", { n: quota.quotaRemaining })}
                     </div>
                     {quota.quotaRemaining <= 3 && (
-                      <Link href="/pricing" className="text-xs text-[#00D26A] hover:underline font-semibold">
+                      <Link href="/pricing" className="text-xs text-[#059669] hover:underline font-semibold">
                         {t("nav.upgrade")} →
                       </Link>
                     )}
@@ -275,8 +275,8 @@ function VerifyContent() {
               </div>
 
               {/* ── Search Card ── */}
-              <div className={`bg-white rounded-2xl border shadow-sm p-6 transition-all ${
-                inputFocused ? "border-[#00D26A] ring-2 ring-[#00D26A]/15 shadow-md" : "border-gray-100"
+              <div className={`bg-white rounded-2xl border shadow-[0_2px_20px_rgba(16,22,43,0.03)] p-6 transition-all ${
+                inputFocused ? "border-[#059669] ring-2 ring-[#059669]/15 shadow-md" : "border-[rgba(16,22,43,0.06)]"
               }`}>
                 <form onSubmit={handleSearch} className="flex gap-3">
                   <div className="flex-1 relative">
@@ -287,13 +287,13 @@ function VerifyContent() {
                       onFocus={() => setInputFocused(true)}
                       onBlur={() => setInputFocused(false)}
                       placeholder={t("verify.searchPlaceholder")}
-                      className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#00D26A] focus:bg-white transition-all font-medium"
+                      className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#059669] focus:bg-white transition-all font-medium"
                     />
                   </div>
                   <div className="relative w-52">
                     <Globe className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
                     <select value={country} onChange={(e) => setCountry(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#00D26A] bg-gray-50 appearance-none font-medium">
+                      className="w-full pl-10 pr-4 py-3.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#059669] bg-gray-50 appearance-none font-medium">
                       <option value="">{t("country.all")}</option>
                       {COUNTRIES.map((c) => (
                         <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
@@ -301,7 +301,7 @@ function VerifyContent() {
                     </select>
                   </div>
                   <button type="submit" disabled={isSearching}
-                    className="px-7 py-3.5 gradient-brand text-white font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-60 flex items-center gap-2 shrink-0 shadow-sm">
+                    className="px-7 py-3.5 gradient-brand text-white font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-60 flex items-center gap-2 shrink-0 shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
                     {isSearching ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Zap className="w-4 h-4" />}
                     {isSearching ? `${t("status.processing")}...` : t("verify.submitBtn")}
                   </button>
@@ -315,7 +315,7 @@ function VerifyContent() {
                     value={website}
                     onChange={(e) => setWebsite(e.target.value)}
                     placeholder={t("verify.websitePlaceholder")}
-                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50/60 border border-gray-100 rounded-xl text-xs focus:outline-none focus:border-[#00D26A] focus:bg-white transition-all"
+                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50/60 border border-[rgba(16,22,43,0.06)] rounded-xl text-xs focus:outline-none focus:border-[#059669] focus:bg-white transition-all"
                   />
                 </div>
 
@@ -324,7 +324,7 @@ function VerifyContent() {
                   <span className="text-xs text-gray-400 font-medium">{t("verify.examplesLabel")}</span>
                   {EXAMPLE_QUERIES.map((q) => (
                     <button key={q} onClick={() => { setQuery(q.split(",")[0].trim()); setCountry(q.split(",")[1]?.trim() || ""); }}
-                      className="text-xs px-3 py-1 bg-gray-50 border border-gray-200 text-gray-500 rounded-full hover:border-[#00D26A] hover:text-[#00843F] hover:bg-[#E6F9F0] transition-all">
+                      className="text-xs px-3 py-1 bg-gray-50 border border-gray-200 text-gray-500 rounded-full hover:border-[#059669] hover:text-[#047857] hover:bg-[#E7F6EF] transition-all">
                       {q}
                     </button>
                   ))}
@@ -332,7 +332,7 @@ function VerifyContent() {
               </div>
 
               {/* ── Deal Structure (P7) — optional ── */}
-              <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="mt-4 bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] shadow-[0_2px_20px_rgba(16,22,43,0.03)] overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setShowDeal((v) => !v)}
@@ -367,7 +367,7 @@ function VerifyContent() {
                       </label>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                         {([
-                          { v: "SAFE", label: t("verify.payment.safe"), sub: t("verify.payment.safeSub"), Icon: ShieldCheck, color: "#00A859", bg: "#E6F9F0", ring: "#00D26A" },
+                          { v: "SAFE", label: t("verify.payment.safe"), sub: t("verify.payment.safeSub"), Icon: ShieldCheck, color: "#059669", bg: "#E7F6EF", ring: "#059669" },
                           { v: "MODERATE", label: t("verify.payment.moderate"), sub: t("verify.payment.moderateSub"), Icon: Shield, color: "#D97706", bg: "#FFF8E7", ring: "#F59E0B" },
                           { v: "RISKY", label: t("verify.payment.risky"), sub: t("verify.payment.riskySub"), Icon: ShieldAlert, color: "#DC2626", bg: "#FFF1F0", ring: "#EF4444" },
                         ] as const).map(({ v, label, sub, Icon, color, bg, ring }) => {
@@ -378,7 +378,7 @@ function VerifyContent() {
                               type="button"
                               onClick={() => setPaymentSafety(active ? "" : v)}
                               className={`text-left p-3.5 rounded-xl border-2 transition-all ${
-                                active ? "shadow-sm" : "border-gray-100 hover:border-gray-200"
+                                active ? "shadow-[0_2px_20px_rgba(16,22,43,0.03)]" : "border-[rgba(16,22,43,0.06)] hover:border-gray-200"
                               }`}
                               style={active ? { borderColor: ring, backgroundColor: bg } : undefined}
                             >
@@ -403,14 +403,14 @@ function VerifyContent() {
                           <label className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
                             <Percent className="w-3.5 h-3.5 text-gray-400" /> {t("verify.depositLabel")}
                           </label>
-                          <span className={`text-sm font-extrabold ${depositSet ? "text-[#00843F]" : "text-gray-300"}`}>
+                          <span className={`text-sm font-extrabold ${depositSet ? "text-[#047857]" : "text-gray-300"}`}>
                             {depositSet ? `${deposit}%` : "—"}
                           </span>
                         </div>
                         <input
                           type="range" min={0} max={100} step={5} value={deposit}
                           onChange={(e) => { setDeposit(Number(e.target.value)); setDepositSet(true); }}
-                          className="w-full accent-[#00D26A] cursor-pointer"
+                          className="w-full accent-[#059669] cursor-pointer"
                         />
                         <div className="flex justify-between text-[10px] text-gray-300 font-medium mt-1">
                           <span>0%</span><span>{t("verify.depositLowSafer")}</span><span>100%</span>
@@ -428,7 +428,7 @@ function VerifyContent() {
                             type="number" min={0} inputMode="numeric" value={dealValue}
                             onChange={(e) => setDealValue(e.target.value)}
                             placeholder={t("verify.dealValuePlaceholder")}
-                            className="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#00D26A] focus:bg-white transition-all font-medium"
+                            className="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#059669] focus:bg-white transition-all font-medium"
                           />
                         </div>
                       </div>
@@ -439,7 +439,7 @@ function VerifyContent() {
                       {pickedContract ? (
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <FileText className="w-4 h-4 text-[#00843F] shrink-0" />
+                            <FileText className="w-4 h-4 text-[#047857] shrink-0" />
                             <div className="min-w-0">
                               <p className="text-xs font-bold text-gray-700 truncate">{pickedContract.fileName}</p>
                               <p className="text-[11px] text-emerald-600">
@@ -471,7 +471,7 @@ function VerifyContent() {
                             <button
                               type="button"
                               onClick={() => setShowContractModal(true)}
-                              className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all border bg-white text-gray-400 border-gray-200 hover:border-[#00D26A] hover:text-[#00843F]"
+                              className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all border bg-white text-gray-400 border-gray-200 hover:border-[#059669] hover:text-[#047857]"
                             >
                               {t("verify.yesBtn")}
                             </button>
@@ -518,7 +518,7 @@ function VerifyContent() {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-base font-extrabold text-gray-900">{t("dash.recentReports")}</h2>
-                <Link href="/reports" className="text-sm text-[#00D26A] hover:underline font-semibold flex items-center gap-1">
+                <Link href="/reports" className="text-sm text-[#059669] hover:underline font-semibold flex items-center gap-1">
                   {t("dash.viewAll")} <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -526,11 +526,11 @@ function VerifyContent() {
               {isLoadingReports ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 h-20 shimmer" />
+                    <div key={i} className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-4 h-20 shimmer" />
                   ))}
                 </div>
               ) : recentReports.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center shadow-sm">
+                <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-8 text-center shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
                   <Building2 className="w-10 h-10 text-gray-100 mx-auto mb-3" />
                   <p className="text-gray-400 text-sm font-semibold mb-1">{t("dash.noReports")}</p>
                   <p className="text-xs text-gray-300">{t("dash.noReportsSub")}</p>
@@ -541,7 +541,7 @@ function VerifyContent() {
                     const isProcessing = isProcessingStatus(report.status);
                     return (
                       <div key={report.id}
-                        className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm card-hover group flex items-center gap-4">
+                        className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-4 shadow-[0_2px_20px_rgba(16,22,43,0.03)] card-hover group flex items-center gap-4">
                         <ScoreRing score={report.overallScore} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -579,9 +579,9 @@ function VerifyContent() {
             </div>
 
             {/* ── 8 Pillars Info ── */}
-            <div className="mt-8 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div className="mt-8 bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] shadow-[0_2px_20px_rgba(16,22,43,0.03)] p-6">
               <h3 className="text-sm font-extrabold text-gray-900 mb-4 flex items-center gap-2">
-                <Shield className="w-4 h-4 text-[#00D26A]" />
+                <Shield className="w-4 h-4 text-[#059669]" />
                 {t("verify.pillarsTitle")}
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -616,8 +616,8 @@ function VerifyContent() {
 export default function VerifyPage() {
   return (
     <Suspense fallback={
-      <div className="h-screen flex items-center justify-center bg-[#FAFBFA]">
-        <div className="w-10 h-10 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin" />
+      <div className="h-screen flex items-center justify-center bg-[#faf9f6]">
+        <div className="w-10 h-10 border-2 border-[#059669]/20 border-t-[#059669] rounded-full animate-spin" />
       </div>
     }>
       <VerifyContent />

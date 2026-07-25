@@ -16,7 +16,7 @@ import { useLanguage } from "@/providers/language-provider";
 function getQuotaBarColor(pct: number) {
   if (pct >= 90) return "#EF4444";
   if (pct >= 70) return "#F59E0B";
-  return "#00D26A";
+  return "#059669";
 }
 
 function getPlanStyle(plan: string) {
@@ -105,7 +105,7 @@ export default function AdminCustomersPage() {
                 <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Global Operations &gt; Customer Central</p>
                 <div className="flex items-center gap-3">
                   <h1 className="text-2xl font-extrabold text-gray-900">{t("admin.customers.title")}</h1>
-                  <span className="text-xs font-bold text-[#00843F] bg-[#E6F9F0] border border-[#00D26A]/30 px-3 py-1 rounded-full">
+                  <span className="text-xs font-bold text-[#047857] bg-[#E7F6EF] border border-[#059669]/30 px-3 py-1 rounded-full">
                     Real-time Data
                   </span>
                 </div>
@@ -165,7 +165,7 @@ export default function AdminCustomersPage() {
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               {isLoading ? (
                 <div className="p-12 flex flex-col items-center">
-                  <div className="w-10 h-10 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin mb-3" />
+                  <div className="w-10 h-10 border-2 border-[#059669]/20 border-t-[#059669] rounded-full animate-spin mb-3" />
                   <p className="text-sm text-gray-400">{t("admin.customers.loading")}</p>
                 </div>
               ) : filtered.length === 0 ? (
@@ -192,7 +192,7 @@ export default function AdminCustomersPage() {
                         const initials = user.fullName.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
                         const avatarColor = getAvatarColor(user.fullName);
                         return (
-                          <tr key={user.id} className="hover:bg-[#FAFBFA] transition-colors group">
+                          <tr key={user.id} className="hover:bg-[#faf9f6] transition-colors group">
                             <td className="px-5 py-4">
                               <div className="flex items-center gap-3">
                                 <div className={`w-9 h-9 rounded-xl ${avatarColor} flex items-center justify-center text-white font-bold text-sm shrink-0`}>

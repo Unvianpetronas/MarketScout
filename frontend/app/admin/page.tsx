@@ -76,7 +76,7 @@ export default function AdminOverviewPage() {
 
         {isLoading || !data ? (
           <div className="bg-white rounded-2xl border border-gray-100 p-16 flex flex-col items-center shadow-sm">
-            <div className="w-10 h-10 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin mb-3" />
+            <div className="w-10 h-10 border-2 border-[#059669]/20 border-t-[#059669] rounded-full animate-spin mb-3" />
             <p className="text-sm text-gray-400">{t("admin.dashboard.loading")}</p>
           </div>
         ) : (
@@ -159,7 +159,7 @@ export default function AdminOverviewPage() {
                             <span className="text-xs text-gray-400">{count}</span>
                           </div>
                           <div className="bg-gray-100 rounded-full h-1.5">
-                            <div className="h-1.5 rounded-full bg-[#00D26A]" style={{ width: `${pct}%` }} />
+                            <div className="h-1.5 rounded-full bg-[#059669]" style={{ width: `${pct}%` }} />
                           </div>
                         </div>
                       );

@@ -37,7 +37,7 @@ export function AdminShell({ active, children }: { active: AdminNavId; children:
             <Logo className="w-9 h-9" />
             <div>
               <p className="text-sm font-bold text-white">MarketScout</p>
-              <p className="text-[10px] text-[#00D26A] font-bold uppercase tracking-widest">{t("admin.shell.superAdmin")}</p>
+              <p className="text-[10px] text-[#059669] font-bold uppercase tracking-widest">{t("admin.shell.superAdmin")}</p>
             </div>
           </div>
         </div>
@@ -87,7 +87,7 @@ export function AdminShell({ active, children }: { active: AdminNavId; children:
               <p className="text-sm font-semibold text-white truncate">{t("admin.shell.superAdmin")}</p>
               <p className="text-xs text-gray-500 truncate">admin@marketscout.vn</p>
             </div>
-            <div className="w-2 h-2 rounded-full bg-[#00D26A]" />
+            <div className="w-2 h-2 rounded-full bg-[#059669]" />
           </div>
         </div>
       </aside>

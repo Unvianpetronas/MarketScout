@@ -71,7 +71,7 @@ export function Sidebar({ active }: { active?: string }) {
         <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
           <Logo className="w-9 h-9" />
           {!collapsed && (
-            <span className="font-extrabold text-gray-900 text-[17px] tracking-tight truncate animate-fade-in">
+            <span className="font-display font-extrabold text-gray-900 text-[17px] tracking-tight truncate animate-fade-in">
               MarketScout
             </span>
           )}
@@ -115,23 +115,23 @@ export function Sidebar({ active }: { active?: string }) {
               title={collapsed ? t(item.labelKey) : undefined}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-150 group ${
                 itemActive
-                  ? "bg-[#E6F9F0] text-[#00843F] font-semibold"
+                  ? "bg-[#E7F6EF] text-[#047857] font-semibold"
                   : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
               } ${collapsed ? "justify-center" : ""}`}
             >
               <item.icon
                 className={`w-[18px] h-[18px] shrink-0 transition-colors ${
-                  itemActive ? "text-[#00D26A]" : "text-gray-400 group-hover:text-gray-700"
+                  itemActive ? "text-[#059669]" : "text-gray-400 group-hover:text-gray-700"
                 }`}
               />
               {!collapsed && <span className="flex-1 truncate">{t(item.labelKey)}</span>}
               {!collapsed && item.badge && (
-                <span className="text-[10px] bg-[#00D26A] text-white font-bold px-1.5 py-0.5 rounded-full">
+                <span className="text-[10px] bg-[#059669] text-white font-bold px-1.5 py-0.5 rounded-full">
                   {item.badge}
                 </span>
               )}
               {itemActive && !collapsed && (
-                <div className="w-1.5 h-1.5 rounded-full bg-[#00D26A]" />
+                <div className="w-1.5 h-1.5 rounded-full bg-[#059669]" />
               )}
             </Link>
           );
@@ -188,7 +188,7 @@ export function Sidebar({ active }: { active?: string }) {
           {!collapsed && (
             <>
               <span className="flex-1 text-left truncate">{lang === "vi" ? "Tiếng Việt" : "English"}</span>
-              <span className="text-[10px] font-bold text-[#00843F] bg-[#E6F9F0] px-1.5 py-0.5 rounded-full">
+              <span className="text-[10px] font-bold text-[#047857] bg-[#E7F6EF] px-1.5 py-0.5 rounded-full">
                 {lang === "vi" ? "EN" : "VI"}
               </span>
             </>

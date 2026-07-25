@@ -110,7 +110,7 @@ export default function AdminBillingPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {isLoading ? (
             <div className="p-12 flex flex-col items-center">
-              <div className="w-10 h-10 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin mb-3" />
+              <div className="w-10 h-10 border-2 border-[#059669]/20 border-t-[#059669] rounded-full animate-spin mb-3" />
               <p className="text-sm text-gray-400">{t("admin.billing.loading")}</p>
             </div>
           ) : plans.length === 0 ? (
@@ -134,7 +134,7 @@ export default function AdminBillingPage() {
                   const edit = getEdit(plan);
                   const dirty = isDirty(plan);
                   return (
-                    <tr key={plan.id} className="hover:bg-[#FAFBFA] transition-colors">
+                    <tr key={plan.id} className="hover:bg-[#faf9f6] transition-colors">
                       <td className="px-5 py-4">
                         <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${getPlanStyle(plan.name)}`}>
                           {plan.name}
@@ -163,7 +163,7 @@ export default function AdminBillingPage() {
                         <button
                           onClick={() => handleToggleActive(plan)}
                           disabled={togglingId === plan.id}
-                          className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${plan.isActive ? "bg-[#00D26A]" : "bg-gray-200"}`}
+                          className={`relative w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${plan.isActive ? "bg-[#059669]" : "bg-gray-200"}`}
                         >
                           <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${plan.isActive ? "translate-x-5" : ""}`} />
                         </button>
