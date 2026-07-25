@@ -78,7 +78,7 @@ function FlagsQueue() {
 
       {isLoading ? (
         <div className="p-10 flex flex-col items-center">
-          <div className="w-8 h-8 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-[#059669]/20 border-t-[#059669] rounded-full animate-spin" />
         </div>
       ) : flags.length === 0 ? (
         <div className="p-10 text-center text-sm text-gray-400">Không có mục nào.</div>
@@ -88,7 +88,7 @@ function FlagsQueue() {
             <div key={f.id} className="px-5 py-4 flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <Link href={`/admin/reports/${f.reportId}`} className="text-sm font-semibold text-gray-900 hover:text-[#00843F] truncate">
+                  <Link href={`/admin/reports/${f.reportId}`} className="text-sm font-semibold text-gray-900 hover:text-[#047857] truncate">
                     {f.reportEntityName}
                   </Link>
                   <span className="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded uppercase shrink-0">
@@ -167,7 +167,7 @@ function ReportsTable() {
 
       {isLoading ? (
         <div className="p-10 flex flex-col items-center">
-          <div className="w-8 h-8 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-[#059669]/20 border-t-[#059669] rounded-full animate-spin" />
         </div>
       ) : reports.length === 0 ? (
         <div className="p-10 text-center text-sm text-gray-400">Không có báo cáo.</div>
@@ -186,7 +186,7 @@ function ReportsTable() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {reports.map((r) => (
-                <tr key={r.id} className="hover:bg-[#FAFBFA]">
+                <tr key={r.id} className="hover:bg-[#faf9f6]">
                   <td className="px-5 py-3">
                     <p className="text-sm font-semibold text-gray-900">{r.entityName}</p>
                     <p className="text-[11px] text-gray-400">{r.userEmail}</p>
@@ -209,7 +209,7 @@ function ReportsTable() {
                   </td>
                   <td className="px-5 py-3 text-xs text-gray-400">{new Date(r.createdAt).toLocaleDateString("vi-VN")}</td>
                   <td className="px-5 py-3">
-                    <Link href={`/admin/reports/${r.id}`} className="text-xs font-semibold text-[#00D26A] hover:underline">
+                    <Link href={`/admin/reports/${r.id}`} className="text-xs font-semibold text-[#059669] hover:underline">
                       Xem →
                     </Link>
                   </td>

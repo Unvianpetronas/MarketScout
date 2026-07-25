@@ -81,7 +81,7 @@ function PriceDisplay({ vnd, usd, isFree, isCustom, isDark }: { vnd: number; usd
 function FaqItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border border-gray-100 rounded-2xl overflow-hidden">
+    <div className="border border-[rgba(16,22,43,0.06)] rounded-2xl overflow-hidden">
       <button onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50">
         <p className="text-sm font-semibold text-gray-900">{q}</p>
@@ -148,14 +148,14 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFBFA]">
+    <div className="min-h-screen bg-[#faf9f6]">
       {/* ── Navbar ── */}
-      <nav className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-gray-100 px-6 py-4 flex items-center justify-between">
+      <nav className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-[rgba(16,22,43,0.06)] px-6 py-4 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
           <Logo className="w-8 h-8" />
           <div>
-            <span className="font-extrabold text-gray-900 text-sm">MarketScout</span>
-            <span className="text-[#00D26A] text-xs font-semibold ml-1.5">B2B INTELLIGENCE</span>
+            <span className="font-display font-extrabold text-gray-900 text-sm">MarketScout</span>
+            <span className="text-[#059669] text-xs font-semibold ml-1.5">B2B INTELLIGENCE</span>
           </div>
         </Link>
         <div className="flex items-center gap-3">
@@ -188,7 +188,7 @@ export default function PricingPage() {
 
         {/* ── Header ── */}
         <div className="text-center mb-14 animate-fade-in-up">
-          <span className="text-xs font-bold text-[#00D26A] bg-[#E6F9F0] border border-[#00D26A]/30 px-4 py-1.5 rounded-full uppercase tracking-widest">
+          <span className="text-xs font-bold text-[#059669] bg-[#E7F6EF] border border-[#059669]/30 px-4 py-1.5 rounded-full uppercase tracking-widest">
             {t("pricing.badge")}
           </span>
           <h1 className="text-5xl font-extrabold text-gray-900 mt-5 mb-4 leading-tight">
@@ -223,7 +223,7 @@ export default function PricingPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-16 stagger">
           {plans.map((plan) => (
             <div key={plan.id}
-              className={`relative flex flex-col rounded-2xl border p-6 shadow-sm transition-all hover:shadow-md ${plan.cardStyle}`}>
+              className={`relative flex flex-col rounded-2xl border p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)] transition-all hover:shadow-md ${plan.cardStyle}`}>
 
               {plan.isPopular && (
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
@@ -273,9 +273,9 @@ export default function PricingPage() {
         </div>
 
         {/* ── Add-on Quota ── */}
-        <Reveal variant="scale" className="bg-[#0A1A12] rounded-2xl p-8 mb-16 flex items-center justify-between gap-6">
+        <Reveal variant="scale" className="bg-[#0b1120] rounded-2xl p-8 mb-16 flex items-center justify-between gap-6">
           <div>
-            <span className="text-[10px] font-bold text-[#00D26A] uppercase tracking-widest border border-[#00D26A]/30 rounded px-2 py-0.5">
+            <span className="text-[10px] font-bold text-[#059669] uppercase tracking-widest border border-[#059669]/30 rounded px-2 py-0.5">
               {t("pricing.addon.badge")}
             </span>
             <h2 className="text-2xl font-extrabold text-white mt-3 mb-2">{t("pricing.addon.title")}</h2>
@@ -304,7 +304,7 @@ export default function PricingPage() {
             { icon: "🌏", key: "countries" },
             { icon: "⚡", key: "uptime" },
           ].map(({ icon, key }) => (
-            <div key={key} className="bg-white border border-gray-100 rounded-2xl p-5 text-center shadow-sm">
+            <div key={key} className="bg-white border border-[rgba(16,22,43,0.06)] rounded-2xl p-5 text-center shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
               <p className="text-3xl mb-2">{icon}</p>
               <p className="text-sm font-bold text-gray-900 mb-0.5">{t(`pricing.trust.${key}.title`)}</p>
               <p className="text-xs text-gray-400">{t(`pricing.trust.${key}.desc`)}</p>
@@ -341,7 +341,7 @@ export default function PricingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-16 border-t border-gray-100 py-8 px-6">
+      <footer className="mt-16 border-t border-[rgba(16,22,43,0.06)] py-8 px-6">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <p className="text-xs text-gray-400">{t("pricing.footer.copyright")}</p>
           <div className="flex items-center gap-4">

@@ -19,6 +19,7 @@ import { ChatSession, ChatMessage, CompanyCandidate } from "@/types/chat";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
 import { parseResult, VerifyResultCard } from "@/components/chat/verify-result-card";
+import { ChatMarkdown } from "@/components/chat/chat-markdown";
 import { ContractPickerModal } from "@/components/contract/ContractPickerModal";
 
 const SUGGESTED_PROMPTS = [
@@ -34,7 +35,7 @@ function TypingDots() {
         {[0, 150, 300].map((delay) => (
             <div
                 key={delay}
-                className="w-2 h-2 rounded-full bg-[#00D26A]"
+                className="w-2 h-2 rounded-full bg-[#059669]"
                 style={{ animation: `bounce 1.2s ${delay}ms ease-in-out infinite` }}
             />
         ))}
@@ -57,11 +58,11 @@ function MessageBubble({ msg, userInitials, isLatest, onConfirmVerify, onAttachC
       <div className={`flex gap-3 animate-fade-in-up ${isUser ? "flex-row-reverse" : ""}`}>
         {/* Avatar */}
         <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-            isUser ? "gradient-brand" : "bg-[#0D2218]"
+            isUser ? "gradient-brand" : "bg-[#10162b]"
         }`}>
           {isUser
               ? <span className="text-white text-xs font-bold">{userInitials}</span>
-              : <Bot className="w-4 h-4 text-[#00D26A]" />
+              : <Bot className="w-4 h-4 text-[#059669]" />
           }
         </div>
 
@@ -75,17 +76,21 @@ function MessageBubble({ msg, userInitials, isLatest, onConfirmVerify, onAttachC
           ) : (
               <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
                   isUser
-                      ? "bg-[#0D2218] text-white rounded-tr-sm"
+                      ? "bg-[#10162b] text-white rounded-tr-sm"
                       : "bg-white text-gray-800 rounded-tl-sm border border-gray-100"
               }`}>
-                <p style={{ whiteSpace: "pre-wrap" }}>{msg.content}</p>
+                {isUser ? (
+                    <p style={{ whiteSpace: "pre-wrap" }}>{msg.content}</p>
+                ) : (
+                    <ChatMarkdown content={msg.content} />
+                )}
               </div>
           )}
 
           {!isUser && !result && msg.reportId && (
               <Link
                   href={`/reports/${msg.reportId}`}
-                  className="flex items-center gap-1 text-[11px] font-semibold text-[#00843F] hover:underline px-1"
+                  className="flex items-center gap-1 text-[11px] font-semibold text-[#047857] hover:underline px-1"
               >
                 {t("chat.viewReport")} <ChevronRight className="w-3 h-3" />
               </Link>
@@ -97,13 +102,13 @@ function MessageBubble({ msg, userInitials, isLatest, onConfirmVerify, onAttachC
                     <button
                         key={idx}
                         onClick={() => onSelectCandidate(c)}
-                        className="text-left bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 hover:border-[#00D26A] hover:bg-[#E6F9F0]/30 transition-colors"
+                        className="text-left bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 hover:border-[#059669] hover:bg-[#E7F6EF]/30 transition-colors"
                     >
                       <p className="text-sm font-bold text-gray-900">{c.companyName}</p>
                       <div className="flex items-center gap-2 flex-wrap mt-0.5">
                         {c.website && <span className="text-[11px] text-gray-400 truncate max-w-[220px]">{c.website}</span>}
                         {c.taxId && (
-                            <span className="text-[10px] font-bold text-[#00843F] bg-[#E6F9F0] px-1.5 py-0.5 rounded-full">
+                            <span className="text-[10px] font-bold text-[#047857] bg-[#E7F6EF] px-1.5 py-0.5 rounded-full">
                               MST: {c.taxId}
                             </span>
                         )}
@@ -175,6 +180,10 @@ function ChatContent() {
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Set true right before we point activeSession at a session we JUST created
+  // (during a send). The history-loading effect below reads this to skip its
+  // fetch, so it can't overwrite the optimistic user message with empty history.
+  const justCreatedSessionRef = useRef(false);
   // Optional P7 deal parameters passed from /verify via URL. Consumed once, on the
   // first send (the verification message), then cleared.
   const dealParamsRef = useRef<{
@@ -206,11 +215,16 @@ function ChatContent() {
   }, []);
 
   useEffect(() => {
-    if (activeSession) {
-      getSessionHistory(activeSession.id)
-          .then((conv) => setMessages(conv.messages))
-          .catch(() => setMessages([]));
+    if (!activeSession) return;
+    // A session we just created (mid-send) has no server history yet and already
+    // holds an optimistic message in state — skip the fetch so it isn't clobbered.
+    if (justCreatedSessionRef.current) {
+      justCreatedSessionRef.current = false;
+      return;
     }
+    getSessionHistory(activeSession.id)
+        .then((conv) => setMessages(conv.messages))
+        .catch(() => setMessages([]));
   }, [activeSession]);
 
   useEffect(() => {
@@ -243,6 +257,7 @@ function ChatContent() {
     try {
       const session = await createSession("New Conversation");
       setSessions((prev) => [session, ...prev]);
+      justCreatedSessionRef.current = true;
       setActiveSession(session);
       setMessages([]);
       inputRef.current?.focus();
@@ -381,6 +396,7 @@ function ChatContent() {
       try {
         session = await createSession("New Conversation");
         setSessions((prev) => [session!, ...prev]);
+        justCreatedSessionRef.current = true;
         setActiveSession(session);
       } catch {
         toast.error(t("chat.errCreateSession")); return;
@@ -457,6 +473,7 @@ function ChatContent() {
       try {
         session = await createSession("New Conversation");
         setSessions((prev) => [session!, ...prev]);
+        justCreatedSessionRef.current = true;
         setActiveSession(session);
       } catch {
         toast.error(t("chat.errCreateSession")); return;
@@ -496,7 +513,7 @@ function ChatContent() {
                 }}
             />
         )}
-        <div className="flex h-screen bg-[#FAFBFA] overflow-hidden">
+        <div className="flex h-screen bg-[#faf9f6] overflow-hidden">
           <Sidebar active="ai-assistant" />
 
           {/* ── Session Sidebar ── */}
@@ -537,7 +554,7 @@ function ChatContent() {
                             onClick={() => setActiveSession(session)}
                             className={`flex items-center justify-between rounded-xl px-3 py-2.5 cursor-pointer group transition-all ${
                                 activeSession?.id === session.id
-                                    ? "bg-[#E6F9F0] text-[#00843F]"
+                                    ? "bg-[#E7F6EF] text-[#047857]"
                                     : "text-gray-600 hover:bg-gray-50"
                             }`}
                         >
@@ -559,13 +576,13 @@ function ChatContent() {
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Header */}
             <div className="bg-white border-b border-gray-100 px-6 py-3.5 flex items-center gap-3 shrink-0 shadow-sm">
-              <div className="w-9 h-9 rounded-full bg-[#0D2218] flex items-center justify-center">
-                <Bot className="w-4.5 h-4.5 text-[#00D26A]" />
+              <div className="w-9 h-9 rounded-full bg-[#10162b] flex items-center justify-center">
+                <Bot className="w-4.5 h-4.5 text-[#059669]" />
               </div>
               <div>
                 <p className="font-bold text-gray-900 text-sm">{t("chat.ai")}</p>
                 <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#00D26A]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#059669]" />
                   <span className="text-[11px] text-gray-400">{t("chat.headerStatus")}</span>
                 </div>
               </div>
@@ -577,7 +594,7 @@ function ChatContent() {
                     </div>
                 )}
                 <span className="text-[11px] text-gray-400 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
-                <Sparkles className="w-3 h-3 inline-block mr-1 text-[#00D26A]" />
+                <Sparkles className="w-3 h-3 inline-block mr-1 text-[#059669]" />
                 {t("chat.poweredBy")}
               </span>
               </div>
@@ -587,8 +604,8 @@ function ChatContent() {
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 scrollbar-thin">
               {messages.length === 0 && !isStreaming && (
                   <div className="flex flex-col items-center justify-center h-full text-center pb-20 animate-fade-in">
-                    <div className="w-20 h-20 rounded-full bg-[#0D2218] flex items-center justify-center mb-5 shadow-lg">
-                      <Bot className="w-10 h-10 text-[#00D26A]" />
+                    <div className="w-20 h-20 rounded-full bg-[#10162b] flex items-center justify-center mb-5 shadow-lg">
+                      <Bot className="w-10 h-10 text-[#059669]" />
                     </div>
                     <h3 className="text-xl font-extrabold text-gray-900 mb-2">{t("chat.greetingTitle")}</h3>
                     <p className="text-gray-500 text-sm max-w-md mb-8">
@@ -599,12 +616,12 @@ function ChatContent() {
                           <button
                               key={labelKey}
                               onClick={() => { setInput(t(textKey)); inputRef.current?.focus(); }}
-                              className="flex items-start gap-2.5 text-left p-3.5 bg-white border border-gray-200 rounded-xl hover:border-[#00D26A] hover:bg-[#E6F9F0] transition-all group shadow-sm"
+                              className="flex items-start gap-2.5 text-left p-3.5 bg-white border border-gray-200 rounded-xl hover:border-[#059669] hover:bg-[#E7F6EF] transition-all group shadow-sm"
                           >
-                            <div className="w-6 h-6 bg-[#E6F9F0] rounded-lg flex items-center justify-center shrink-0 group-hover:bg-white transition-colors">
-                              <Icon className="w-3.5 h-3.5 text-[#00D26A]" />
+                            <div className="w-6 h-6 bg-[#E7F6EF] rounded-lg flex items-center justify-center shrink-0 group-hover:bg-white transition-colors">
+                              <Icon className="w-3.5 h-3.5 text-[#059669]" />
                             </div>
-                            <span className="text-xs font-semibold text-gray-700 group-hover:text-[#00843F]">{t(labelKey)}</span>
+                            <span className="text-xs font-semibold text-gray-700 group-hover:text-[#047857]">{t(labelKey)}</span>
                           </button>
                       ))}
                     </div>
@@ -628,8 +645,8 @@ function ChatContent() {
                 const streamResult = streamingContent ? parseResult(streamingContent) : null;
                 return (
                   <div className="flex gap-3 animate-fade-in">
-                    <div className="w-8 h-8 rounded-full bg-[#0D2218] flex items-center justify-center shrink-0">
-                      <Bot className="w-4 h-4 text-[#00D26A]" />
+                    <div className="w-8 h-8 rounded-full bg-[#10162b] flex items-center justify-center shrink-0">
+                      <Bot className="w-4 h-4 text-[#059669]" />
                     </div>
                     <div className="flex flex-col gap-1 max-w-[80%]">
                       <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider px-1">{t("chat.ai")}</p>
@@ -638,10 +655,10 @@ function ChatContent() {
                       ) : (
                           <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100">
                             {streamingContent ? (
-                                <p className="text-sm text-gray-800 leading-relaxed" style={{ whiteSpace: "pre-wrap" }}>
-                                  {streamingContent}
-                                  <span className="inline-block w-0.5 h-4 bg-[#00D26A] ml-0.5 animate-pulse" />
-                                </p>
+                                <div className="leading-relaxed">
+                                  <ChatMarkdown content={streamingContent} />
+                                  <span className="inline-block w-0.5 h-4 bg-[#059669] ml-0.5 animate-pulse align-text-bottom" />
+                                </div>
                             ) : (
                                 <div className="flex items-center gap-2.5">
                                   <TypingDots />
@@ -663,7 +680,7 @@ function ChatContent() {
             {/* Input Bar */}
             <div className="bg-white border-t border-gray-100 px-6 py-4 shrink-0">
               <div className={`flex items-end gap-3 bg-gray-50 rounded-2xl border transition-all ${
-                  input ? "border-[#00D26A] ring-2 ring-[#00D26A]/15" : "border-gray-200"
+                  input ? "border-[#059669] ring-2 ring-[#059669]/15" : "border-gray-200"
               } px-4 py-3`}>
               <textarea
                   ref={inputRef}
@@ -699,8 +716,8 @@ function ChatContent() {
 export default function ChatPage() {
   return (
       <Suspense fallback={
-        <div className="min-h-screen bg-[#FAFBFA] flex items-center justify-center">
-          <div className="w-10 h-10 border-2 border-[#00D26A]/30 border-t-[#00D26A] rounded-full animate-spin" />
+        <div className="min-h-screen bg-[#faf9f6] flex items-center justify-center">
+          <div className="w-10 h-10 border-2 border-[#059669]/30 border-t-[#059669] rounded-full animate-spin" />
         </div>
       }>
         <ChatContent />

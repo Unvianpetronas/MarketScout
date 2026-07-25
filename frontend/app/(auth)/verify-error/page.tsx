@@ -21,7 +21,7 @@ function VerifyErrorContent() {
       </p>
       <Link
         href="/login"
-        className="flex items-center justify-center gap-2 text-sm text-[#00D26A] hover:underline font-medium"
+        className="flex items-center justify-center gap-2 text-sm text-[#059669] hover:underline font-medium"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Sign In
@@ -36,7 +36,7 @@ export default function VerifyErrorPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-md">
         <div className="flex items-center gap-2 mb-8">
           <Logo className="w-8 h-8" />
-          <span className="font-bold text-gray-900">MarketScout</span>
+          <span className="font-display font-bold text-gray-900">MarketScout</span>
         </div>
 
         <Suspense fallback={<div className="text-center">Loading...</div>}>

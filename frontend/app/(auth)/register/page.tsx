@@ -135,7 +135,7 @@ export default function RegisterPage() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-10 max-w-md w-full text-center">
           <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-8 h-8 text-[#00D26A]" />
+            <CheckCircle2 className="w-8 h-8 text-[#059669]" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>
           <p className="text-gray-500 mb-6">
@@ -144,7 +144,7 @@ export default function RegisterPage() {
           </p>
           <Link
             href="/login"
-            className="inline-block w-full py-3 bg-[#00D26A] text-white font-semibold rounded-lg text-center hover:bg-[#00b85d] transition-colors"
+            className="inline-block w-full py-3 bg-[#059669] text-white font-semibold rounded-lg text-center hover:bg-[#047857] transition-colors"
           >
             Back to Sign In
           </Link>
@@ -158,7 +158,7 @@ export default function RegisterPage() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-md">
         <div className="flex items-center gap-2 mb-6">
           <Logo className="w-8 h-8" />
-          <span className="font-bold text-gray-900">MarketScout</span>
+          <span className="font-display font-bold text-gray-900">MarketScout</span>
         </div>
 
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Create your account</h1>
@@ -172,7 +172,7 @@ export default function RegisterPage() {
             <input
               {...register("fullName", { required: "Full name is required" })}
               placeholder="John Smith"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00D26A] focus:ring-2 focus:ring-[#00D26A]/20 transition-all"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#059669] focus:ring-2 focus:ring-[#059669]/20 transition-all"
             />
             {errors.fullName && (
               <p className="mt-1 text-xs text-red-500">{errors.fullName.message}</p>
@@ -187,7 +187,7 @@ export default function RegisterPage() {
               type="email"
               {...register("email", { required: "Email is required" })}
               placeholder="you@company.com"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00D26A] focus:ring-2 focus:ring-[#00D26A]/20 transition-all"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#059669] focus:ring-2 focus:ring-[#059669]/20 transition-all"
             />
             {errors.email && (
               <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>
@@ -205,7 +205,7 @@ export default function RegisterPage() {
                 minLength: { value: 8, message: "Minimum 8 characters" },
               })}
               placeholder="••••••••"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00D26A] focus:ring-2 focus:ring-[#00D26A]/20 transition-all"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#059669] focus:ring-2 focus:ring-[#059669]/20 transition-all"
             />
             {errors.password && (
               <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>
@@ -223,7 +223,7 @@ export default function RegisterPage() {
                 validate: (val) => val === watch("password") || "Passwords do not match",
               })}
               placeholder="••••••••"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00D26A] focus:ring-2 focus:ring-[#00D26A]/20 transition-all"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#059669] focus:ring-2 focus:ring-[#059669]/20 transition-all"
             />
             {errors.confirmPassword && (
               <p className="mt-1 text-xs text-red-500">{errors.confirmPassword.message}</p>
@@ -237,14 +237,14 @@ export default function RegisterPage() {
             <input
               {...register("companyName")}
               placeholder="Acme Corp"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00D26A] focus:ring-2 focus:ring-[#00D26A]/20 transition-all"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#059669] focus:ring-2 focus:ring-[#059669]/20 transition-all"
             />
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-3 bg-[#00D26A] text-white font-semibold rounded-lg hover:bg-[#00b85d] transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
+            className="w-full py-3 bg-[#059669] text-white font-semibold rounded-lg hover:bg-[#047857] transition-colors disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
           >
             {isLoading && (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -272,7 +272,7 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm text-gray-500 mt-6">
           Already have an account?{" "}
-          <Link href="/login" className="text-[#00D26A] font-medium hover:underline">
+          <Link href="/login" className="text-[#059669] font-medium hover:underline">
             Sign in
           </Link>
         </p>

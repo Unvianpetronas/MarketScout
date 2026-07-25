@@ -62,7 +62,7 @@ export default function AdminHistoryPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {isLoading ? (
             <div className="p-12 flex flex-col items-center">
-              <div className="w-10 h-10 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin mb-3" />
+              <div className="w-10 h-10 border-2 border-[#059669]/20 border-t-[#059669] rounded-full animate-spin mb-3" />
               <p className="text-sm text-gray-400">{t("admin.history.loading")}</p>
             </div>
           ) : logs.length === 0 ? (
@@ -84,7 +84,7 @@ export default function AdminHistoryPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {logs.map((log) => (
-                    <tr key={log.id} className="hover:bg-[#FAFBFA] transition-colors">
+                    <tr key={log.id} className="hover:bg-[#faf9f6] transition-colors">
                       <td className="px-5 py-4 text-xs text-gray-500 whitespace-nowrap">
                         {new Date(log.createdAt).toLocaleString("vi-VN")}
                       </td>

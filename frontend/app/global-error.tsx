@@ -18,7 +18,7 @@ export default function GlobalError({
 
   return (
     <html lang="en">
-      <body style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "sans-serif", background: "#FAFBFA" }}>
+      <body style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "sans-serif", background: "#faf9f6" }}>
         <div style={{ maxWidth: 420, textAlign: "center", padding: 24 }}>
           <h1 style={{ fontSize: 18, fontWeight: 800, color: "#111827", marginBottom: 8 }}>
             Ứng dụng gặp sự cố nghiêm trọng
@@ -30,8 +30,8 @@ export default function GlobalError({
             onClick={reset}
             style={{
               padding: "10px 20px",
-              background: "#00D26A",
-              color: "#0A1A12",
+              background: "#059669",
+              color: "#0b1120",
               fontWeight: 700,
               fontSize: 14,
               borderRadius: 12,

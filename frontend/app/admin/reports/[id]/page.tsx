@@ -125,7 +125,7 @@ export default function AdminReportDetailPage({ params }: Props) {
 
         {isLoading || !detail ? (
           <div className="p-16 flex flex-col items-center">
-            <div className="w-8 h-8 border-2 border-[#00D26A]/20 border-t-[#00D26A] rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-[#059669]/20 border-t-[#059669] rounded-full animate-spin" />
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -44,18 +44,18 @@ function PillarDocCard({ p }: { p: PillarDoc }) {
     t(`methodology.pillar.p${p.no}.source${i + 1}`)
   );
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm card-hover">
+    <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)] card-hover">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#E6F9F0] flex items-center justify-center shrink-0">
-            <Icon className="w-5 h-5 text-[#00843F]" />
+          <div className="w-10 h-10 rounded-xl bg-[#E7F6EF] flex items-center justify-center shrink-0">
+            <Icon className="w-5 h-5 text-[#047857]" />
           </div>
           <div>
             <p className="text-[10px] text-gray-400 font-mono uppercase">{t("methodology.pillarLabel", { no: p.no })}</p>
             <h3 className="text-base font-bold text-gray-900 mt-0.5">{t(`methodology.pillar.p${p.no}.name`)}</h3>
           </div>
         </div>
-        <span className="text-xs font-bold text-[#00843F] bg-[#E6F9F0] px-2.5 py-1 rounded-full shrink-0">
+        <span className="text-xs font-bold text-[#047857] bg-[#E7F6EF] px-2.5 py-1 rounded-full shrink-0">
           {t("methodology.weightLabel", { weight: p.weight })}
         </span>
       </div>
@@ -79,14 +79,14 @@ function PillarDocCard({ p }: { p: PillarDoc }) {
           </p>
           <div className="flex flex-wrap gap-1.5">
             {sources.map((s, i) => (
-              <span key={i} className="text-[11px] text-gray-600 bg-gray-50 border border-gray-100 px-2 py-1 rounded-lg">
+              <span key={i} className="text-[11px] text-gray-600 bg-gray-50 border border-[rgba(16,22,43,0.06)] px-2 py-1 rounded-lg">
                 {s}
               </span>
             ))}
           </div>
         </div>
         <div className="border-t border-gray-50 pt-3 space-y-2">
-          <StatusLine label="PASS" text={t(`methodology.pillar.p${p.no}.pass`)} color="#047857" bg="#E6F9F0" />
+          <StatusLine label="PASS" text={t(`methodology.pillar.p${p.no}.pass`)} color="#047857" bg="#E7F6EF" />
           <StatusLine label="WARN" text={t(`methodology.pillar.p${p.no}.warn`)} color="#B45309" bg="#FFF8E7" />
           <StatusLine label="FAIL" text={t(`methodology.pillar.p${p.no}.fail`)} color="#B91C1C" bg="#FFF1F0" />
         </div>
@@ -99,7 +99,7 @@ export default function MethodologyPage() {
   const { t } = useLanguage();
   return (
     <AuthGuard>
-      <div className="flex h-screen overflow-hidden bg-[#FAFBFA]">
+      <div className="flex h-screen overflow-hidden bg-[#faf9f6]">
         <Sidebar active="methodology" />
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           <main className="max-w-6xl mx-auto px-6 py-8">
@@ -107,7 +107,7 @@ export default function MethodologyPage() {
             {/* ── Header ── */}
             <div className="mb-8 animate-fade-in">
               <div className="flex items-center gap-3 mb-2">
-                <div className="w-11 h-11 rounded-2xl gradient-brand flex items-center justify-center shadow-sm">
+                <div className="w-11 h-11 rounded-2xl gradient-brand flex items-center justify-center shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
                   <BookOpen className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -120,7 +120,7 @@ export default function MethodologyPage() {
             </div>
 
             {/* ── How scoring works ── */}
-            <Reveal className="bg-gradient-to-r from-[#0A1A12] to-[#0D2218] rounded-2xl p-6 mb-8">
+            <Reveal className="bg-gradient-to-r from-[#0b1120] to-[#10162b] rounded-2xl p-6 mb-8">
               <p className="text-[#5FD48A] text-xs font-bold uppercase tracking-widest mb-2">{t("methodology.scoringLabel")}</p>
               <p className="text-white/90 text-sm leading-relaxed mb-3">
                 {t("methodology.scoringIntro")}{" "}
@@ -143,7 +143,7 @@ export default function MethodologyPage() {
             </Reveal>
 
             {/* ── Confidence note ── */}
-            <Reveal className="mt-8 bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+            <Reveal className="mt-8 bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
               <h3 className="text-sm font-bold text-gray-900 mb-2">{t("methodology.confidenceTitle")}</h3>
               <p className="text-sm text-gray-600">
                 {t("methodology.confidenceDesc")}

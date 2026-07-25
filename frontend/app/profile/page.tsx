@@ -46,7 +46,7 @@ const TABS = [
 function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
     <button onClick={onChange} type="button"
-      className={`relative w-11 h-6 rounded-full transition-all ${checked ? "bg-[#00D26A]" : "bg-gray-200"}`}>
+      className={`relative w-11 h-6 rounded-full transition-all ${checked ? "bg-[#059669]" : "bg-gray-200"}`}>
       <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`} />
     </button>
   );
@@ -130,13 +130,13 @@ export default function ProfilePage() {
 
   return (
     <AuthGuard>
-      <div className="flex h-screen overflow-hidden bg-[#FAFBFA]">
+      <div className="flex h-screen overflow-hidden bg-[#faf9f6]">
         <Sidebar active="profile" />
 
         <div className="flex-1 flex overflow-hidden">
           {/* ── Settings Tabs Sidebar ── */}
-          <aside className="w-56 bg-white border-r border-gray-100 flex flex-col shrink-0">
-            <div className="p-5 border-b border-gray-100">
+          <aside className="w-56 bg-white border-r border-[rgba(16,22,43,0.06)] flex flex-col shrink-0">
+            <div className="p-5 border-b border-[rgba(16,22,43,0.06)]">
               <h2 className="text-sm font-bold text-gray-900">{t("profile.accountSettings")}</h2>
               <p className="text-xs text-gray-400 mt-0.5">{t("profile.manageAccount")}</p>
             </div>
@@ -145,19 +145,19 @@ export default function ProfilePage() {
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all text-left ${
                     activeTab === tab.id
-                      ? "bg-[#E6F9F0] text-[#00843F] font-semibold"
+                      ? "bg-[#E7F6EF] text-[#047857] font-semibold"
                       : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
                   }`}>
-                  <tab.icon className={`w-4 h-4 shrink-0 ${activeTab === tab.id ? "text-[#00D26A]" : "text-gray-400"}`} />
+                  <tab.icon className={`w-4 h-4 shrink-0 ${activeTab === tab.id ? "text-[#059669]" : "text-gray-400"}`} />
                   {t(tab.labelKey)}
                 </button>
               ))}
             </nav>
             {/* Help card */}
-            <div className="m-3 bg-[#0A1A12] rounded-2xl p-4">
+            <div className="m-3 bg-[#0b1120] rounded-2xl p-4">
               <p className="text-xs font-bold text-white mb-1">{t("profile.needHelp")}</p>
               <p className="text-xs text-gray-400 mb-3">{t("profile.helpDesc")}</p>
-              <button className="text-xs text-[#00D26A] hover:underline font-semibold flex items-center gap-1">
+              <button className="text-xs text-[#059669] hover:underline font-semibold flex items-center gap-1">
                 {t("profile.contactSupport")} <ChevronRight className="w-3 h-3" />
               </button>
             </div>
@@ -171,12 +171,12 @@ export default function ProfilePage() {
               {activeTab === "profile" && (
                 <>
                   {/* Avatar header */}
-                  <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm flex items-center gap-5">
+                  <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)] flex items-center gap-5">
                     <div className="relative">
                       <div className="w-20 h-20 rounded-2xl gradient-brand flex items-center justify-center text-white text-2xl font-extrabold shadow-lg">
                         {userInitials}
                       </div>
-                      <button className="absolute -bottom-1.5 -right-1.5 w-7 h-7 bg-white border border-gray-200 rounded-lg flex items-center justify-center shadow-sm hover:bg-gray-50">
+                      <button className="absolute -bottom-1.5 -right-1.5 w-7 h-7 bg-white border border-gray-200 rounded-lg flex items-center justify-center shadow-[0_2px_20px_rgba(16,22,43,0.03)] hover:bg-gray-50">
                         <Camera className="w-3.5 h-3.5 text-gray-500" />
                       </button>
                     </div>
@@ -197,9 +197,9 @@ export default function ProfilePage() {
                   </div>
 
                   {/* Profile form */}
-                  <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                  <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
                     <h2 className="text-base font-bold text-gray-900 mb-5 flex items-center gap-2">
-                      <User className="w-4 h-4 text-[#00D26A]" />
+                      <User className="w-4 h-4 text-[#059669]" />
                       {t("profile.tab.profile")}
                     </h2>
                     <form onSubmit={handleSaveProfile} className="space-y-4">
@@ -255,9 +255,9 @@ export default function ProfilePage() {
                     </form>
 
                     {showPasswordForm && (
-                      <form onSubmit={handleChangePassword} className="mt-6 pt-6 border-t border-gray-100 space-y-4">
+                      <form onSubmit={handleChangePassword} className="mt-6 pt-6 border-t border-[rgba(16,22,43,0.06)] space-y-4">
                         <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
-                          <Lock className="w-4 h-4 text-[#00D26A]" /> {t("profile.changePw")}
+                          <Lock className="w-4 h-4 text-[#059669]" /> {t("profile.changePw")}
                         </h3>
                         <div className="grid grid-cols-3 gap-4">
                           {[
@@ -287,10 +287,10 @@ export default function ProfilePage() {
               {/* ── Subscription Tab ── */}
               {activeTab === "subscription" && (
                 <>
-                  <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                  <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
                     <div className="flex items-start justify-between mb-5">
                       <div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#00D26A] bg-[#E6F9F0] px-3 py-1 rounded-full">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#059669] bg-[#E7F6EF] px-3 py-1 rounded-full">
                           {t("profile.currentPlan")}
                         </span>
                         <h2 className="text-xl font-extrabold text-gray-900 mt-3">{user?.planName
@@ -330,11 +330,11 @@ export default function ProfilePage() {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
                         <div className="h-3 rounded-full transition-all duration-700"
-                          style={{ width: `${quotaPercent}%`, background: quotaPercent > 80 ? "#EF4444" : quotaPercent > 60 ? "#F59E0B" : "#00D26A" }} />
+                          style={{ width: `${quotaPercent}%`, background: quotaPercent > 80 ? "#EF4444" : quotaPercent > 60 ? "#F59E0B" : "#059669" }} />
                       </div>
                       <div className="flex items-center justify-between text-xs text-gray-400">
                         <span>{t("profile.quotaRemaining", { n: quotaRemaining.toLocaleString() })}</span>
-                        <span className="text-[#00D26A] font-semibold">{t("profile.quotaNoExpire")}</span>
+                        <span className="text-[#059669] font-semibold">{t("profile.quotaNoExpire")}</span>
                       </div>
                     </div>
 
@@ -348,7 +348,7 @@ export default function ProfilePage() {
                       </div>
                     )}
 
-                    <div className="flex gap-3 mt-4 pt-4 border-t border-gray-100">
+                    <div className="flex gap-3 mt-4 pt-4 border-t border-[rgba(16,22,43,0.06)]">
                       <button onClick={() => toast.info(t("profile.comingSoon"))}
                         className="px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50">
                         {t("profile.cancelSub")}
@@ -365,9 +365,9 @@ export default function ProfilePage() {
               {/* ── Security Tab ── */}
               {activeTab === "security" && (
                 <div className="space-y-4">
-                  <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                  <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
                     <h2 className="text-base font-bold text-gray-900 mb-5 flex items-center gap-2">
-                      <Bell className="w-4 h-4 text-[#00D26A]" /> {t("profile.notifications")}
+                      <Bell className="w-4 h-4 text-[#059669]" /> {t("profile.notifications")}
                     </h2>
                     <div className="space-y-0.5">
                       {[
@@ -386,9 +386,9 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                  <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
                     <h2 className="text-base font-bold text-gray-900 mb-5 flex items-center gap-2">
-                      <Key className="w-4 h-4 text-[#00D26A]" /> {t("profile.sessions")}
+                      <Key className="w-4 h-4 text-[#059669]" /> {t("profile.sessions")}
                     </h2>
                     <div className="flex items-center justify-between py-3 border-b border-gray-50">
                       <div>
@@ -406,13 +406,13 @@ export default function ProfilePage() {
 
               {/* ── Billing Tab ── */}
               {activeTab === "billing" && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] shadow-[0_2px_20px_rgba(16,22,43,0.03)] overflow-hidden">
+                  <div className="px-6 py-4 border-b border-[rgba(16,22,43,0.06)] flex items-center justify-between">
                     <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-[#00D26A]" /> {t("profile.billingHistory")}
+                      <CreditCard className="w-4 h-4 text-[#059669]" /> {t("profile.billingHistory")}
                     </h2>
                     <button onClick={() => toast.info(t("profile.exportSoon"))}
-                      className="flex items-center gap-1.5 text-sm text-[#00D26A] hover:underline font-semibold">
+                      className="flex items-center gap-1.5 text-sm text-[#059669] hover:underline font-semibold">
                       <Download className="w-4 h-4" /> {t("profile.exportAll")}
                     </button>
                   </div>
@@ -435,7 +435,7 @@ export default function ProfilePage() {
                             <td className="px-6 py-4 text-sm text-gray-600">{formatBillingDate(row.paidAt || row.createdAt)}</td>
                             <td className="px-6 py-4">
                               <p className="text-sm font-semibold text-gray-900">{row.itemLabel}</p>
-                              <p className="text-xs text-[#00D26A]">{row.invoiceNo}</p>
+                              <p className="text-xs text-[#059669]">{row.invoiceNo}</p>
                             </td>
                             <td className="px-6 py-4 text-sm font-bold text-gray-900">{VND.format(row.totalVnd)}₫</td>
                             <td className="px-6 py-4">
@@ -443,7 +443,7 @@ export default function ProfilePage() {
                             </td>
                             <td className="px-6 py-4">
                               <button onClick={() => toast.info(t("profile.soon"))}
-                                className="flex items-center gap-1 text-xs text-[#00D26A] hover:underline font-semibold">
+                                className="flex items-center gap-1 text-xs text-[#059669] hover:underline font-semibold">
                                 <Download className="w-3 h-3" /> PDF
                               </button>
                             </td>

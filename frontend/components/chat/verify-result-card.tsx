@@ -120,7 +120,7 @@ export function parseResult(content: string): ParsedResult | null {
 // ── Visual helpers ──────────────────────────────────────────────────────────
 
 function scoreStyle(score: number) {
-  if (score >= 75) return { color: "#00A859", track: "#D7F5E5", label: "Rủi ro thấp", chip: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+  if (score >= 75) return { color: "#059669", track: "#D7F5E5", label: "Rủi ro thấp", chip: "bg-emerald-50 text-emerald-700 border-emerald-200" };
   if (score >= 50) return { color: "#65A30D", track: "#ECFCCB", label: "Rủi ro trung bình", chip: "bg-lime-50 text-lime-700 border-lime-200" };
   if (score >= 30) return { color: "#D97706", track: "#FEF3C7", label: "Rủi ro cao", chip: "bg-amber-50 text-amber-700 border-amber-200" };
   return { color: "#DC2626", track: "#FEE2E2", label: "Rủi ro nghiêm trọng", chip: "bg-red-50 text-red-700 border-red-200" };
@@ -228,8 +228,8 @@ export function VerifyResultCard({ result }: { result: ParsedResult }) {
         <div className="p-4">
           <div className="flex items-start justify-between gap-3 mb-4">
             <div className="flex items-start gap-2.5 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-[#E6F9F0] flex items-center justify-center shrink-0">
-                <Building2 className="w-4.5 h-4.5 text-[#00843F]" />
+              <div className="w-9 h-9 rounded-xl bg-[#E7F6EF] flex items-center justify-center shrink-0">
+                <Building2 className="w-4.5 h-4.5 text-[#047857]" />
               </div>
               <div className="min-w-0">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Thẩm định 8 trụ cột</p>

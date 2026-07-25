@@ -175,7 +175,7 @@ export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }:
               key={t}
               onClick={() => setTab(t)}
               className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-                tab === t ? "bg-[#E6F9F0] text-[#00843F]" : "text-gray-400 hover:text-gray-600"
+                tab === t ? "bg-[#E7F6EF] text-[#047857]" : "text-gray-400 hover:text-gray-600"
               }`}
             >
               {t === "existing" ? "Hợp đồng có sẵn" : "Tải lên mới"}
@@ -192,7 +192,7 @@ export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }:
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Tìm kiếm theo tên file hoặc đối tác..."
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#00D26A]/30"
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#059669]/30"
                 />
               </div>
 
@@ -221,7 +221,7 @@ export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }:
                                 if (e.key === "Enter") saveRename(c.id);
                                 if (e.key === "Escape") setRenamingId(null);
                               }}
-                              className="w-full text-sm font-semibold text-gray-800 border border-[#00D26A]/40 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-[#00D26A]/30"
+                              className="w-full text-sm font-semibold text-gray-800 border border-[#059669]/40 rounded-lg px-2 py-0.5 focus:outline-none focus:ring-2 focus:ring-[#059669]/30"
                             />
                           ) : (
                             <div className="flex items-center gap-1.5 group">
@@ -243,7 +243,7 @@ export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }:
                       <button
                         onClick={() => chooseExisting(c.id)}
                         disabled={linkingId === c.id}
-                        className="shrink-0 px-3 py-1.5 text-xs font-bold text-white rounded-lg bg-gradient-to-r from-[#00D26A] to-[#00843F] disabled:opacity-60"
+                        className="shrink-0 px-3 py-1.5 text-xs font-bold text-white rounded-lg bg-gradient-to-r from-[#059669] to-[#047857] disabled:opacity-60"
                       >
                         {linkingId === c.id ? "Đang dùng..." : "Dùng →"}
                       </button>
@@ -266,12 +266,12 @@ export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }:
                   }}
                   onClick={() => fileInputRef.current?.click()}
                   className={`border-2 border-dashed rounded-2xl py-12 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors ${
-                    dragOver ? "border-[#00D26A] bg-[#F0FAF4]" : "border-gray-200 hover:border-gray-300"
+                    dragOver ? "border-[#059669] bg-[#F0FAF4]" : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
                   {uploading ? (
                     <>
-                      <Loader2 className="w-8 h-8 text-[#00D26A] animate-spin" />
+                      <Loader2 className="w-8 h-8 text-[#059669] animate-spin" />
                       <p className="text-sm text-gray-500">Đang tải lên...</p>
                     </>
                   ) : (
@@ -295,7 +295,7 @@ export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }:
                 </div>
               ) : !extractionDone && !extractionFailed ? (
                 <div className="flex flex-col items-center justify-center gap-3 py-12">
-                  <Loader2 className="w-8 h-8 text-[#00D26A] animate-spin" />
+                  <Loader2 className="w-8 h-8 text-[#059669] animate-spin" />
                   <p className="text-sm text-gray-500">AI đang đọc hợp đồng...</p>
                 </div>
               ) : extractionFailed ? (
@@ -322,7 +322,7 @@ export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }:
                           value={edited[field] ?? fieldValueToInput(data.value)}
                           onChange={(e) => setEdited((prev) => ({ ...prev, [field]: e.target.value }))}
                           disabled={!reportId}
-                          className="flex-1 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#00D26A]/30 disabled:bg-gray-50 disabled:text-gray-400"
+                          className="flex-1 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#059669]/30 disabled:bg-gray-50 disabled:text-gray-400"
                         />
                         {data.confidence != null && (
                           <span className="text-[11px] text-gray-400 shrink-0 w-10 text-right">
@@ -355,7 +355,7 @@ export function ContractPickerModal({ reportId, onClose, onLinked, onSelected }:
             <button
               onClick={confirmUse}
               disabled={confirming}
-              className="px-4 py-2 text-sm font-bold text-white rounded-xl bg-gradient-to-r from-[#00D26A] to-[#00843F] disabled:opacity-60"
+              className="px-4 py-2 text-sm font-bold text-white rounded-xl bg-gradient-to-r from-[#059669] to-[#047857] disabled:opacity-60"
             >
               {confirming ? "Đang xác nhận..." : "Xác nhận & Dùng →"}
             </button>

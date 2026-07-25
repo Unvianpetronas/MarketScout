@@ -112,14 +112,14 @@ const WMS_CSS = `
 .wms-inner { position:relative; max-width:1360px; margin:0 auto; z-index:1; }
 
 .wms-head { position:relative; max-width:660px; margin-bottom:96px; }
-.wms-ghost3 { position:absolute; bottom:calc(100% + 14px); right:0; font-family:var(--font-sora),sans-serif;
+.wms-ghost3 { position:absolute; bottom:calc(100% + 14px); right:0; font-family:var(--font-display),sans-serif;
   font-weight:800; font-size:90px; line-height:1; color:#10162b; opacity:.05; z-index:0; user-select:none; pointer-events:none; }
 .wms-eyebrow { position:relative; z-index:1; display:inline-flex; align-items:center; gap:10px; margin-bottom:20px; }
-.wms-rule { width:22px; height:2px; border-radius:1px; background:#00A859; display:inline-block; }
-.wms-eyebrow-label { font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#00A859; }
-.wms-h2 { position:relative; z-index:1; margin:0 0 20px; font-family:var(--font-sora),sans-serif; font-weight:800;
+.wms-rule { width:22px; height:2px; border-radius:1px; background:#059669; display:inline-block; }
+.wms-eyebrow-label { font-size:13px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#059669; }
+.wms-h2 { position:relative; z-index:1; margin:0 0 20px; font-family:var(--font-display),sans-serif; font-weight:800;
   font-size:clamp(34px,4.6vw,60px); line-height:1.06; letter-spacing:-.02em; color:#10162b; }
-.wms-accent { color:#00A859; }
+.wms-accent { color:#059669; }
 .wms-sub { position:relative; z-index:1; margin:0; font-size:18px; line-height:1.65; color:#5b6474; max-width:600px; }
 
 .wms-grid { display:grid; grid-template-columns:1.3fr .85fr 1fr; align-items:start; }
@@ -141,17 +141,17 @@ const WMS_CSS = `
 .wms.is-visible .wms-col3 .wms-anim { opacity:1; transform:translateY(0); transition-delay:.25s; }
 
 .wms-numwrap { position:relative; }
-.wms-ghost { position:absolute; bottom:0; font-family:var(--font-sora),sans-serif; font-weight:800; line-height:1;
+.wms-ghost { position:absolute; bottom:0; font-family:var(--font-display),sans-serif; font-weight:800; line-height:1;
   color:#10162b; opacity:.045; z-index:0; user-select:none; pointer-events:none; white-space:nowrap; }
 .wms-ghost1 { left:-8px; font-size:250px; }
 .wms-ghost2 { left:-6px; font-size:170px; }
 .wms-ghost3n { left:-6px; font-size:200px; }
-.wms-mark { position:relative; z-index:1; width:32px; height:3px; border-radius:2px; background:#00A859; margin-bottom:24px; }
-.wms-num { position:relative; z-index:1; font-family:var(--font-sora),sans-serif; font-weight:800; line-height:.95; color:#10162b; }
+.wms-mark { position:relative; z-index:1; width:32px; height:3px; border-radius:2px; background:#059669; margin-bottom:24px; }
+.wms-num { position:relative; z-index:1; font-family:var(--font-display),sans-serif; font-weight:800; line-height:.95; color:#10162b; }
 .wms-num1 { font-size:clamp(96px,11vw,168px); letter-spacing:-.04em; }
 .wms-num2 { font-size:clamp(64px,7vw,92px); letter-spacing:-.03em; }
 .wms-num3 { font-size:clamp(72px,8vw,108px); letter-spacing:-.03em; }
-.wms-label { position:relative; z-index:1; margin:16px 0 12px; font-family:var(--font-sora),sans-serif;
+.wms-label { position:relative; z-index:1; margin:16px 0 12px; font-family:var(--font-display),sans-serif;
   font-weight:700; font-size:23px; color:#10162b; }
 .wms-body { position:relative; z-index:1; margin:0; font-size:16.5px; line-height:1.65; color:#5b6474; }
 .wms-body1 { max-width:340px; }

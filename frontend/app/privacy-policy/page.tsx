@@ -265,7 +265,7 @@ export default function PrivacyPolicyPage() {
       <nav className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white/95 backdrop-blur z-50">
         <Link href="/" className="flex items-center gap-2">
           <Logo className="w-8 h-8" />
-          <span className="font-bold text-gray-900 text-lg">MarketScout</span>
+          <span className="font-display font-bold text-gray-900 text-lg">MarketScout</span>
         </Link>
         <Link
           href="/"
@@ -277,10 +277,10 @@ export default function PrivacyPolicyPage() {
       </nav>
 
       {/* Header */}
-      <div className="bg-gradient-to-br from-[#0A1A12] to-[#0D2218] py-16">
+      <div className="bg-gradient-to-br from-[#0b1120] to-[#10162b] py-16">
         <div className="max-w-4xl mx-auto px-6 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-[#00D26A]/15 flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-6 h-6 text-[#00D26A]" />
+          <div className="w-12 h-12 rounded-2xl bg-[#059669]/15 flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-6 h-6 text-[#059669]" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">{t("privacy.title")}</h1>
           <p className="text-gray-400 text-sm">
@@ -300,7 +300,7 @@ export default function PrivacyPolicyPage() {
                   <a
                     key={s.id}
                     href={`#${s.id}`}
-                    className="block text-sm text-gray-500 hover:text-[#00A859] py-1 transition-colors"
+                    className="block text-sm text-gray-500 hover:text-[#059669] py-1 transition-colors"
                   >
                     {s.title}
                   </a>
@@ -311,8 +311,8 @@ export default function PrivacyPolicyPage() {
 
           {/* Content */}
           <article className="flex-1 min-w-0">
-            <div className="bg-[#E6F9F0] border border-[#00D26A]/20 rounded-2xl p-5 mb-10">
-              <p className="text-sm text-[#00843F] leading-relaxed">
+            <div className="bg-[#E7F6EF] border border-[#059669]/20 rounded-2xl p-5 mb-10">
+              <p className="text-sm text-[#047857] leading-relaxed">
                 <strong>{t("privacy.summaryLabel")}</strong> {t("privacy.summaryText")}
               </p>
             </div>
@@ -341,7 +341,7 @@ export default function PrivacyPolicyPage() {
         <div className="flex items-center justify-center gap-4 mt-3 text-xs">
           <Link href="/terms-of-service" className="hover:text-gray-600 transition-colors">{t("privacy.footerTerms")}</Link>
           <span>·</span>
-          <Link href="/privacy-policy" className="text-[#00A859]">{t("privacy.footerPrivacy")}</Link>
+          <Link href="/privacy-policy" className="text-[#059669]">{t("privacy.footerPrivacy")}</Link>
           <span>·</span>
           <Link href="/support-desk" className="hover:text-gray-600 transition-colors">{t("privacy.footerSupport")}</Link>
         </div>

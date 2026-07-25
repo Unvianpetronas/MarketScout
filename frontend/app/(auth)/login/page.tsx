@@ -143,7 +143,7 @@ export default function LoginPage() {
       <div
         className="hidden lg:flex lg:w-[42%] flex-col justify-between p-10"
         style={{
-          background: "linear-gradient(135deg, #0A1A12 0%, #0D2218 50%, #0A1A12 100%)",
+          background: "linear-gradient(135deg, #0b1120 0%, #10162b 50%, #0b1120 100%)",
         }}
       >
         {/* Top section */}
@@ -151,7 +151,7 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="flex items-center gap-3 mb-8">
             <Logo className="w-12 h-12" />
-            <span className="text-white font-bold text-xl tracking-tight">MarketScout</span>
+            <span className="font-display text-white font-bold text-xl tracking-tight">MarketScout</span>
           </div>
 
           {/* Badge */}
@@ -165,7 +165,7 @@ export default function LoginPage() {
           <h1 className="text-5xl font-extrabold text-white leading-tight mb-6">
             {t("auth.heroPrefix")}{" "}
             <span
-              className="text-[#00D26A]"
+              className="text-[#059669]"
               style={{
                 textDecorationLine: "underline",
                 textDecorationStyle: "wavy",
@@ -197,7 +197,7 @@ export default function LoginPage() {
               },
             ].map((item) => (
               <div key={item.title} className="flex items-start gap-3">
-                <div className="bg-[#00D26A] rounded-full w-6 h-6 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="bg-[#059669] rounded-full w-6 h-6 flex items-center justify-center shrink-0 mt-0.5">
                   <svg className="w-3.5 h-3.5 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
@@ -255,7 +255,7 @@ export default function LoginPage() {
           {/* Mobile logo */}
           <div className="flex lg:hidden items-center gap-2 mb-8">
             <Logo className="w-10 h-10" />
-            <span className="font-bold text-gray-900">MarketScout</span>
+            <span className="font-display font-bold text-gray-900">MarketScout</span>
           </div>
 
           <h1 className="text-4xl font-bold text-gray-900 mb-1">{t("auth.signInTitle")}</h1>
@@ -273,7 +273,7 @@ export default function LoginPage() {
                   type="email"
                   placeholder="you@corporate.com"
                   {...register("email", { required: t("auth.emailRequired") })}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00D26A] focus:ring-2 focus:ring-[#00D26A]/20 transition-all"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#059669] focus:ring-2 focus:ring-[#059669]/20 transition-all"
                 />
               </div>
               {errors.email && (
@@ -292,7 +292,7 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   {...register("password", { required: t("auth.passwordRequired") })}
-                  className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#00D26A] focus:ring-2 focus:ring-[#00D26A]/20 transition-all"
+                  className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#059669] focus:ring-2 focus:ring-[#059669]/20 transition-all"
                 />
                 <button
                   type="button"
@@ -314,11 +314,11 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 accent-[#00D26A]"
+                  className="w-4 h-4 rounded border-gray-300 accent-[#059669]"
                 />
                 <span className="text-sm text-gray-600">{t("auth.rememberMe")}</span>
               </label>
-              <Link href="/forgot-password" className="text-sm text-[#00D26A] hover:underline font-medium">
+              <Link href="/forgot-password" className="text-sm text-[#059669] hover:underline font-medium">
                 {t("auth.forgotPassword")}
               </Link>
             </div>
@@ -327,7 +327,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3.5 bg-[#00D26A] hover:bg-[#00B85D] text-white font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-base"
+              className="w-full py-3.5 bg-[#059669] hover:bg-[#047857] text-white font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2 text-base"
             >
               {isLoading && (
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -354,7 +354,7 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-gray-500 mt-8">
             {t("auth.noAccount")}{" "}
-            <Link href="/register" className="text-[#00D26A] font-medium hover:underline">
+            <Link href="/register" className="text-[#059669] font-medium hover:underline">
               {t("auth.signUpFreeTrial")}
             </Link>
           </p>
