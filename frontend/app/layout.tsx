@@ -35,10 +35,22 @@ const displayFont = Plus_Jakarta_Sans({
   weight: ["500", "600", "700", "800"],
 });
 
+// Every route rendered a client component, so none of them could export
+// metadata and all 30 shared this one title. Child routes now set their own
+// via a server-component layout.tsx; `template` keeps the brand suffix.
 export const metadata: Metadata = {
-  title: "MarketScout — Trade Partner Verification",
-  description: "Verify your international trade partners with AI-powered intelligence.",
+  title: {
+    default: "MarketScout — Trade Partner Verification",
+    template: "%s — MarketScout",
+  },
+  description:
+    "Verify international trade partners with an 8-pillar AI assessment across 190+ countries: registration, sanctions screening, financials and contract checks.",
   icons: { icon: "/logo.png" },
+  openGraph: {
+    siteName: "MarketScout",
+    type: "website",
+    images: ["/logo.png"],
+  },
 };
 
 export default function RootLayout({
