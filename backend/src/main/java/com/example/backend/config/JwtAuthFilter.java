@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -72,9 +74,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 return;
             }
 
+            // Principal is a UserDetails (not the bare subject String) so controllers
+            // reading @AuthenticationPrincipal UserDetails — e.g. AdminController's
+            // audit "actor" on every write endpoint — resolve a non-null value;
+            // getUsername() returns the email subject the controllers look up by.
+            List<SimpleGrantedAuthority> authorities =
+                    List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().toUpperCase(java.util.Locale.ROOT)));
+            UserDetails principal = new User(claims.getSubject(), "", authorities);
             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                    claims.getSubject(), null,
-                    List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().toUpperCase(java.util.Locale.ROOT)))
+                    principal, null, authorities
             );
             SecurityContextHolder.getContext().setAuthentication(auth);
 
