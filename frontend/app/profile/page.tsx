@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  User, Lock, CheckCircle2, BarChart2,
+  User, Lock, CheckCircle2,
   Bell, Shield, Download, Zap, Clock, Key,
   CreditCard, Camera, Mail, Phone, Building2,
   ChevronRight, AlertCircle, Star, XCircle

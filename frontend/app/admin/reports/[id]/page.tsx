@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, ShieldCheck, RotateCcw, Trash2, RefreshCw,
@@ -36,7 +36,7 @@ export default function AdminReportDetailPage({ params }: Props) {
   const [hardStopInput, setHardStopInput] = useState<"unset" | "true" | "false">("unset");
   const [note, setNote] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [d, f] = await Promise.all([
         getReportDetail(id),
@@ -52,9 +52,9 @@ export default function AdminReportDetailPage({ params }: Props) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
 
-  useEffect(() => { Promise.resolve().then(load); }, [id]);
+  useEffect(() => { Promise.resolve().then(load); }, [load]);
 
   const handleSaveOverride = async () => {
     if (!note.trim()) { toast.error("Cần ghi lý do điều chỉnh."); return; }

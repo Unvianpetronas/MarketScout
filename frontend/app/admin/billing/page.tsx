@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CreditCard, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
@@ -28,7 +28,7 @@ export default function AdminBillingPage() {
   const [savingId, setSavingId] = useState<number | null>(null);
   const [togglingId, setTogglingId] = useState<number | null>(null);
 
-  const fetchPlans = async () => {
+  const fetchPlans = useCallback(async () => {
     try {
       const res = await getPlans();
       setPlans(res);
@@ -37,9 +37,9 @@ export default function AdminBillingPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
-  useEffect(() => { Promise.resolve().then(fetchPlans); }, []);
+  useEffect(() => { Promise.resolve().then(fetchPlans); }, [fetchPlans]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

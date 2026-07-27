@@ -4,9 +4,9 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
-  Send, Plus, Trash2, FileText, Loader2, MessageSquare,
-  RefreshCw, Sparkles, Search, Shield, TrendingUp, Globe,
-  ChevronRight, X, Bot, User, FileSignature
+  Send, Plus, FileText, Loader2, MessageSquare,
+  Sparkles, Search, Shield, TrendingUp, Globe,
+  ChevronRight, X, Bot, FileSignature
 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
@@ -331,7 +331,7 @@ function ChatContent() {
       pendingConfirmRef.current = null;
       candidatesRef.current = null;
     },
-    onError: (_err: Error) => {
+    onError: () => {
       setIsStreaming(false);
       setStreamingStatus("");
       const partialContent = streamingContentRef.current; // FIX: chụp giá trị trước, lý do như onDone

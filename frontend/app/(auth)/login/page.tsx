@@ -75,6 +75,9 @@ export default function LoginPage() {
     if (params.get("verified") === "true") {
       toast.success(t("auth.emailVerifiedToast"));
     }
+    // Mount-only: this one-shot toast must not re-fire when `t` changes on a
+    // language toggle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Keep the ref pointing at the latest handler (fresh loginWithGoogle / t)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Database, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
@@ -29,7 +29,7 @@ export default function AdminQuotaPage() {
   const [topupPriceEdit, setTopupPriceEdit] = useState("");
   const [isSavingTopupPrice, setIsSavingTopupPrice] = useState(false);
 
-  const fetchPlans = async () => {
+  const fetchPlans = useCallback(async () => {
     try {
       const res = await getPlans();
       setPlans(res);
@@ -38,9 +38,9 @@ export default function AdminQuotaPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
-  const fetchTopupPrice = async () => {
+  const fetchTopupPrice = useCallback(async () => {
     try {
       const res = await getPaymentSettings();
       setTopupPrice(res.pricePerCreditVnd);
@@ -48,9 +48,9 @@ export default function AdminQuotaPage() {
     } catch {
       toast.error(t("admin.quota.topupPriceLoadError"));
     }
-  };
+  }, [t]);
 
-  useEffect(() => { Promise.resolve().then(() => { fetchPlans(); fetchTopupPrice(); }); }, []);
+  useEffect(() => { Promise.resolve().then(() => { fetchPlans(); fetchTopupPrice(); }); }, [fetchPlans, fetchTopupPrice]);
 
   const handleSaveTopupPrice = async () => {
     const price = Number(topupPriceEdit);

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  FileText, Search, Download, Clock, CheckCircle2, AlertTriangle,
+  FileText, Search, Download, CheckCircle2, AlertTriangle,
   Globe, Calendar, ChevronRight, RefreshCw, Zap, Building2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,7 +24,7 @@ export default function ReportsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     try {
       setReports(await getReports());
     } catch {
@@ -32,9 +32,9 @@ export default function ReportsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
-  useEffect(() => { Promise.resolve().then(fetchReports); }, []);
+  useEffect(() => { Promise.resolve().then(fetchReports); }, [fetchReports]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
