@@ -63,6 +63,7 @@ public class SubscriptionLifecycleService {
 
         for (Subscription sub : due) {
             if (isFreePlan(sub.getPlan())) continue;
+            if (sub.getCancelAt() != null) continue; // user cancelled renewal — don't nag them
             boolean alreadySent = isThreeDayReminder ? sub.getReminderSent3dAt() != null : sub.getReminderSent1dAt() != null;
             if (alreadySent) continue;
 

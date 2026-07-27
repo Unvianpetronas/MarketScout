@@ -31,6 +31,8 @@ export interface AdminUsersResponse {
 
 // ── Analytics ─────────────────────────────────────────────────────────────
 export interface TopCompany { name: string; count: number; }
+export interface MonthlyCount { label: string; count: number; }
+export interface CountryCount { code: string; count: number; }
 export interface AnalyticsOverview {
   totalUsers: number;
   activeUsers: number;
@@ -47,6 +49,62 @@ export interface AnalyticsOverview {
   failedJobs: number;
   runningJobs: number;
   openAlerts: number;
+  reportsOverTime: MonthlyCount[];
+  reportsByCountry: CountryCount[];
+}
+
+// ── Revenue ───────────────────────────────────────────────────────────────
+export interface MonthlyRevenue { label: string; amount: number; }
+export interface NamedAmount { name: string; amount: number; }
+export interface TopPayer { name: string; email: string; amount: number; plan: string; }
+export interface RecentTx {
+  customer: string; email: string; plan: string;
+  amount: number; provider: string; status: string; date: string;
+}
+export interface RevenueAnalytics {
+  revenueThisMonth: number;
+  revenueLastMonth: number;
+  revenueThisYear: number;
+  revenueAllTime: number;
+  pendingFailedAmount: number;
+  completedCountThisMonth: number;
+  failedCountThisMonth: number;
+  pendingCountThisMonth: number;
+  payingUsers: number;
+  totalUsers: number;
+  revenueOverTime: MonthlyRevenue[];
+  revenueByPlan: NamedAmount[];
+  revenueByProvider: NamedAmount[];
+  topPayers: TopPayer[];
+  recentTransactions: RecentTx[];
+}
+
+// ── System evaluation ───────────────────────────────────────────────────────
+export interface Bucket { label: string; count: number; }
+export interface RatingEntry {
+  stars: number;
+  comment: string | null;
+  reportEntity: string;
+  userEmail: string;
+  createdAt: string;
+}
+export interface EvaluationAnalytics {
+  totalReports: number;
+  overriddenCount: number;
+  flaggedTotal: number;
+  flagsOpen: number;
+  flagsResolved: number;
+  flagsDismissed: number;
+  sanctionsFalsePositive: number;
+  accuracyPct: number;
+  overrideRatePct: number;
+  flagRatePct: number;
+  avgStars: number | null;
+  ratingCount: number;
+  starDistribution: Bucket[];
+  confidenceDistribution: Bucket[];
+  flagsByReason: Bucket[];
+  recentRatings: RatingEntry[];
 }
 
 // ── Reports ───────────────────────────────────────────────────────────────
@@ -199,6 +257,12 @@ export interface PaymentSettingsDTO {
 
 export const getAnalyticsOverview = () =>
   api.get<AnalyticsOverview>("/admin/analytics/overview").then(r => r.data);
+
+export const getRevenueAnalytics = () =>
+  api.get<RevenueAnalytics>("/admin/analytics/revenue").then(r => r.data);
+
+export const getEvaluationAnalytics = () =>
+  api.get<EvaluationAnalytics>("/admin/analytics/evaluation").then(r => r.data);
 
 export const getAdminUsers = (page = 0, size = 20, search = "") =>
   api.get<AdminUsersResponse>("/admin/users", { params: { page, size, search } }).then(r => r.data);

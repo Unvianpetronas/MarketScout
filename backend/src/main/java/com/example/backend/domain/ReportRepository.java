@@ -35,13 +35,24 @@ public interface ReportRepository extends JpaRepository<Report, UUID> {
     @Query("SELECT r.entityName, COUNT(r) FROM Report r GROUP BY r.entityName ORDER BY COUNT(r) DESC")
     List<Object[]> findTopEntities(Pageable pageable);
 
+    @Query("SELECT r.countryIso2, COUNT(r) FROM Report r WHERE r.countryIso2 IS NOT NULL GROUP BY r.countryIso2 ORDER BY COUNT(r) DESC")
+    List<Object[]> countGroupByCountry();
+
+    // Reports a human admin corrected (override applied) — a ground-truth "AI was wrong" signal.
+    @Query("SELECT COUNT(r) FROM Report r WHERE r.overriddenAt IS NOT NULL")
+    long countOverridden();
+
     // No JOIN FETCH: the caller (AdminController.listReports) is @Transactional,
-    // so toReportSummary can lazy-load user/overriddenBy during mapping. This
-    // keeps the query — and Spring Data's derived count query — plain, matching
-    // the report-flags queries that work. A JOIN FETCH here forces a hand-written
-    // countQuery and is the kind of thing that quietly breaks the list endpoint.
+    // so toReportSummary can lazy-load user/overriddenBy during mapping.
+    //
+    // entityName is matched with an always-on LIKE (NOT guarded by ":x IS NULL"),
+    // and the caller passes "" instead of null. A *null* string bound inside
+    // LOWER(CONCAT(...)) has no column to infer its type from, so PostgreSQL types
+    // it as bytea and fails at plan time with "function lower(bytea) does not exist"
+    // — the IS NULL branch never gets to short-circuit it. An empty string matches
+    // every row, which is exactly "no filter". This mirrors UsersRepository.searchUsers.
     @Query("SELECT r FROM Report r WHERE " +
-           "(:entityName IS NULL OR LOWER(r.entityName) LIKE LOWER(CONCAT('%', :entityName, '%'))) AND " +
+           "LOWER(r.entityName) LIKE LOWER(CONCAT('%', :entityName, '%')) AND " +
            "(:status IS NULL OR r.status = :status) AND " +
            "(:riskLevel IS NULL OR r.riskLevel = :riskLevel) AND " +
            "(:userId IS NULL OR r.user.id = :userId)")

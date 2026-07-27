@@ -55,3 +55,23 @@ export const getMyInvoices = async (): Promise<InvoiceSummary[]> => {
   const { data } = await api.get<InvoiceSummary[]>("/payments/invoices");
   return data;
 };
+
+export interface SubscriptionInfo {
+  planName: string;
+  status: string;                   // active | canceled | free
+  currentPeriodEnd: string | null;  // ISO; null on Free
+  cancelAt: string | null;          // set once renewal is cancelled
+  paid: boolean;                    // false = Free / no active paid plan
+}
+
+/** Current paid subscription state (plan, cycle end, cancel flag) for the profile page. */
+export const getSubscription = async (): Promise<SubscriptionInfo> => {
+  const { data } = await api.get<SubscriptionInfo>("/payments/subscription");
+  return data;
+};
+
+/** "Cancel subscription" — opt out of renewal; the plan stays active until cycle end. */
+export const cancelSubscription = async (): Promise<SubscriptionInfo> => {
+  const { data } = await api.post<SubscriptionInfo>("/payments/subscription/cancel");
+  return data;
+};

@@ -197,6 +197,65 @@ public class PaymentService {
                 .build();
     }
 
+    /** Current paid subscription (or a "free" marker) for the profile page. */
+    @Transactional(readOnly = true)
+    public PaymentDTO.SubscriptionResponse getSubscription(UUID userId) {
+        Users user = usersRepository.findById(userId)
+                .orElseThrow(() -> new AppException(AppException.ErrorCode.USER_NOT_FOUND));
+        Subscription active = activePaidSubscription(userId);
+        if (active == null) {
+            return PaymentDTO.SubscriptionResponse.builder()
+                    .planName(user.getPlan() != null ? user.getPlan().getName() : "free")
+                    .status("free").paid(false).build();
+        }
+        return toSubscriptionResponse(active);
+    }
+
+    /**
+     * "Hủy đăng ký" — the user opts out of renewing their paid plan. SePay is
+     * one-time so nothing is charged/refunded: the plan stays usable until the
+     * end of the already-paid cycle, then SubscriptionLifecycleService downgrades
+     * it to Free. cancelAt marks the sub so no renewal reminders are sent.
+     */
+    @Transactional
+    public PaymentDTO.SubscriptionResponse cancelSubscription(UUID userId) {
+        Users user = usersRepository.findById(userId)
+                .orElseThrow(() -> new AppException(AppException.ErrorCode.USER_NOT_FOUND));
+        Subscription active = activePaidSubscription(userId);
+        if (active == null) {
+            throw new AppException(AppException.ErrorCode.BAD_REQUEST,
+                    "Bạn đang dùng gói miễn phí — không có đăng ký trả phí nào để hủy.");
+        }
+        if (active.getCancelAt() == null) {
+            active.setCancelAt(active.getCurrentPeriodEnd());
+            subscriptionRepository.save(active);
+        }
+        // Cancelling means "don't renew, don't switch" — drop any scheduled change.
+        if (user.getPendingPlan() != null) {
+            user.setPendingPlan(null);
+            user.setPendingPlanRequestedAt(null);
+            usersRepository.save(user);
+        }
+        log.info("Subscription cancelled (no renewal) — user={} plan={} activeUntil={}",
+                userId, active.getPlan().getName(), active.getCurrentPeriodEnd());
+        return toSubscriptionResponse(active);
+    }
+
+    private Subscription activePaidSubscription(UUID userId) {
+        return subscriptionRepository.findByUser_IdAndStatus(userId, "active").stream()
+                .filter(s -> s.getPlan() != null && !"free".equalsIgnoreCase(s.getPlan().getName()))
+                .findFirst().orElse(null);
+    }
+
+    private PaymentDTO.SubscriptionResponse toSubscriptionResponse(Subscription s) {
+        return PaymentDTO.SubscriptionResponse.builder()
+                .planName(s.getPlan().getName())
+                .status(s.getCancelAt() != null ? "canceled" : s.getStatus())
+                .currentPeriodEnd(s.getCurrentPeriodEnd())
+                .cancelAt(s.getCancelAt())
+                .paid(true).build();
+    }
+
     @Transactional
     public PaymentDTO.ScheduledPlanChangeResponse cancelScheduledPlanChange(UUID userId) {
         Users user = usersRepository.findById(userId)

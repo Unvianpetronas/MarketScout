@@ -23,10 +23,68 @@ public class AdminDTO {
             long totalJobs,
             long failedJobs,
             long runningJobs,
-            long openAlerts
+            long openAlerts,
+            List<MonthlyCount> reportsOverTime,
+            List<CountryCount> reportsByCountry
     ) {}
 
     public record TopCompany(String name, Long count) {}
+
+    public record MonthlyCount(String label, long count) {}
+
+    public record CountryCount(String code, long count) {}
+
+    // ── Revenue analytics (real collected money) ──
+    public record RevenueAnalytics(
+            BigDecimal revenueThisMonth,
+            BigDecimal revenueLastMonth,
+            BigDecimal revenueThisYear,
+            BigDecimal revenueAllTime,
+            BigDecimal pendingFailedAmount,
+            long completedCountThisMonth,
+            long failedCountThisMonth,
+            long pendingCountThisMonth,
+            long payingUsers,
+            long totalUsers,
+            List<MonthlyRevenue> revenueOverTime,
+            List<NamedAmount> revenueByPlan,
+            List<NamedAmount> revenueByProvider,
+            List<TopPayer> topPayers,
+            List<RecentTx> recentTransactions
+    ) {}
+
+    public record MonthlyRevenue(String label, BigDecimal amount) {}
+
+    public record NamedAmount(String name, BigDecimal amount) {}
+
+    public record TopPayer(String name, String email, BigDecimal amount, String plan) {}
+
+    // ── System evaluation (quality of the AI verification) ──
+    public record EvaluationAnalytics(
+            long totalReports,
+            long overriddenCount,
+            long flaggedTotal,
+            long flagsOpen,
+            long flagsResolved,
+            long flagsDismissed,
+            long sanctionsFalsePositive,
+            double accuracyPct,
+            double overrideRatePct,
+            double flagRatePct,
+            Double avgStars,
+            long ratingCount,
+            List<Bucket> starDistribution,
+            List<Bucket> confidenceDistribution,
+            List<Bucket> flagsByReason,
+            List<RatingEntry> recentRatings
+    ) {}
+
+    public record Bucket(String label, long count) {}
+
+    public record RatingEntry(Short stars, String comment, String reportEntity, String userEmail, Instant createdAt) {}
+
+    public record RecentTx(String customer, String email, String plan,
+                           BigDecimal amount, String provider, String status, Instant date) {}
 
     public record AdminUser(
             UUID id,

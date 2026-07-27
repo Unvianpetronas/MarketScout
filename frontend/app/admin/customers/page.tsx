@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import {
   Users, Ban,
   Search, Download, UserPlus,
-  ArrowUpRight, AlertTriangle, CheckCircle2, RefreshCw,
+  ArrowUpRight, AlertTriangle, CheckCircle2,
   Activity
 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminPageHeader, RefreshButton } from "@/components/admin/admin-page-header";
 import { getAdminUsers, setUserQuota, refundUserQuota, AdminUser } from "@/services/admin.service";
 import { useLanguage } from "@/providers/language-provider";
 
@@ -99,32 +100,25 @@ export default function AdminCustomersPage() {
   return (
     <AuthGuard requiredRole="ADMIN">
       <AdminShell active="customers">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Global Operations &gt; Customer Central</p>
-                <div className="flex items-center gap-3">
-                  <h1 className="text-2xl font-extrabold text-gray-900">{t("admin.customers.title")}</h1>
-                  <span className="text-xs font-bold text-[#047857] bg-[#E7F6EF] border border-[#059669]/30 px-3 py-1 rounded-full">
-                    Real-time Data
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={handleRefresh} disabled={isRefreshing}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
-                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                </button>
-                <button onClick={() => toast.info(t("profile.comingSoon"))}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
-                  <Download className="w-4 h-4" /> {t("admin.customers.export")}
-                </button>
-                <button onClick={() => toast.info(t("profile.comingSoon"))}
-                  className="flex items-center gap-2 px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90 shadow-sm">
-                  <UserPlus className="w-4 h-4" /> {t("admin.customers.createAccount")}
-                </button>
-              </div>
-            </div>
+            <AdminPageHeader
+              breadcrumb="GLOBAL OPERATIONS > CUSTOMER CENTRAL"
+              title="Khách hàng"
+              subtitle="Quản lý người dùng, gói cước và hạn mức trên toàn hệ thống."
+              rightSlot={
+                <>
+                  <button onClick={() => toast.info(t("profile.comingSoon"))}
+                    className="flex items-center gap-2 px-4 h-11 rounded-xl bg-white border border-[rgba(16,22,43,0.08)] text-[13px] font-semibold text-[#10162b] shadow-sm hover:bg-[#faf9f6] transition-colors">
+                    <Download className="w-4 h-4" /> {t("admin.customers.export")}
+                  </button>
+                  <button onClick={() => toast.info(t("profile.comingSoon"))}
+                    className="flex items-center gap-2 px-4 h-11 rounded-xl text-white text-[13px] font-semibold shadow-sm hover:opacity-90 transition-opacity"
+                    style={{ background: "linear-gradient(155deg,#059669,#0a7a56)" }}>
+                    <UserPlus className="w-4 h-4" /> {t("admin.customers.createAccount")}
+                  </button>
+                  <RefreshButton onClick={handleRefresh} spinning={isRefreshing} />
+                </>
+              }
+            />
 
             {/* Metrics */}
             <div className="grid grid-cols-4 gap-4 mb-6">

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Database, RefreshCw, Save } from "lucide-react";
+import { Database, Save } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminPageHeader, RefreshButton } from "@/components/admin/admin-page-header";
 import { getPlans, updatePlan, PlanDTO, getPaymentSettings, updatePaymentSettings } from "@/services/admin.service";
 import { useLanguage } from "@/providers/language-provider";
 
@@ -100,16 +101,12 @@ export default function AdminQuotaPage() {
   return (
     <AuthGuard requiredRole="ADMIN">
       <AdminShell active="quota">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">{t("admin.quota.breadcrumb")}</p>
-            <h1 className="text-2xl font-extrabold text-gray-900">{t("admin.quota.title")}</h1>
-          </div>
-          <button onClick={handleRefresh} disabled={isRefreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          </button>
-        </div>
+        <AdminPageHeader
+          breadcrumb="GLOBAL OPERATIONS > QUOTA MATRIX"
+          title="Quota Matrix"
+          subtitle="Cấu hình hạn mức gói cước và giá credit nạp thêm."
+          rightSlot={<RefreshButton onClick={handleRefresh} spinning={isRefreshing} />}
+        />
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
           <p className="text-sm font-bold text-gray-900 mb-1">{t("admin.quota.topupPriceTitle")}</p>

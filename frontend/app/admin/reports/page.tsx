@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Search, RefreshCw, FileWarning, FileText, AlertTriangle,
+  Search, FileWarning, FileText, AlertTriangle,
   CheckCircle2, XCircle, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminPageHeader, RefreshButton } from "@/components/admin/admin-page-header";
 import {
   getAdminReports, getReportFlags, resolveReportFlag,
   ReportSummary, ReportFlagDTO,
@@ -238,16 +239,12 @@ export default function AdminReportsPage() {
   return (
     <AuthGuard requiredRole="ADMIN">
       <AdminShell active="reports">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Global Operations &gt; Reports &amp; Flags</p>
-            <h1 className="text-2xl font-extrabold text-gray-900">Báo cáo &amp; Khiếu nại</h1>
-          </div>
-          <button onClick={() => setRefreshKey((k) => k + 1)}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
-            <RefreshCw className="w-4 h-4" />
-          </button>
-        </div>
+        <AdminPageHeader
+          breadcrumb="GLOBAL OPERATIONS > REPORTS & FLAGS"
+          title="Báo cáo & Khiếu nại"
+          subtitle="Xử lý báo cáo sai từ người dùng và quản lý toàn bộ báo cáo."
+          rightSlot={<RefreshButton onClick={() => setRefreshKey((k) => k + 1)} />}
+        />
 
         <div className="space-y-6" key={refreshKey}>
           <FlagsQueue />

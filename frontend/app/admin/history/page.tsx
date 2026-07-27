@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { History, RefreshCw } from "lucide-react";
+import { History } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
+import { AdminPageHeader, RefreshButton } from "@/components/admin/admin-page-header";
 import { getAuditLogs, AuditLogEntry } from "@/services/admin.service";
 import { useLanguage } from "@/providers/language-provider";
 
@@ -48,16 +49,12 @@ export default function AdminHistoryPage() {
   return (
     <AuthGuard requiredRole="ADMIN">
       <AdminShell active="history">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">{t("admin.history.breadcrumb")}</p>
-            <h1 className="text-2xl font-extrabold text-gray-900">{t("admin.history.title")}</h1>
-          </div>
-          <button onClick={handleRefresh} disabled={isRefreshing}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 shadow-sm">
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-          </button>
-        </div>
+        <AdminPageHeader
+          breadcrumb="GLOBAL OPERATIONS > AUDIT LOG"
+          title="Lịch sử"
+          subtitle="Nhật ký mọi hành động quản trị trên hệ thống."
+          rightSlot={<RefreshButton onClick={handleRefresh} spinning={isRefreshing} />}
+        />
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {isLoading ? (
