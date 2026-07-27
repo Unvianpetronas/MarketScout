@@ -32,6 +32,15 @@ public class PaymentDTO {
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class SubscriptionResponse {
+        private String  planName;
+        private String  status;            // active | canceled (won't renew) | free
+        private Instant currentPeriodEnd;  // null when on Free
+        private Instant cancelAt;          // set once the user cancels renewal
+        private boolean paid;              // false = on Free / no active paid subscription
+    }
+
+    @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class TopupResponse {
         private UUID       invoiceId;
         private int        quantity;

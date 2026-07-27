@@ -14,6 +14,7 @@ import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
 import { ContractPickerModal } from "@/components/contract/ContractPickerModal";
 import { getReport, getReportRecommendations, patchDealInfo, exportReportPdf, flagReport } from "@/services/report.service";
+import { ReportRatingCard } from "@/components/reports/report-rating-card";
 import { getContract, unlinkContract, listContractLinks } from "@/services/contract.service";
 import { VerificationReport, PillarResult, ReportRecommendations, FlagReason, isProcessingStatus } from "@/types/report";
 import { LinkResponse, ContractSummary } from "@/types/contract";
@@ -848,6 +849,9 @@ export default function ReportDetailPage({ params }: Props) {
                     {t("report.copilotCta")}
                   </Link>
                 </div>
+
+                {/* ── Satisfaction rating ── */}
+                {!isProcessingStatus(report.status) && <ReportRatingCard reportId={id} />}
 
               </div>
             )}

@@ -65,3 +65,4 @@ auth-explanation.txt
 !backend/src/main/resources/db/payment_tables.sql
 *.txt
 *.md
+*.pdf

@@ -101,6 +101,28 @@ public class PaymentController {
     }
 
     /**
+     * GET /api/v1/payments/subscription
+     * Current paid subscription (plan, cycle end, cancel state) for the profile
+     * page — or a "free" marker when the user has no active paid plan.
+     */
+    @GetMapping("/subscription")
+    public ResponseEntity<PaymentDTO.SubscriptionResponse> getSubscription(
+            @RequestHeader("Authorization") String authHeader) {
+        return ResponseEntity.ok(paymentService.getSubscription(extractUserId(authHeader)));
+    }
+
+    /**
+     * POST /api/v1/payments/subscription/cancel
+     * "Hủy đăng ký" — opt out of renewal. The plan stays usable until the paid
+     * cycle ends, then auto-downgrades to Free (no charge/refund; SePay is one-time).
+     */
+    @PostMapping("/subscription/cancel")
+    public ResponseEntity<PaymentDTO.SubscriptionResponse> cancelSubscription(
+            @RequestHeader("Authorization") String authHeader) {
+        return ResponseEntity.ok(paymentService.cancelSubscription(extractUserId(authHeader)));
+    }
+
+    /**
      * GET /api/v1/payments/topups/{invoiceId}/status
      * Owner-only poll for payment state (pending | paid | expired).
      */

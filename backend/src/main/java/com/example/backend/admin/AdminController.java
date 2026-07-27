@@ -81,11 +81,28 @@ public class AdminController {
         long runningJobs = reportJobRepository.countByStatus("running");
         long openAlerts  = systemAlertRepository.countByIsResolvedFalse();
 
+        // Report volume for the last 6 calendar months (oldest → newest), reusing
+        // countByCreatedAtBetween so no DB-specific date-bucketing query is needed.
+        java.time.YearMonth curMonth = java.time.YearMonth.now(java.time.ZoneOffset.UTC);
+        List<AdminDTO.MonthlyCount> reportsOverTime = new ArrayList<>();
+        for (int i = 5; i >= 0; i--) {
+            java.time.YearMonth ym = curMonth.minusMonths(i);
+            Instant mStart = ym.atDay(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+            Instant mEnd   = ym.plusMonths(1).atDay(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+            reportsOverTime.add(new AdminDTO.MonthlyCount(
+                    "T" + ym.getMonthValue(), reportRepository.countByCreatedAtBetween(mStart, mEnd)));
+        }
+
+        List<AdminDTO.CountryCount> reportsByCountry = reportRepository.countGroupByCountry().stream()
+                .map(r -> new AdminDTO.CountryCount((String) r[0], (Long) r[1]))
+                .toList();
+
         return ResponseEntity.ok(new AdminDTO.AnalyticsOverview(
                 totalUsers, activeUsers, newUsersThisMonth, newUsersLastMonth,
                 totalReports, reportsThisMonth, reportsLastMonth,
                 byStatus, byRisk, topCompanies, usersByPlan,
-                totalJobs, failedJobs, runningJobs, openAlerts));
+                totalJobs, failedJobs, runningJobs, openAlerts,
+                reportsOverTime, reportsByCountry));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -187,8 +204,10 @@ public class AdminController {
             @RequestParam(required = false) String riskLevel,
             @RequestParam(required = false) UUID userId) {
 
+        // entityName must never be null — see ReportRepository.searchReports (a null
+        // string inside LOWER(CONCAT(...)) is typed as bytea by PostgreSQL and blows up).
         Page<Report> result = reportRepository.searchReports(
-                entityName, status, riskLevel, userId,
+                entityName == null ? "" : entityName, status, riskLevel, userId,
                 PageRequest.of(page, size, Sort.by("createdAt").descending()));
 
         List<AdminDTO.ReportSummary> items = result.getContent().stream()

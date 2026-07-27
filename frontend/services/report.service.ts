@@ -64,6 +64,29 @@ export const flagReport = async (id: string, body: FlagReportRequest): Promise<F
   return response.data;
 };
 
+// ── Report satisfaction rating (owner-only, 1–5 stars + optional comment) ──
+export interface ReportRating {
+  stars: number;
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// GET returns 204 No Content when the report is unrated → treat as null.
+export const getReportRating = async (id: string): Promise<ReportRating | null> => {
+  const response = await api.get<ReportRating>(`/reports/${id}/rating`);
+  return response.status === 204 || !response.data ? null : response.data;
+};
+
+export const upsertReportRating = async (
+  id: string,
+  stars: number,
+  comment?: string | null
+): Promise<ReportRating> => {
+  const response = await api.put<ReportRating>(`/reports/${id}/rating`, { stars, comment: comment ?? null });
+  return response.data;
+};
+
 // Quick scan via the pipeline: sessionId + leadIndex identify the lead from a Find Partners chat result
 export const quickScan = async (sessionId: string, leadIndex: number): Promise<ReportListItem> => {
   const response = await api.post<ReportListItem>(

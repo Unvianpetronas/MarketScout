@@ -15,7 +15,7 @@ import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
 import { updateProfile, changePassword } from "@/services/auth.service";
 import { getMyQuota } from "@/services/quota.service";
-import { getMyInvoices, cancelScheduledPlanChange } from "@/services/payment.service";
+import { getMyInvoices, cancelScheduledPlanChange, getSubscription, cancelSubscription, SubscriptionInfo } from "@/services/payment.service";
 import { QuotaStatus } from "@/types/quota";
 import { InvoiceSummary } from "@/types/payment";
 
@@ -71,6 +71,23 @@ export default function ProfilePage() {
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [notifications, setNotifications] = useState({ quotaAlert: true, reportComplete: true, marketing: false });
   const [cancellingPlanChange, setCancellingPlanChange] = useState(false);
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [cancellingSub, setCancellingSub] = useState(false);
+
+  const handleCancelSubscription = async () => {
+    if (!window.confirm(t("profile.cancelSubConfirm"))) return;
+    setCancellingSub(true);
+    try {
+      const res = await cancelSubscription();
+      setSubscription(res);
+      toast.success(t("profile.cancelSubSuccess", { date: formatBillingDate(res.currentPeriodEnd) }));
+      await refreshUser();
+    } catch {
+      toast.error(t("profile.cancelSubError"));
+    } finally {
+      setCancellingSub(false);
+    }
+  };
 
   const handleCancelPendingPlanChange = async () => {
     setCancellingPlanChange(true);
@@ -92,6 +109,7 @@ export default function ProfilePage() {
     }
     getMyQuota().then(setQuota).catch(() => null);
     getMyInvoices().then(setInvoices).catch(() => null);
+    getSubscription().then(setSubscription).catch(() => null);
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [user]);
 
@@ -296,7 +314,9 @@ export default function ProfilePage() {
                         <h2 className="text-xl font-extrabold text-gray-900 mt-3">{user?.planName
                           ? `${user.planName.charAt(0).toUpperCase()}${user.planName.slice(1)} ${t("nav.planSuffix")}`
                           : t("nav.freePlan")}</h2>
-                        <p className="text-sm text-gray-400 mt-0.5">{t("profile.nextCyclePrefix")} 28/10/2024</p>
+                        <p className="text-sm text-gray-400 mt-0.5">
+                          {t("profile.nextCyclePrefix")} {subscription?.currentPeriodEnd ? formatBillingDate(subscription.currentPeriodEnd) : "—"}
+                        </p>
                       </div>
                       <Link href="/pricing" className="flex items-center gap-2 px-4 py-2 gradient-brand text-white text-sm font-semibold rounded-xl hover:opacity-90">
                         <Zap className="w-4 h-4" /> {t("nav.upgrade")}
@@ -320,6 +340,15 @@ export default function ProfilePage() {
                           className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 hover:text-purple-900 shrink-0 disabled:opacity-50">
                           <XCircle className="w-3.5 h-3.5" /> {t("pricing.schedule.cancelPending")}
                         </button>
+                      </div>
+                    )}
+
+                    {subscription?.cancelAt && (
+                      <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
+                        <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+                        <p className="text-sm text-amber-800">
+                          {t("profile.subCanceledBanner", { date: formatBillingDate(subscription.currentPeriodEnd) })}
+                        </p>
                       </div>
                     )}
 
@@ -349,9 +378,10 @@ export default function ProfilePage() {
                     )}
 
                     <div className="flex gap-3 mt-4 pt-4 border-t border-[rgba(16,22,43,0.06)]">
-                      <button onClick={() => toast.info(t("profile.comingSoon"))}
-                        className="px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50">
-                        {t("profile.cancelSub")}
+                      <button onClick={handleCancelSubscription}
+                        disabled={cancellingSub || !subscription?.paid || !!subscription?.cancelAt}
+                        className="px-4 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {subscription?.cancelAt ? t("profile.cancelSubDone") : t("profile.cancelSub")}
                       </button>
                       <Link href="/checkout?plan=topup"
                         className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700">
