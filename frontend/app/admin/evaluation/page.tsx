@@ -155,7 +155,7 @@ function EvaluationBody({ data }: { data: EvaluationAnalytics }) {
               <StackedSegmentBar segments={flagStatusSegments} />
               {data.sanctionsFalsePositive > 0 && (
                 <p className="text-xs text-[#8b93a3] mt-4 leading-relaxed">
-                  Có <span className="font-bold text-[#c1483d]">{data.sanctionsFalsePositive}</span> khiếu nại "báo nhầm trừng phạt" —
+                  Có <span className="font-bold text-[#c1483d]">{data.sanctionsFalsePositive}</span> khiếu nại &quot;báo nhầm trừng phạt&quot; —
                   cần rà soát ngưỡng sàng lọc sanctions để giảm false-positive.
                 </p>
               )}

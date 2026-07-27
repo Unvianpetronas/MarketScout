@@ -12,11 +12,10 @@ export function DonutChart({
   centerLabel: string;
 }) {
   const total = segments.reduce((s, x) => s + x.value, 0) || 1;
-  let acc = 0;
-  const stops = segments.map((s) => {
-    const start = (acc / total) * 100;
-    acc += s.value;
-    const end = (acc / total) * 100;
+  const stops = segments.map((s, i) => {
+    const before = segments.slice(0, i).reduce((a, x) => a + x.value, 0);
+    const start = (before / total) * 100;
+    const end = ((before + s.value) / total) * 100;
     return `${s.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
   });
   const gradient = `conic-gradient(${stops.join(", ")})`;
