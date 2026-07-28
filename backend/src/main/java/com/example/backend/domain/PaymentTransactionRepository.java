@@ -30,10 +30,10 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
            "WHERE t.status = 'completed' GROUP BY t.provider ORDER BY SUM(t.amountVnd) DESC")
     List<Object[]> sumCompletedByProvider();
 
-    @Query("SELECT p.name, COALESCE(SUM(t.amountVnd), 0) FROM PaymentTransaction t " +
-           "JOIN t.invoice i JOIN i.user u LEFT JOIN u.plan p " +
-           "WHERE t.status = 'completed' GROUP BY p.name ORDER BY SUM(t.amountVnd) DESC")
-    List<Object[]> sumCompletedByPlan();
+    // Revenue grouped by plan lives in PlanPurchaseRepository now. Grouping it
+    // here meant joining u.plan — the payer's CURRENT plan — which reported
+    // quota top-ups as plan revenue and moved a customer's whole payment
+    // history onto whichever plan they upgraded to.
 
     // Rows: [fullName, email, sumAmount, planName]
     @Query("SELECT u.fullName, u.email, COALESCE(SUM(t.amountVnd), 0), p.name FROM PaymentTransaction t " +
