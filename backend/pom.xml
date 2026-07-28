@@ -236,6 +236,15 @@
 			<version>1.18.3</version>
 		</dependency>
 
+		<!-- Apache POI — .xlsx export for the admin revenue report. Built here
+		     rather than in the browser so the workbook covers every
+		     transaction, not just the page currently loaded. -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>5.4.1</version>
+		</dependency>
+
 		<!-- OpenPDF — generates the report PDF export (free iText 4 fork, LGPL/MPL) -->
 		<dependency>
 			<groupId>com.github.librepdf</groupId>

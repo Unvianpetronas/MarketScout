@@ -8,15 +8,21 @@ import com.example.backend.domain.QuotaTopupRepository;
 import com.example.backend.domain.PaymentTransactionRepository;
 import com.example.backend.domain.UsersRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -40,14 +46,71 @@ public class AdminRevenueController {
     /** Bucket name for credits bought outside a plan. */
     static final String REVENUE_LABEL_TOPUP = "Nạp quota lẻ";
 
+    /** Batch size when walking every transaction for the .xlsx export. */
+    private static final int EXPORT_PAGE_SIZE = 500;
+
     private final PaymentTransactionRepository txRepository;
     private final UsersRepository usersRepository;
     private final PlanPurchaseRepository planPurchaseRepository;
     private final QuotaTopupRepository quotaTopupRepository;
+    private final RevenueExcelExporter excelExporter;
 
     @GetMapping("/revenue")
     @Transactional(readOnly = true)
     public ResponseEntity<AdminDTO.RevenueAnalytics> getRevenue() {
+        return ResponseEntity.ok(buildAnalytics());
+    }
+
+    /**
+     * Full transaction history, newest first — backs "Xem tất cả", which
+     * previously had nowhere to go. The dashboard card only ever shows 8.
+     */
+    @GetMapping("/transactions")
+    @Transactional(readOnly = true)
+    public ResponseEntity<AdminDTO.TransactionPage> getTransactions(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size) {
+        int safeSize = Math.min(Math.max(size, 1), 200);
+        Page<PaymentTransaction> found =
+                txRepository.findAllWithUser(PageRequest.of(Math.max(page, 0), safeSize));
+        Map<UUID, String> boughtLabels = boughtLabelsFor(found.getContent());
+        List<AdminDTO.RecentTx> items = found.getContent().stream()
+                .map(t -> toRecentTx(t, boughtLabels))
+                .toList();
+        return ResponseEntity.ok(new AdminDTO.TransactionPage(items, found.getTotalElements()));
+    }
+
+    /**
+     * The whole report as .xlsx. Every transaction is included, not just the
+     * page the browser happens to be showing, so the file stands on its own.
+     */
+    @GetMapping("/revenue/export")
+    @Transactional(readOnly = true)
+    public ResponseEntity<byte[]> exportRevenue() {
+        AdminDTO.RevenueAnalytics analytics = buildAnalytics();
+
+        List<AdminDTO.RecentTx> all = new ArrayList<>();
+        int page = 0;
+        Page<PaymentTransaction> slice;
+        do {
+            slice = txRepository.findAllWithUser(PageRequest.of(page++, EXPORT_PAGE_SIZE));
+            Map<UUID, String> labels = boughtLabelsFor(slice.getContent());
+            slice.getContent().forEach(t -> all.add(toRecentTx(t, labels)));
+        } while (slice.hasNext());
+
+        byte[] workbook = excelExporter.build(analytics, all);
+        String filename = "marketscout-doanh-thu-"
+                + LocalDate.now(ZoneOffset.UTC) + ".xlsx";
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment().filename(filename).build().toString())
+                .body(workbook);
+    }
+
+    private AdminDTO.RevenueAnalytics buildAnalytics() {
         ZoneOffset utc = ZoneOffset.UTC;
         Instant now = Instant.now();
         YearMonth curMonth = YearMonth.now(utc);
@@ -125,10 +188,10 @@ public class AdminRevenueController {
                 .map(t -> toRecentTx(t, boughtLabels))
                 .toList();
 
-        return ResponseEntity.ok(new AdminDTO.RevenueAnalytics(
+        return new AdminDTO.RevenueAnalytics(
                 revenueThisMonth, revenueLastMonth, revenueThisYear, revenueAllTime, pendingFailed,
                 completedCount, failedCount, pendingCount, payingUsers, totalUsers,
-                revenueOverTime, revenueByPlan, revenueByProvider, topPayers, recentTransactions));
+                revenueOverTime, revenueByPlan, revenueByProvider, topPayers, recentTransactions);
     }
 
     /**

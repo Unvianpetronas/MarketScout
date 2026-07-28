@@ -1,5 +1,6 @@
 package com.example.backend.domain;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -52,4 +53,11 @@ public interface PaymentTransactionRepository extends JpaRepository<PaymentTrans
     // Recent transactions with customer eagerly fetched for DTO mapping.
     @Query("SELECT t FROM PaymentTransaction t JOIN FETCH t.invoice i JOIN FETCH i.user ORDER BY t.initiatedAt DESC")
     List<PaymentTransaction> findRecentWithUser(Pageable pageable);
+
+    // Same shape, paged — backs the full transaction list and the .xlsx export.
+    // countQuery is spelled out because a JOIN FETCH cannot be counted.
+    @Query(value = "SELECT t FROM PaymentTransaction t JOIN FETCH t.invoice i JOIN FETCH i.user "
+                 + "ORDER BY t.initiatedAt DESC",
+           countQuery = "SELECT COUNT(t) FROM PaymentTransaction t")
+    Page<PaymentTransaction> findAllWithUser(Pageable pageable);
 }

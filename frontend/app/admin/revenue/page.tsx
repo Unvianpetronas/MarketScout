@@ -13,44 +13,22 @@ import { SectionCard, TrendPill } from "@/components/admin/section-card";
 import { TrendAreaChart } from "@/components/admin/charts/trend-area-chart";
 import { DonutChart, DonutSegment } from "@/components/admin/charts/donut-chart";
 import { RankedBarList, RankedItem, InitialsAvatar } from "@/components/admin/charts/ranked-bar-list";
-import { getRevenueAnalytics, RevenueAnalytics } from "@/services/admin.service";
-
-const vnd = (n: number) => new Intl.NumberFormat("vi-VN").format(Math.round(n)) + " ₫";
-function vndCompact(n: number): string {
-  if (n >= 1e9) return (n / 1e9).toFixed(1).replace(".", ",") + "B ₫";
-  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(".", ",") + "M ₫";
-  if (n >= 1e3) return Math.round(n / 1e3) + "K ₫";
-  return Math.round(n) + " ₫";
-}
+import { getRevenueAnalytics, downloadRevenueReport, RevenueAnalytics } from "@/services/admin.service";
+import Link from "next/link";
+import { vnd, vndCompact, planColor, STATUS_META } from "./revenue-format";
 
 function pctChange(cur: number, prev: number): number | null {
   if (prev === 0) return cur > 0 ? 100 : null;
   return ((cur - prev) / prev) * 100;
 }
 
-function planColor(name: string): string {
-  const p = name.toLowerCase();
-  // Credits bought outside a plan are their own bucket, so they need their own
-  // colour — otherwise they share the grey used for unattributed revenue.
-  if (p.includes("quota")) return "#059669";
-  if (p.includes("enterprise")) return "#db2777";
-  if (p.includes("pro")) return "#7c3aed";
-  if (p.includes("starter")) return "#2563eb";
-  return "#8b93a3";
-}
-
 const PROVIDER_COLORS = ["#059669", "#2563eb", "#7c3aed", "#c98a2c"];
-
-const STATUS_META: Record<string, { label: string; color: string }> = {
-  completed: { label: "Thành công", color: "#059669" },
-  failed: { label: "Thất bại", color: "#c1483d" },
-  pending: { label: "Đang xử lý", color: "#c98a2c" },
-};
 
 export default function AdminRevenuePage() {
   const [data, setData] = useState<RevenueAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [range, setRange] = useState<"month" | "quarter" | "year">("month");
 
   const fetchData = async () => {
@@ -71,6 +49,18 @@ export default function AdminRevenuePage() {
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      await downloadRevenueReport();
+      toast.success("Đã xuất báo cáo .xlsx.");
+    } catch {
+      toast.error("Không xuất được báo cáo. Thử lại sau.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <AuthGuard requiredRole="ADMIN">
       <AdminShell active="revenue">
@@ -89,7 +79,7 @@ export default function AdminRevenuePage() {
                   { value: "year", label: "Năm nay" },
                 ]}
               />
-              <ExportButton />
+              <ExportButton onClick={handleExport} busy={isExporting} />
               <RefreshButton onClick={handleRefresh} spinning={isRefreshing} />
             </>
           }
@@ -221,7 +211,12 @@ function RevenueBody({ data }: { data: RevenueAnalytics }) {
       {/* Bottom row */}
       <div className="grid gap-5" style={{ gridTemplateColumns: "1.7fr 1fr" }}>
         <SectionCard title="Giao dịch gần đây"
-          headerRight={<span className="text-[13px] font-bold text-[#047857] cursor-pointer">Xem tất cả →</span>}>
+          headerRight={
+            <Link href="/admin/revenue/transactions"
+              className="text-[13px] font-bold text-[#047857] hover:underline">
+              Xem tất cả →
+            </Link>
+          }>
           {data.recentTransactions.length === 0 ? (
             <p className="text-sm text-[#8b93a3] py-4">Chưa có giao dịch.</p>
           ) : (

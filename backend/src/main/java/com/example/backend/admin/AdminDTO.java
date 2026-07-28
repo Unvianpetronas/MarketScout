@@ -86,6 +86,9 @@ public class AdminDTO {
     public record RecentTx(String customer, String email, String plan,
                            BigDecimal amount, String provider, String status, Instant date) {}
 
+    /** One page of the full transaction history behind "Xem tất cả". */
+    public record TransactionPage(List<RecentTx> items, long total) {}
+
     public record AdminUser(
             UUID id,
             String email,
