@@ -55,12 +55,12 @@ export function RefreshButton({ onClick, spinning }: { onClick: () => void; spin
   );
 }
 
-export function ExportButton({ onClick }: { onClick?: () => void }) {
+export function ExportButton({ onClick, busy = false }: { onClick?: () => void; busy?: boolean }) {
   return (
-    <button onClick={onClick}
-      className="flex items-center gap-2 px-4 h-11 rounded-xl bg-white border border-[rgba(16,22,43,0.08)] text-[13px] font-semibold text-[#10162b] shadow-sm hover:bg-[#faf9f6] transition-colors">
-      <Download className="w-4 h-4" />
-      Xuất báo cáo
+    <button onClick={onClick} disabled={busy}
+      className="flex items-center gap-2 px-4 h-11 rounded-xl bg-white border border-[rgba(16,22,43,0.08)] text-[13px] font-semibold text-[#10162b] shadow-sm hover:bg-[#faf9f6] transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+      <Download className={`w-4 h-4 ${busy ? "animate-pulse" : ""}`} />
+      {busy ? "Đang xuất…" : "Xuất báo cáo"}
     </button>
   );
 }

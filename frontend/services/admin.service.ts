@@ -261,6 +261,41 @@ export const getAnalyticsOverview = () =>
 export const getRevenueAnalytics = () =>
   api.get<RevenueAnalytics>("/admin/analytics/revenue").then(r => r.data);
 
+export interface TransactionPage { items: RecentTx[]; total: number; }
+
+/** Full transaction history — the dashboard card only shows the latest 8. */
+export const getTransactionPage = (page = 0, size = 25) =>
+  api.get<TransactionPage>("/admin/analytics/transactions", { params: { page, size } })
+    .then(r => r.data);
+
+/**
+ * Downloads the revenue report as .xlsx. The workbook is built server-side so
+ * it covers every transaction, not just the page currently loaded, and so no
+ * spreadsheet library has to ship to the browser.
+ */
+export async function downloadRevenueReport(): Promise<void> {
+  const res = await api.get("/admin/analytics/revenue/export", { responseType: "blob" });
+
+  // Prefer the filename the server chose; fall back to a dated one.
+  const disposition = res.headers["content-disposition"] as string | undefined;
+  const match = disposition?.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+  const filename = match ? decodeURIComponent(match[1])
+    : `marketscout-doanh-thu-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+  const url = URL.createObjectURL(res.data as Blob);
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    // Revoking immediately can cancel the download in some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  }
+}
+
 export const getEvaluationAnalytics = () =>
   api.get<EvaluationAnalytics>("/admin/analytics/evaluation").then(r => r.data);
 
