@@ -1,11 +1,13 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 
-// Pure-logic unit tests only for now (no React plugin / jsdom) — this
-// project runs on a bleeding-edge Next.js/React stack (see AGENTS.md) where
-// @vitejs/plugin-react's optional Babel-8 peer conflicts with an existing
-// Babel-7 devDependency. Component-rendering tests can be added once that's
-// resolved; this still covers real regressions in business logic.
+// No @vitejs/plugin-react on purpose: its optional Babel-8 peer conflicts with
+// an existing Babel-7 devDependency on this stack (see AGENTS.md). It is not
+// needed either — Vitest 4 transforms TSX with oxc, which picks up
+// "jsx": "react-jsx" from tsconfig.json and uses the automatic runtime. The
+// plugin only adds Fast Refresh and Babel plugins, neither of which matters
+// under test. (Setting `esbuild.jsx` here does nothing — oxc takes precedence
+// and Vitest warns that the esbuild options are ignored.)
 export default defineConfig({
   resolve: {
     alias: {
@@ -13,8 +15,10 @@ export default defineConfig({
     },
   },
   test: {
+    // Node by default (pure-logic suites). Component tests opt into jsdom with
+    // a `@vitest-environment jsdom` docblock, so they don't slow the rest down.
     environment: "node",
-    include: ["**/*.test.ts"],
+    include: ["**/*.test.ts", "**/*.test.tsx"],
     exclude: ["node_modules", ".next"],
   },
 });

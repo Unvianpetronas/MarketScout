@@ -18,7 +18,12 @@ export function DonutChart({
     const end = ((before + s.value) / total) * 100;
     return `${s.color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
   });
-  const gradient = `conic-gradient(${stops.join(", ")})`;
+  // CSS requires at least two colour stops in a gradient, so a one-segment
+  // donut (only one plan earning, or every report on the same status) produced
+  // an invalid `conic-gradient(<one stop>)` that browsers drop entirely — the
+  // ring rendered blank. A single category is a solid ring.
+  const gradient =
+    stops.length === 1 ? segments[0].color : `conic-gradient(${stops.join(", ")})`;
 
   return (
     <div className="flex items-center gap-5">
