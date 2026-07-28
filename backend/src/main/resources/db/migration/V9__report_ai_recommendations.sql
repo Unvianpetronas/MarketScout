@@ -1,0 +1,21 @@
+-- ─────────────────────────────────────────────────────────────────────
+-- reports.ai_recommendations — close a schema drift found while
+-- introducing Flyway (2026-07-28).
+--
+-- WHY: Report.java has mapped `@Column(name = "ai_recommendations")` for a
+-- while, but no SQL file in this repository ever created that column. The
+-- live database has it only because it was added by hand with psql and
+-- never written down, so any rebuilt environment (a fresh Railway volume,
+-- a teammate's local Postgres) would be missing it and every read of
+-- `reports` would fail with "column reports.ai_recommendations does not
+-- exist".
+--
+-- It went unnoticed because the backend tests run on H2 with
+-- ddl-auto=create-drop, which generates the schema from the entities — so
+-- the column always exists under test and never exists from the repo.
+--
+-- Idempotent, and harmless on the live database where the column is
+-- already present.
+-- ─────────────────────────────────────────────────────────────────────
+
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS ai_recommendations text;

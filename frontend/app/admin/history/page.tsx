@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { History } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
@@ -26,7 +26,7 @@ export default function AdminHistoryPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const size = 30;
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       const res = await getAuditLogs(page, size);
       setLogs(res.logs);
@@ -36,9 +36,9 @@ export default function AdminHistoryPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, t]);
 
-  useEffect(() => { Promise.resolve().then(fetchLogs); }, [page]);
+  useEffect(() => { Promise.resolve().then(fetchLogs); }, [fetchLogs]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

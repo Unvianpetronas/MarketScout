@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Users, Ban,
   Search, Download, UserPlus,
@@ -46,7 +46,7 @@ export default function AdminCustomersPage() {
   const [quotaValue, setQuotaValue] = useState("50");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const res = await getAdminUsers(page, 20, searchQuery);
       setUsers(res.users);
@@ -56,9 +56,9 @@ export default function AdminCustomersPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, searchQuery, t]);
 
-  useEffect(() => { Promise.resolve().then(fetchUsers); }, [page, searchQuery]);
+  useEffect(() => { Promise.resolve().then(fetchUsers); }, [fetchUsers]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

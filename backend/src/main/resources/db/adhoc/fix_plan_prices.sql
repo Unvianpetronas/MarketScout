@@ -12,10 +12,15 @@
 -- possibly-stale ("hệ thống cũ"); it's the same table the working
 -- /admin/billing panel already reads/writes successfully.
 --
--- HOW TO RUN (PostgreSQL):
---   psql "$DB_URL" -f backend/src/main/resources/db/fix_plan_prices.sql
--- Idempotent — safe to re-run. Prefer running this over /admin/billing if
--- you want it scripted; either works since they hit the same table.
+-- ⚠️ NOT a migration, and NOT safe to re-run blindly. This is an
+-- unconditional UPDATE: it overwrites whatever price is currently in the
+-- table, including one an admin has since set via /admin/billing. It lives
+-- in db/adhoc/ (not db/migration/) precisely so Flyway never applies it and
+-- no deploy can silently reset live prices back to these seed values.
+--
+-- HOW TO RUN (PostgreSQL) — only for a fresh environment whose `plans` rows
+-- still hold the wrong placeholder seed data:
+--   psql "$DB_URL" -f backend/src/main/resources/db/adhoc/fix_plan_prices.sql
 -- ─────────────────────────────────────────────────────────────────────
 
 UPDATE plans SET price_vnd = 2000000, price_usd = 80  WHERE lower(name) = 'starter';

@@ -383,7 +383,7 @@ function TransactionInfoCard({
       }
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [report.id, report.p7VerifiedContractId, report.entityName]);
+  }, [report.id, report.p7VerifiedContractId, report.entityName, t]);
 
   const saveSelfReport = async (hasWrittenContract: boolean | null) => {
     setSaving(true);
@@ -555,6 +555,9 @@ export default function ReportDetailPage({ params }: Props) {
     load();
 
     return () => { cancelled = true; clearTimeout(timer); };
+    // Keyed on `id` only: adding `t` (used solely for the error toast) would
+    // tear down and restart the 3s polling loop on every language toggle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   // Generate AI next-step recommendations once the report has loaded.

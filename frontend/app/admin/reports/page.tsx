@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Search, FileWarning, FileText, AlertTriangle,
@@ -29,7 +29,7 @@ function FlagsQueue() {
   const [isLoading, setIsLoading] = useState(true);
   const [actingId, setActingId] = useState<string | null>(null);
 
-  const fetchFlags = async () => {
+  const fetchFlags = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await getReportFlags(0, 50, statusFilter);
@@ -40,9 +40,9 @@ function FlagsQueue() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter]);
 
-  useEffect(() => { Promise.resolve().then(fetchFlags); }, [statusFilter]);
+  useEffect(() => { Promise.resolve().then(fetchFlags); }, [fetchFlags]);
 
   const handleResolve = async (id: string, status: "resolved" | "dismissed") => {
     setActingId(id);
@@ -135,7 +135,7 @@ function ReportsTable() {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await getAdminReports({ page, size: 20, entityName: search || undefined });
@@ -146,9 +146,9 @@ function ReportsTable() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, search]);
 
-  useEffect(() => { Promise.resolve().then(fetchReports); }, [page, search]);
+  useEffect(() => { Promise.resolve().then(fetchReports); }, [fetchReports]);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

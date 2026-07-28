@@ -3,9 +3,9 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
-  Search, Globe, CheckCircle2, Clock, XCircle, Zap, Shield,
-  HelpCircle, ChevronRight, AlertTriangle, Building2, ExternalLink,
-  MapPin, Star, ChevronDown, ShieldCheck, ShieldAlert, Percent,
+  Search, Globe, CheckCircle2, XCircle, Zap, Shield,
+  ChevronRight, Building2,
+  ChevronDown, ShieldCheck, ShieldAlert, Percent,
   FileSignature, DollarSign, Sparkles, FileText, X as XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -17,8 +17,7 @@ import { getMyQuota } from "@/services/quota.service";
 import { QuotaStatus } from "@/types/quota";
 import { getReports } from "@/services/report.service";
 import { streamPipelineMessage } from "@/services/chat.service";
-import { ReportListItem, isProcessingStatus } from "@/types/report";
-import { useAuth } from "@/providers/auth-provider";
+import { ReportListItem } from "@/types/report";
 import { useLanguage } from "@/providers/language-provider";
 
 const COUNTRIES = [
@@ -92,7 +91,6 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
 function VerifyContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user } = useAuth();
   const { t } = useLanguage();
   const [query, setQuery] = useState(searchParams.get("q") || "");
   const [country, setCountry] = useState(searchParams.get("country") || "");
@@ -194,8 +192,6 @@ function VerifyContent() {
       }
     );
   };
-
-  const userInitials = (user?.fullName || user?.email || "U").split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase();
 
   return (
     <AuthGuard>
@@ -538,7 +534,6 @@ function VerifyContent() {
               ) : (
                 <div className="space-y-3 stagger">
                   {recentReports.map((report) => {
-                    const isProcessing = isProcessingStatus(report.status);
                     return (
                       <div key={report.id}
                         className="bg-white rounded-2xl border border-[rgba(16,22,43,0.06)] p-4 shadow-[0_2px_20px_rgba(16,22,43,0.03)] card-hover group flex items-center gap-4">

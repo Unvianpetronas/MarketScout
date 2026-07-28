@@ -16,6 +16,27 @@ jobs:
     defaults:
       run:
         working-directory: backend
+
+    # Real PostgreSQL for SchemaMigrationPostgresTest, which applies the Flyway
+    # migrations to an empty database and checks the result against the JPA
+    # entities. Everything else here is a Mockito unit test, so without this
+    # nothing would ever execute a migration or catch schema drift. Supplied as
+    # a service rather than via Testcontainers, whose bundled docker-java
+    # cannot negotiate an API version Docker Engine 29 accepts.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: marketscout_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -27,6 +48,12 @@ jobs:
           cache: maven
 
       - name: Run tests
+        # The schema test skips itself when this is unset, so it must stay set
+        # here — otherwise the migration check silently stops running.
+        env:
+          MARKETSCOUT_TEST_DB_URL: jdbc:postgresql://localhost:5432/marketscout_test
+          MARKETSCOUT_TEST_DB_USER: postgres
+          MARKETSCOUT_TEST_DB_PASSWORD: postgres
         run: ./mvnw -B test
 
       - name: Build jar

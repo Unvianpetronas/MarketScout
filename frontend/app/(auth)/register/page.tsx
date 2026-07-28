@@ -50,7 +50,7 @@ export default function RegisterPage() {
   const {
     register,
     handleSubmit,
-    watch,
+    getValues,
     formState: { errors },
   } = useForm<RegisterFormData>();
 
@@ -220,7 +220,7 @@ export default function RegisterPage() {
               type="password"
               {...register("confirmPassword", {
                 required: "Please confirm your password",
-                validate: (val) => val === watch("password") || "Passwords do not match",
+                validate: (val) => val === getValues("password") || "Passwords do not match",
               })}
               placeholder="••••••••"
               className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#059669] focus:ring-2 focus:ring-[#059669]/20 transition-all"

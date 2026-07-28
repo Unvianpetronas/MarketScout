@@ -58,11 +58,20 @@ logs/
 marketscout-system-design-guide.txt
 quota-service-explanation.txt
 auth-explanation.txt
+# Ignore stray SQL dumps/scratch queries, but NEVER the schema migrations —
+# they define production and must ship in the jar. Previously only
+# payment_tables.sql was excepted, so contract_tables / subscription_lifecycle
+# / report_ratings and the whole baseline schema were absent from a fresh
+# clone: Railway built a jar whose `optional:classpath:db/...` scripts did not
+# exist, and those tables/columns were silently never provisioned.
 *.sql
-# Exception: this schema script must ship in the jar (loaded via
-# spring.sql.init.schema-locations=classpath:db/payment_tables.sql).
-# Without it, the backend crashes on startup → Railway health check fails.
-!backend/src/main/resources/db/payment_tables.sql
+!backend/src/main/resources/db/migration/
+!backend/src/main/resources/db/migration/*.sql
+!backend/src/main/resources/db/adhoc/
+!backend/src/main/resources/db/adhoc/*.sql
+# ...but never an environment-specific seed. This repo is public, so real
+# admin emails + BCrypt hashes must stay local (see seed_admins.example.sql).
+*.local.sql
 *.txt
 *.md
 *.pdf
