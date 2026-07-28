@@ -30,6 +30,9 @@ function pctChange(cur: number, prev: number): number | null {
 
 function planColor(name: string): string {
   const p = name.toLowerCase();
+  // Credits bought outside a plan are their own bucket, so they need their own
+  // colour — otherwise they share the grey used for unattributed revenue.
+  if (p.includes("quota")) return "#059669";
   if (p.includes("enterprise")) return "#db2777";
   if (p.includes("pro")) return "#7c3aed";
   if (p.includes("starter")) return "#2563eb";
@@ -195,7 +198,7 @@ function RevenueBody({ data }: { data: RevenueAnalytics }) {
           <TrendAreaChart values={data.revenueOverTime.map((m) => m.amount)} labels={data.revenueOverTime.map((m) => m.label)} />
         </SectionCard>
 
-        <SectionCard title="Doanh thu theo gói">
+        <SectionCard title="Doanh thu theo gói & quota">
           {planSegments.length === 0 ? (
             <p className="text-sm text-[#8b93a3] py-4">Chưa có dữ liệu.</p>
           ) : (
