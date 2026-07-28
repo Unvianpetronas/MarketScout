@@ -70,10 +70,14 @@
 		<!-- Flyway — versioned, checksummed schema migrations. Replaces the
 		     spring.sql.init script list, which re-ran every boot with
 		     continue-on-error=true and so could silently leave the schema
-		     half-migrated with no record of what had actually been applied. -->
+		     half-migrated with no record of what had actually been applied.
+		     NOTE: must be the starter, not bare flyway-core. Spring Boot 4
+		     moved Flyway auto-configuration into its own module, so with only
+		     flyway-core on the classpath every spring.flyway.* property is
+		     silently ignored and no migration ever runs. -->
 		<dependency>
-			<groupId>org.flywaydb</groupId>
-			<artifactId>flyway-core</artifactId>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.flywaydb</groupId>
@@ -203,26 +207,14 @@
 			<scope>test</scope>
 		</dependency>
 
-		<!-- Testcontainers — the rest of the suite runs on H2 in MSSQLServer
-		     mode while production is PostgreSQL, so Postgres-only behaviour
-		     (jsonb, bytea, gen_random_uuid, lower() on non-text) and the
-		     Flyway migrations themselves were never actually exercised.
-		     These give a throwaway real Postgres for exactly that. -->
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-testcontainers</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>postgresql</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.testcontainers</groupId>
-			<artifactId>junit-jupiter</artifactId>
-			<scope>test</scope>
-		</dependency>
+		<!-- No Testcontainers on purpose: its bundled docker-java cannot talk
+		     to Docker Engine 29 (negotiates API 1.32, minimum accepted is
+		     1.40), so the container never starts. SchemaMigrationPostgresTest
+		     instead points at a Postgres supplied by the environment —
+		     `services: postgres` in CI, a plain `docker run` locally — which
+		     keeps the migration check deterministic and dependency-free. -->
+		<!-- (postgresql JDBC driver above is promoted to test scope by the
+		     runtime scope already on the classpath.) -->
 
 		<!-- ══════════════════════════════════════════════════
              NHÓM 8: PHASE 2 — BỎ COMMENT KHI CẦN

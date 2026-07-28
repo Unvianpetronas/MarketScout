@@ -53,9 +53,12 @@
 --
 -- Toàn bộ chạy trong 1 transaction — lỗi ở bất kỳ đâu thì KHÔNG có gì
 -- được ghi vào DB (rollback toàn bộ).
+--
+-- BEGIN/COMMIT tường minh đã được BỎ khi chuyển sang Flyway: Flyway tự bọc
+-- mỗi migration trong một transaction riêng, nên BEGIN lồng nhau sẽ cảnh báo
+-- và COMMIT giữa file sẽ commit sớm transaction của Flyway, làm mất luôn khả
+-- năng rollback. Tính nguyên tử vẫn được giữ, chỉ là do Flyway quản lý.
 -- ============================================================
-
-BEGIN;
 
 -- gen_random_uuid() có sẵn từ PostgreSQL 13 (module pgcrypto).
 -- Một số managed Postgres không cho phép CREATE EXTENSION với role
@@ -908,9 +911,6 @@ SET pillar_weights = EXCLUDED.pillar_weights,
 --   2. Điền email thật + hash BCrypt tự sinh
 --   3. psql "$DB_URL" -f db/adhoc/seed_admins.local.sql
 -- ============================================================
-
-
-COMMIT;
 
 
 -- ============================================================
