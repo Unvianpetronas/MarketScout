@@ -39,6 +39,8 @@ public class SystemSurveyController {
     /** Users below this many reports haven't used the product enough to judge it. */
     static final long MIN_REPORTS_TO_ASK = 3;
 
+    static final String ROLE_ADMIN = "admin";
+
     private final SystemRatingRepository ratingRepository;
     private final ReportRepository reportRepository;
     private final UsersRepository usersRepository;
@@ -63,9 +65,19 @@ public class SystemSurveyController {
     public ResponseEntity<EligibilityResponse> eligibility(
             @RequestHeader("Authorization") String authHeader) {
         UUID userId = extractUserId(authHeader);
+        // Staff rating their own product is not usability evidence — it is
+        // self-assessment, and mixing it into the SUS mean quietly invalidates
+        // the number for anyone who asks where the responses came from.
+        if (ROLE_ADMIN.equalsIgnoreCase(requireUser(userId).getRole())) {
+            return ResponseEntity.ok(new EligibilityResponse(false, 0));
+        }
         if (ratingRepository.existsByUser_Id(userId)) {
             return ResponseEntity.ok(new EligibilityResponse(false, 0));
         }
+        // Counts reports in any status on purpose: someone whose three runs all
+        // FAILED still experienced the software, and they are the most worth
+        // hearing from. Counting only DONE would survey just the users who got
+        // a good result — a self-selected sample.
         long reports = reportRepository.countByUserId(userId);
         long needed = Math.max(0, MIN_REPORTS_TO_ASK - reports);
         return ResponseEntity.ok(new EligibilityResponse(needed == 0, needed));
@@ -77,6 +89,13 @@ public class SystemSurveyController {
             @RequestHeader("Authorization") String authHeader,
             @Valid @RequestBody SubmitRequest req) {
         UUID userId = extractUserId(authHeader);
+        Users user = requireUser(userId);
+        // Enforced here too, not just in eligibility(): that endpoint only tells
+        // the client whether to render the modal, so it is a hint, not a gate.
+        if (ROLE_ADMIN.equalsIgnoreCase(user.getRole())) {
+            throw new AppException(AppException.ErrorCode.BAD_REQUEST,
+                    "Tài khoản quản trị không tham gia khảo sát đánh giá hệ thống.");
+        }
         // Not an upsert: SUS measures a first impression of usability, and
         // letting people revise it turns the score into whatever they last felt.
         if (ratingRepository.existsByUser_Id(userId)) {
@@ -88,7 +107,7 @@ public class SystemSurveyController {
         }
 
         SystemRating rating = new SystemRating();
-        rating.setUser(requireUser(userId));
+        rating.setUser(user);
         rating.applyAnswers(answers);
         rating.setComment(req.comment() != null && !req.comment().isBlank() ? req.comment().trim() : null);
         ratingRepository.save(rating);

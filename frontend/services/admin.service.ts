@@ -119,6 +119,8 @@ export interface SusItem {
 }
 export interface SusEntry {
   score: number | null;
+  // The respondent's ten raw 1–5 answers in question order; empty for a dismissal.
+  answers: number[];
   comment: string | null;
   userEmail: string;
   createdAt: string;

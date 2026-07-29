@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Target, Edit3, Flag, Star } from "lucide-react";
+import { Target, Edit3, Flag, Star, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { AdminShell } from "@/components/admin/admin-shell";
@@ -10,7 +10,7 @@ import { StatCard } from "@/components/admin/stat-card";
 import { SectionCard } from "@/components/admin/section-card";
 import { StackedSegmentBar, StackSegment } from "@/components/admin/charts/stacked-segment-bar";
 import { RankedBarList, RankedItem } from "@/components/admin/charts/ranked-bar-list";
-import { getEvaluationAnalytics, EvaluationAnalytics, Bucket } from "@/services/admin.service";
+import { getEvaluationAnalytics, EvaluationAnalytics, Bucket, SusEntry } from "@/services/admin.service";
 
 const CONFIDENCE_META: Record<string, { label: string; color: string }> = {
   HIGH: { label: "Cao", color: "#059669" },
@@ -242,20 +242,14 @@ function EvaluationBody({ data }: { data: EvaluationAnalytics }) {
         </SectionCard>
       </div>
 
-      {/* Recent SUS responses with comments */}
+      {/* Recent SUS responses — each one expands to the respondent's ten
+          answers, so a bad score can be traced to the questions that caused it
+          rather than only being read as an aggregate. */}
       {data.sus.recentResponses.length > 0 && (
         <SectionCard title="Phản hồi SUS gần đây">
           <div className="divide-y divide-[#f0f1f4]">
             {data.sus.recentResponses.map((r, i) => (
-              <div key={i} className="py-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[13px] font-bold" style={{ color: susColor(r.score ?? 0, data.sus.benchmark) }}>
-                    {r.score != null ? r.score.toFixed(0) : "—"}/100
-                  </span>
-                </div>
-                {r.comment && <p className="text-[13px] text-[#5b6474] mb-1">{r.comment}</p>}
-                <p className="text-[11px] text-[#8b93a3]">{r.userEmail} · {new Date(r.createdAt).toLocaleString("vi-VN")}</p>
-              </div>
+              <SusResponseRow key={i} entry={r} benchmark={data.sus.benchmark} />
             ))}
           </div>
         </SectionCard>
@@ -284,6 +278,72 @@ function EvaluationBody({ data }: { data: EvaluationAnalytics }) {
           </div>
         )}
       </SectionCard>
+    </div>
+  );
+}
+
+/**
+ * One SUS respondent, collapsed to their score until clicked. Expanding shows
+ * all ten answers with each item's normalised contribution, which is the only
+ * way to tell *why* someone scored the product low — the aggregate can't.
+ */
+function SusResponseRow({ entry, benchmark }: { entry: SusEntry; benchmark: number }) {
+  const [open, setOpen] = useState(false);
+  const hasAnswers = entry.answers.length === SUS_ITEM_LABEL.length;
+
+  return (
+    <div className="py-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={!hasAnswers}
+        aria-expanded={open}
+        className="w-full flex items-center gap-2 text-left disabled:cursor-default"
+      >
+        <span className="text-[13px] font-bold" style={{ color: susColor(entry.score ?? 0, benchmark) }}>
+          {/* One decimal, matching the headline average — rounding to a whole
+              number here made a single response read as 58 next to a 57.5 mean. */}
+          {entry.score != null ? entry.score.toFixed(1) : "—"}/100
+        </span>
+        <span className="text-[11px] text-[#8b93a3]">
+          {entry.userEmail} · {new Date(entry.createdAt).toLocaleString("vi-VN")}
+        </span>
+        {hasAnswers && (
+          <ChevronDown
+            className={`w-3.5 h-3.5 text-[#8b93a3] ml-auto shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        )}
+      </button>
+
+      {entry.comment && <p className="text-[13px] text-[#5b6474] mt-1">{entry.comment}</p>}
+
+      {open && hasAnswers && (
+        <div className="mt-3 space-y-1.5 border-l-2 border-[#f0f1f4] pl-3">
+          {SUS_ITEM_LABEL.map((label, idx) => {
+            const answer = entry.answers[idx];
+            // Odd items (index 0, 2, …) are positively worded and contribute
+            // answer-1; even ones are negative and contribute 5-answer.
+            const contribution = (idx % 2 === 0 ? answer - 1 : 5 - answer) / 4 * 100;
+            return (
+              <div key={label} className="flex items-center gap-2">
+                <span className="text-[12px] text-[#5b6474] flex-1 min-w-0 truncate">{label}</span>
+                <span
+                  className="text-[11px] font-bold w-11 h-6 rounded-md flex items-center justify-center shrink-0"
+                  style={{
+                    color: susColor(contribution, benchmark),
+                    background: `${susColor(contribution, benchmark)}1a`,
+                  }}
+                >
+                  {answer}/5
+                </span>
+                <span className="text-[11px] text-[#8b93a3] w-14 text-right shrink-0">
+                  {contribution.toFixed(0)}/100
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

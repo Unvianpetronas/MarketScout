@@ -38,6 +38,13 @@ class SystemSurveyControllerTest {
     private static final UUID USER_ID = UUID.randomUUID();
     private static final String AUTH = "Bearer token";
 
+    private static Users userWithRole(String role) {
+        Users u = new Users();
+        u.setId(USER_ID);
+        u.setRole(role);
+        return u;
+    }
+
     @BeforeEach
     void setUp() {
         controller = new SystemSurveyController(ratingRepository, reportRepository, usersRepository, jwtService);
@@ -84,10 +91,56 @@ class SystemSurveyControllerTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    // The admin page reads an individual response through answers(); a
+    // dismissal stores none, so it must come back empty rather than a list of
+    // nulls that would render as blank answer chips.
+    @Test
+    void answers_returnsAllTenInQuestionOrder_andEmptyForADismissal() {
+        SystemRating submitted = new SystemRating();
+        submitted.applyAnswers(new short[]{5, 1, 4, 2, 5, 1, 4, 2, 5, 1});
+        assertThat(submitted.answers())
+                .containsExactly((short) 5, (short) 1, (short) 4, (short) 2, (short) 5,
+                        (short) 1, (short) 4, (short) 2, (short) 5, (short) 1);
+
+        SystemRating dismissed = new SystemRating();
+        dismissed.setStatus(SystemRating.STATUS_DISMISSED);
+        assertThat(dismissed.answers()).isEmpty();
+    }
+
     // ── eligibility ──────────────────────────────────────────────────────
+
+    // Staff rating their own product is self-assessment, not usability evidence.
+    @Test
+    void eligibility_adminAccount_isNeverAsked() {
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(userWithRole("admin")));
+
+        var body = controller.eligibility(AUTH).getBody();
+
+        assertThat(body).isNotNull();
+        assertThat(body.eligible()).isFalse();
+        verifyNoInteractions(reportRepository, ratingRepository);
+    }
+
+    // eligibility() only tells the client whether to render the modal, so the
+    // real gate has to be on the write path.
+    @Test
+    void submit_adminAccount_throws_evenIfItBypassesTheModal() {
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(userWithRole("admin")));
+
+        var req = new SystemSurveyController.SubmitRequest(
+                List.of((short) 3, (short) 3, (short) 3, (short) 3, (short) 3,
+                        (short) 3, (short) 3, (short) 3, (short) 3, (short) 3),
+                null);
+
+        assertThatThrownBy(() -> controller.submit(AUTH, req))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("quản trị");
+        verify(ratingRepository, never()).save(any());
+    }
 
     @Test
     void eligibility_belowReportThreshold_isNotEligible() {
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(userWithRole("user")));
         when(ratingRepository.existsByUser_Id(USER_ID)).thenReturn(false);
         when(reportRepository.countByUserId(USER_ID)).thenReturn(1L);
 
@@ -100,6 +153,7 @@ class SystemSurveyControllerTest {
 
     @Test
     void eligibility_atThreshold_isEligible() {
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(userWithRole("user")));
         when(ratingRepository.existsByUser_Id(USER_ID)).thenReturn(false);
         when(reportRepository.countByUserId(USER_ID)).thenReturn(3L);
 
@@ -114,6 +168,7 @@ class SystemSurveyControllerTest {
     // — the whole point of asking at most once.
     @Test
     void eligibility_alreadyAnsweredOrDismissed_isNotEligible_withoutCountingReports() {
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(userWithRole("user")));
         when(ratingRepository.existsByUser_Id(USER_ID)).thenReturn(true);
 
         var body = controller.eligibility(AUTH).getBody();
@@ -174,6 +229,7 @@ class SystemSurveyControllerTest {
 
     @Test
     void submit_secondTime_throws() {
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(userWithRole("user")));
         when(ratingRepository.existsByUser_Id(USER_ID)).thenReturn(true);
 
         var req = new SystemSurveyController.SubmitRequest(
