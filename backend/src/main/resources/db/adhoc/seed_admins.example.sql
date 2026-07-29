@@ -32,3 +32,23 @@ FROM (VALUES
     ('admin2@example.invalid', '$2b$10$REPLACE_WITH_YOUR_OWN_BCRYPT_HASH_______________________', 'MarketScout Admin 2')
 ) AS v(email, password_hash, full_name)
 ON CONFLICT (email) DO NOTHING;
+
+-- Dòng subscription tương ứng. Đăng ký qua UI (UserService.register) luôn tạo
+-- dòng này; seed thẳng vào `users` thì trước đây bỏ sót, nên tài khoản admin có
+-- plan_id trả phí mà không có chu kỳ thanh toán nào. Các màn hình đọc
+-- users.plan vẫn hiển thị đúng, còn phần đọc `subscriptions` thì coi như
+-- không có gói — bảng giá bị lệch đúng vì vậy.
+--
+-- Idempotent: chỉ chèn cho admin nào chưa có subscription active.
+INSERT INTO subscriptions (
+    user_id, plan_id, status, billing_cycle,
+    current_period_start, current_period_end
+)
+SELECT u.id, u.plan_id, 'active', 'monthly', NOW(), NOW() + INTERVAL '1 month'
+FROM users u
+WHERE u.role = 'admin'
+  AND u.plan_id IS NOT NULL
+  AND NOT EXISTS (
+      SELECT 1 FROM subscriptions s
+      WHERE s.user_id = u.id AND s.status = 'active'
+  );

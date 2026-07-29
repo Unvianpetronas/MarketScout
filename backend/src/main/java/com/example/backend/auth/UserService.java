@@ -230,12 +230,19 @@ public class UserService {
         Users user = usersRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        // Latest-ending active subscription, not whatever the DB returned first —
+        // an unordered findFirst answered differently per request when a user had
+        // more than one active row. Accounts seeded straight into `users` have no
+        // row at all, so fall back to cycle_reset_at instead of rendering the
+        // pending-change banner with an empty date.
         java.time.Instant pendingPlanEffectiveAt = null;
         if (user.getPendingPlan() != null) {
             pendingPlanEffectiveAt = subscriptionRepository.findByUser_IdAndStatus(user.getId(), "active")
-                    .stream().findFirst()
+                    .stream()
                     .map(com.example.backend.domain.Subscription::getCurrentPeriodEnd)
-                    .orElse(null);
+                    .filter(java.util.Objects::nonNull)
+                    .max(java.util.Comparator.naturalOrder())
+                    .orElse(user.getCycleResetAt());
         }
 
         return AuthDTO.MeResponse.builder()

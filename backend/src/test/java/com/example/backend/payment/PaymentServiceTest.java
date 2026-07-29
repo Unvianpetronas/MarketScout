@@ -35,6 +35,7 @@ class PaymentServiceTest {
     @Mock private PlanPurchaseRepository planPurchaseRepository;
     @Mock private PaymentSettingsRepository paymentSettingsRepository;
     @Mock private PaymentEmailService paymentEmailService;
+    @Mock private SubscriptionEmailService subscriptionEmailService;
 
     private PaymentProperties props;
     private PaymentService service;
@@ -61,7 +62,7 @@ class PaymentServiceTest {
         service = new PaymentService(usersRepository, invoiceRepository, transactionRepository,
                 vietqrRepository, topupRepository, billingEventRepository, planRepository,
                 subscriptionRepository, planPurchaseRepository, props, paymentSettingsRepository,
-                new ObjectMapper(), paymentEmailService);
+                new ObjectMapper(), paymentEmailService, subscriptionEmailService);
     }
 
     // ── createTopup ────────────────────────────────────────────────────
@@ -405,6 +406,7 @@ class PaymentServiceTest {
         Plan pro = new Plan();
         pro.setId(2);
         pro.setName("pro");
+        user.setPlan(starter);
         Instant periodEnd = Instant.now().plusSeconds(86400 * 10);
         Subscription active = Subscription.builder().status("active").plan(starter).currentPeriodEnd(periodEnd).build();
 
@@ -423,10 +425,22 @@ class PaymentServiceTest {
         verifyNoInteractions(invoiceRepository, vietqrRepository, planPurchaseRepository);
     }
 
+    // Regression: accounts seeded straight into `users` (admins, migrated data)
+    // carry a paid plan_id with no `subscriptions` row. Guarding on the
+    // subscription made every paid card on /pricing return 400 "Bạn chưa có gói
+    // trả phí đang hoạt động" — entitlement lives on users.plan, so the change
+    // must still be recorded, dated off cycle_reset_at.
     @Test
-    void schedulePlanChange_noActiveSubscription_throws() {
+    void schedulePlanChange_paidPlanButNoSubscriptionRow_stillSchedules() {
         Users user = new Users();
         user.setId(USER_ID);
+        Plan enterprise = new Plan();
+        enterprise.setId(4);
+        enterprise.setName("Enterprise");
+        user.setPlan(enterprise);
+        Instant cycleReset = Instant.now().plusSeconds(86400 * 20);
+        user.setCycleResetAt(cycleReset);
+
         Plan pro = new Plan();
         pro.setId(2);
         pro.setName("pro");
@@ -434,8 +448,32 @@ class PaymentServiceTest {
         when(planRepository.findByNameIgnoreCase("pro")).thenReturn(Optional.of(pro));
         when(subscriptionRepository.findByUser_IdAndStatus(USER_ID, "active")).thenReturn(java.util.List.of());
 
+        PaymentDTO.ScheduledPlanChangeResponse resp = service.schedulePlanChange(USER_ID, "pro");
+
+        assertThat(resp.getCurrentPlanName()).isEqualTo("Enterprise");
+        assertThat(resp.getPendingPlanName()).isEqualTo("pro");
+        assertThat(resp.getEffectiveAt()).isEqualTo(cycleReset);
+        assertThat(user.getPendingPlan().getName()).isEqualTo("pro");
+        verify(usersRepository).save(user);
+    }
+
+    @Test
+    void schedulePlanChange_freePlanUser_throws() {
+        Users user = new Users();
+        user.setId(USER_ID);
+        Plan free = new Plan();
+        free.setId(1);
+        free.setName("Free");
+        user.setPlan(free);
+        Plan pro = new Plan();
+        pro.setId(2);
+        pro.setName("pro");
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(planRepository.findByNameIgnoreCase("pro")).thenReturn(Optional.of(pro));
+
         assertThatThrownBy(() -> service.schedulePlanChange(USER_ID, "pro"))
-                .isInstanceOf(AppException.class);
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("gói miễn phí");
     }
 
     @Test
@@ -445,13 +483,66 @@ class PaymentServiceTest {
         Plan pro = new Plan();
         pro.setId(2);
         pro.setName("pro");
-        Subscription active = Subscription.builder().status("active").plan(pro).currentPeriodEnd(Instant.now()).build();
+        user.setPlan(pro);
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(planRepository.findByNameIgnoreCase("pro")).thenReturn(Optional.of(pro));
+
+        assertThatThrownBy(() -> service.schedulePlanChange(USER_ID, "pro"))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("đang dùng gói này rồi");
+    }
+
+    // Two active rows is bad data the app must survive deterministically:
+    // the later-ending cycle is the one the user actually paid through.
+    @Test
+    void schedulePlanChange_multipleActiveSubscriptions_usesLatestPeriodEnd() {
+        Users user = new Users();
+        user.setId(USER_ID);
+        Plan starter = new Plan();
+        starter.setId(1);
+        starter.setName("starter");
+        user.setPlan(starter);
+        Plan pro = new Plan();
+        pro.setId(2);
+        pro.setName("pro");
+
+        Instant early = Instant.now().plusSeconds(86400 * 2);
+        Instant late = Instant.now().plusSeconds(86400 * 25);
+        Subscription oldSub = Subscription.builder().status("active").plan(starter).currentPeriodEnd(early).build();
+        Subscription newSub = Subscription.builder().status("active").plan(starter).currentPeriodEnd(late).build();
+
+        when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        when(planRepository.findByNameIgnoreCase("pro")).thenReturn(Optional.of(pro));
+        when(subscriptionRepository.findByUser_IdAndStatus(USER_ID, "active"))
+                .thenReturn(java.util.List.of(oldSub, newSub));
+
+        assertThat(service.schedulePlanChange(USER_ID, "pro").getEffectiveAt()).isEqualTo(late);
+    }
+
+    @Test
+    void schedulePlanChange_sendsConfirmationEmail() {
+        Users user = new Users();
+        user.setId(USER_ID);
+        user.setEmail("buyer@example.com");
+        user.setFullName("Buyer");
+        Plan starter = new Plan();
+        starter.setId(1);
+        starter.setName("starter");
+        user.setPlan(starter);
+        Plan pro = new Plan();
+        pro.setId(2);
+        pro.setName("pro");
+        Instant periodEnd = Instant.now().plusSeconds(86400 * 10);
+        Subscription active = Subscription.builder().status("active").plan(starter).currentPeriodEnd(periodEnd).build();
+
         when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         when(planRepository.findByNameIgnoreCase("pro")).thenReturn(Optional.of(pro));
         when(subscriptionRepository.findByUser_IdAndStatus(USER_ID, "active")).thenReturn(java.util.List.of(active));
 
-        assertThatThrownBy(() -> service.schedulePlanChange(USER_ID, "pro"))
-                .isInstanceOf(AppException.class);
+        service.schedulePlanChange(USER_ID, "pro");
+
+        verify(subscriptionEmailService).sendPlanChangeScheduledEmail(
+                "buyer@example.com", "Buyer", "starter", "pro", periodEnd);
     }
 
     @Test
@@ -467,6 +558,7 @@ class PaymentServiceTest {
         Plan enterprise = new Plan();
         enterprise.setId(3);
         enterprise.setName("enterprise");
+        user.setPlan(starter);
         Subscription active = Subscription.builder().status("active").plan(starter).currentPeriodEnd(Instant.now()).build();
 
         when(usersRepository.findById(USER_ID)).thenReturn(Optional.of(user));
