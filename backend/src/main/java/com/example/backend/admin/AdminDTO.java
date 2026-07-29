@@ -76,12 +76,41 @@ public class AdminDTO {
             List<Bucket> starDistribution,
             List<Bucket> confidenceDistribution,
             List<Bucket> flagsByReason,
-            List<RatingEntry> recentRatings
+            List<RatingEntry> recentRatings,
+            SusSummary sus
     ) {}
 
     public record Bucket(String label, long count) {}
 
     public record RatingEntry(Short stars, String comment, String reportEntity, String userEmail, Instant createdAt) {}
+
+    /**
+     * System Usability Scale results — usability of the product, kept separate
+     * from {@code avgStars} (which rates individual report correctness) so the
+     * two are never read as one satisfaction number.
+     *
+     * {@code avgScore} is null until someone responds; the UI must render that
+     * as "chưa có dữ liệu" rather than 0, which would read as a terrible score.
+     */
+    public record SusSummary(
+            Double avgScore,
+            long responseCount,
+            long dismissedCount,
+            double benchmark,
+            List<SusItem> itemAverages,
+            List<SusEntry> recentResponses
+    ) {}
+
+    /**
+     * @param avgAnswer       raw 1–5 mean, as answered
+     * @param contributionPct that item normalised to 0–100 where higher is
+     *                        always better — even-numbered SUS items are worded
+     *                        negatively, so raw means are not comparable across
+     *                        items without this
+     */
+    public record SusItem(int item, double avgAnswer, double contributionPct) {}
+
+    public record SusEntry(Double score, String comment, String userEmail, Instant createdAt) {}
 
     public record RecentTx(String customer, String email, String plan,
                            BigDecimal amount, String provider, String status, Instant date) {}

@@ -47,6 +47,27 @@ public class SubscriptionEmailService {
         }
     }
 
+    /**
+     * Confirms a deferred plan change the moment the user requests it, so the
+     * only record of the switch isn't a toast they can dismiss. {@code effectiveAt}
+     * may be null for accounts with no billing-cycle row yet — the copy then just
+     * omits the date rather than printing a blank one.
+     */
+    @Async
+    public void sendPlanChangeScheduledEmail(String toEmail, String customerName, String fromPlanName,
+                                             String toPlanName, Instant effectiveAt) {
+        if (toEmail == null || toEmail.isBlank()) return;
+        String subject = "Your MarketScout plan will switch to " + toPlanName;
+        try {
+            String html = buildPlanChangeScheduledHtml(customerName, fromPlanName, toPlanName, effectiveAt);
+            boolean ok = mailService.send(toEmail, subject, html);
+            log.info("Plan-change-scheduled email to {} ({} -> {}, effectiveAt={}) — sent={}",
+                    toEmail, fromPlanName, toPlanName, effectiveAt, ok);
+        } catch (Exception e) {
+            log.error("Failed to build/send plan-change-scheduled email to {}: {}", toEmail, e.getMessage(), e);
+        }
+    }
+
     @Async
     public void sendScheduledPlanChangeReadyEmail(String toEmail, String customerName, String newPlanName) {
         if (toEmail == null || toEmail.isBlank()) return;
@@ -108,6 +129,45 @@ public class SubscriptionEmailService {
             </body>
             </html>
             """.formatted(name, when, planName, expiry, pricingUrl);
+    }
+
+    private String buildPlanChangeScheduledHtml(String customerName, String fromPlanName,
+                                                String toPlanName, Instant effectiveAt) {
+        String name = (customerName == null || customerName.isBlank()) ? "there" : customerName;
+        String when = effectiveAt == null
+                ? "when your current cycle ends"
+                : "on <b>" + DATE.format(effectiveAt) + "</b>";
+        String pricingUrl = frontendUrl + "/pricing";
+
+        return """
+            <!DOCTYPE html>
+            <html lang="en">
+            <body style="font-family:Arial,Helvetica,sans-serif;background:#f4f5f7;padding:32px;margin:0">
+              <div style="max-width:560px;margin:auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #ececec">
+                <div style="background:#0A0E1A;padding:24px 32px">
+                  <span style="color:#ffffff;font-size:18px;font-weight:bold">MarketScout</span>
+                  <span style="color:#00D26A;font-size:11px;letter-spacing:1px;margin-left:8px">B2B INTELLIGENCE</span>
+                </div>
+                <div style="padding:32px">
+                  <h2 style="margin:0 0 4px;color:#0A0E1A">Hi %s, your plan change is scheduled</h2>
+                  <p style="color:#555;font-size:14px;margin:0 0 24px">
+                    We've recorded your switch from <b>%s</b> to <b>%s</b>, taking effect %s.
+                    <b>You have not been charged.</b> Your current %s plan and its credits keep working
+                    until then — we'll email you when it's time to complete the transfer for %s.
+                  </p>
+                  <a href="%s" style="display:inline-block;background:#00D26A;color:#0A0E1A;font-weight:bold;
+                    text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px">View my plan</a>
+                  <p style="color:#888;font-size:12px;margin-top:28px">
+                    Changed your mind? You can cancel this scheduled change any time from the pricing page.
+                  </p>
+                </div>
+                <div style="background:#fafafa;padding:16px 32px;border-top:1px solid #eee">
+                  <span style="color:#aaa;font-size:11px">&copy; MarketScout — Trade partner verification. All rights reserved.</span>
+                </div>
+              </div>
+            </body>
+            </html>
+            """.formatted(name, fromPlanName, toPlanName, when, fromPlanName, toPlanName, pricingUrl);
     }
 
     private String buildScheduledChangeReadyHtml(String customerName, String newPlanName) {

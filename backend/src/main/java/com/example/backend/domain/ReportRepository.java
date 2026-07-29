@@ -23,6 +23,10 @@ public interface ReportRepository extends JpaRepository<Report, UUID> {
     @Query("SELECT r.user.language FROM Report r WHERE r.id = :reportId")
     String findUserLanguageByReportId(@Param("reportId") UUID reportId);
 
+    // Gates the one-time SUS survey: only users who have actually run the
+    // product enough times are asked to rate its usability.
+    long countByUserId(UUID userId);
+
     // ── Admin queries ─────────────────────────────────────────────────
     long countByCreatedAtBetween(Instant start, Instant end);
 

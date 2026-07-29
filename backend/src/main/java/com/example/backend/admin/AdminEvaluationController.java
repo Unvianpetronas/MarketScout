@@ -4,6 +4,8 @@ import com.example.backend.domain.PillarResultRepository;
 import com.example.backend.domain.ReportFlagRepository;
 import com.example.backend.domain.ReportRatingRepository;
 import com.example.backend.domain.ReportRepository;
+import com.example.backend.domain.SystemRating;
+import com.example.backend.domain.SystemRatingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +34,10 @@ public class AdminEvaluationController {
     private final ReportFlagRepository reportFlagRepository;
     private final PillarResultRepository pillarResultRepository;
     private final ReportRatingRepository ratingRepository;
+    private final SystemRatingRepository systemRatingRepository;
+
+    /** Published SUS industry average (Brooke, 1996) — the bar, not a pass mark. */
+    private static final double SUS_BENCHMARK = 68.0;
 
     @GetMapping("/evaluation")
     @Transactional(readOnly = true)
@@ -80,7 +86,47 @@ public class AdminEvaluationController {
         return ResponseEntity.ok(new AdminDTO.EvaluationAnalytics(
                 totalReports, overridden, flaggedTotal, flagsOpen, flagsResolved, flagsDismissed,
                 sanctionsFalsePositive, round1(accuracyPct), round1(overrideRatePct), round1(flagRatePct),
-                avgStars, ratingCount, starDistribution, confidenceDistribution, flagsByReason, recentRatings));
+                avgStars, ratingCount, starDistribution, confidenceDistribution, flagsByReason, recentRatings,
+                buildSus()));
+    }
+
+    /**
+     * SUS block. Reported alongside — never merged into — the report-rating
+     * numbers above: those measure whether the AI's answer was right, this
+     * measures whether the software is usable.
+     */
+    private AdminDTO.SusSummary buildSus() {
+        Double avgScore  = systemRatingRepository.averageScore();
+        long responses   = systemRatingRepository.countByStatus(SystemRating.STATUS_SUBMITTED);
+        long dismissals  = systemRatingRepository.countByStatus(SystemRating.STATUS_DISMISSED);
+
+        List<AdminDTO.SusItem> items = List.of();
+        if (responses > 0) {
+            Object[] avgs = systemRatingRepository.itemAverages().get(0);
+            List<AdminDTO.SusItem> built = new java.util.ArrayList<>(SystemRating.ITEM_COUNT);
+            for (int i = 0; i < SystemRating.ITEM_COUNT; i++) {
+                if (avgs[i] == null) continue;
+                double raw = ((Number) avgs[i]).doubleValue();
+                // Odd-numbered items (index 0, 2, …) are positively worded and
+                // contribute answer-1; even ones are negative and contribute
+                // 5-answer. Scale the 0–4 result to 0–100 so a low bar on the
+                // chart always means "this part of the product is weak".
+                double contribution = (i % 2 == 0) ? raw - 1 : 5 - raw;
+                built.add(new AdminDTO.SusItem(i + 1, round1(raw), round1(contribution / 4.0 * 100.0)));
+            }
+            items = List.copyOf(built);
+        }
+
+        List<AdminDTO.SusEntry> recent = systemRatingRepository
+                .findRecentSubmitted(PageRequest.of(0, 20)).stream()
+                .map(s -> new AdminDTO.SusEntry(
+                        s.getScore() != null ? s.getScore().doubleValue() : null,
+                        s.getComment(), s.getUser().getEmail(), s.getCreatedAt()))
+                .toList();
+
+        return new AdminDTO.SusSummary(
+                avgScore != null ? round1(avgScore) : null,
+                responses, dismissals, SUS_BENCHMARK, items, recent);
     }
 
     private static double round1(double v) {

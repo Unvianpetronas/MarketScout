@@ -99,7 +99,7 @@ class SchemaMigrationPostgresTest {
     assertThat(migrateResult.success).isTrue();
     assertThat(migrateResult.migrationsExecuted)
         .as("all V*.sql files in db/migration should apply")
-        .isEqualTo(9);
+        .isEqualTo(10);
   }
 
   /**

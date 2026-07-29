@@ -105,6 +105,32 @@ export interface EvaluationAnalytics {
   confidenceDistribution: Bucket[];
   flagsByReason: Bucket[];
   recentRatings: RatingEntry[];
+  sus: SusSummary;
+}
+
+// System Usability Scale — product usability, deliberately separate from
+// avgStars above (which rates whether an individual report was correct).
+export interface SusItem {
+  item: number;
+  avgAnswer: number;
+  // Normalised 0–100 where higher is always better; even-numbered SUS items
+  // are negatively worded, so raw means aren't comparable without this.
+  contributionPct: number;
+}
+export interface SusEntry {
+  score: number | null;
+  comment: string | null;
+  userEmail: string;
+  createdAt: string;
+}
+export interface SusSummary {
+  // null until someone responds — render as "chưa có dữ liệu", never as 0.
+  avgScore: number | null;
+  responseCount: number;
+  dismissedCount: number;
+  benchmark: number;
+  itemAverages: SusItem[];
+  recentResponses: SusEntry[];
 }
 
 // ── Reports ───────────────────────────────────────────────────────────────

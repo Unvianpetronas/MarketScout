@@ -30,6 +30,28 @@ function bucketMap(buckets: Bucket[]): Record<string, number> {
   return Object.fromEntries(buckets.map((b) => [b.label, b.count]));
 }
 
+/** Green at or above the published SUS average, amber below, red well below. */
+function susColor(score: number, benchmark: number): string {
+  if (score >= benchmark) return "#059669";
+  if (score >= benchmark - 15) return "#c98a2c";
+  return "#c1483d";
+}
+
+// The 10 SUS statements, shortened for the chart axis. Order is fixed by the
+// instrument — item N here must stay item N in SystemRating.susScore.
+const SUS_ITEM_LABEL = [
+  "1. Muốn dùng thường xuyên",
+  "2. Phức tạp không cần thiết",
+  "3. Dễ sử dụng",
+  "4. Cần hỗ trợ kỹ thuật",
+  "5. Chức năng gắn kết tốt",
+  "6. Thiếu nhất quán",
+  "7. Học dùng rất nhanh",
+  "8. Cồng kềnh khi dùng",
+  "9. Tự tin khi sử dụng",
+  "10. Phải học nhiều mới dùng được",
+];
+
 export default function AdminEvaluationPage() {
   const [data, setData] = useState<EvaluationAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -90,6 +112,17 @@ function EvaluationBody({ data }: { data: EvaluationAnalytics }) {
     valueText: String(starMap[String(n)] ?? 0),
     barColor: "#f59e0b",
     leading: <Star className="w-4 h-4 shrink-0" fill="#f59e0b" stroke="#f59e0b" />,
+  }));
+
+  // contributionPct is already normalised so higher is always better, which is
+  // what makes these ten bars comparable despite half the items being worded
+  // negatively. Colour by the same threshold as the headline score.
+  const susItems: RankedItem[] = data.sus.itemAverages.map((it) => ({
+    id: `sus-${it.item}`,
+    label: SUS_ITEM_LABEL[it.item - 1] ?? `Câu ${it.item}`,
+    value: it.contributionPct,
+    valueText: `${it.contributionPct.toFixed(0)}/100 (TB ${it.avgAnswer.toFixed(1)}/5)`,
+    barColor: susColor(it.contributionPct, data.sus.benchmark),
   }));
 
   const reasonItems: RankedItem[] = data.flagsByReason.map((b, i) => ({
@@ -163,6 +196,70 @@ function EvaluationBody({ data }: { data: EvaluationAnalytics }) {
           )}
         </SectionCard>
       </div>
+
+      {/* SUS — kept in its own section, never averaged with the star ratings
+          above: those measure whether a report was correct, this measures
+          whether the software is usable. */}
+      <div className="grid gap-5" style={{ gridTemplateColumns: "1fr 1fr" }}>
+        <SectionCard title="Khả dụng hệ thống — SUS">
+          {data.sus.avgScore == null ? (
+            <p className="text-sm text-[#8b93a3] py-4">
+              Chưa có phản hồi nào. Khảo sát hiện với người dùng đã tạo từ 3 báo cáo trở lên.
+              {data.sus.dismissedCount > 0 && ` Đã có ${data.sus.dismissedCount} người bỏ qua.`}
+            </p>
+          ) : (
+            <>
+              <div className="flex items-end gap-3 mb-1">
+                <span className="text-4xl font-extrabold" style={{ color: susColor(data.sus.avgScore, data.sus.benchmark) }}>
+                  {data.sus.avgScore.toFixed(1)}
+                </span>
+                <span className="text-sm text-[#8b93a3] mb-1.5">/ 100</span>
+              </div>
+              <p className="text-[13px] text-[#5b6474] mb-4">
+                Mốc trung bình ngành là <span className="font-bold">{data.sus.benchmark}</span> —{" "}
+                <span className="font-bold" style={{ color: susColor(data.sus.avgScore, data.sus.benchmark) }}>
+                  {data.sus.avgScore >= data.sus.benchmark ? "trên" : "dưới"} mốc{" "}
+                  {Math.abs(data.sus.avgScore - data.sus.benchmark).toFixed(1)} điểm
+                </span>.
+              </p>
+              {/* Sample size is stated next to the score on purpose: a SUS mean
+                  over a handful of responses is a weak claim and should read
+                  that way rather than being quoted bare. */}
+              <p className="text-xs text-[#8b93a3] leading-relaxed">
+                {data.sus.responseCount} phản hồi · {data.sus.dismissedCount} bỏ qua.
+                {data.sus.responseCount < 5 && " Cỡ mẫu còn nhỏ — con số này chưa đủ vững để kết luận."}
+                <br />
+                SUS (Brooke, 1996) là thang đo chuẩn 10 câu, quy về 0–100. Đây không phải phần trăm.
+              </p>
+            </>
+          )}
+        </SectionCard>
+
+        <SectionCard title="SUS theo từng câu hỏi">
+          {susItems.length === 0
+            ? <p className="text-sm text-[#8b93a3] py-4">Chưa có phản hồi nào.</p>
+            : <RankedBarList items={susItems} max={100} />}
+        </SectionCard>
+      </div>
+
+      {/* Recent SUS responses with comments */}
+      {data.sus.recentResponses.length > 0 && (
+        <SectionCard title="Phản hồi SUS gần đây">
+          <div className="divide-y divide-[#f0f1f4]">
+            {data.sus.recentResponses.map((r, i) => (
+              <div key={i} className="py-3">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[13px] font-bold" style={{ color: susColor(r.score ?? 0, data.sus.benchmark) }}>
+                    {r.score != null ? r.score.toFixed(0) : "—"}/100
+                  </span>
+                </div>
+                {r.comment && <p className="text-[13px] text-[#5b6474] mb-1">{r.comment}</p>}
+                <p className="text-[11px] text-[#8b93a3]">{r.userEmail} · {new Date(r.createdAt).toLocaleString("vi-VN")}</p>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
 
       {/* Recent user ratings with comments */}
       <SectionCard title="Đánh giá gần đây của người dùng">

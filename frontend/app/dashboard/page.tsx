@@ -10,6 +10,7 @@ import {
 import { toast } from "sonner";
 import { AuthGuard } from "@/components/shared/auth-guard";
 import { Sidebar } from "@/components/layout/sidebar";
+import { SusSurveyModal } from "@/components/survey/sus-survey-modal";
 import { useAuth } from "@/providers/auth-provider";
 import { useLanguage } from "@/providers/language-provider";
 import { getReports } from "@/services/report.service";
@@ -462,6 +463,9 @@ export default function DashboardPage() {
           </main>
         </div>
       </div>
+      {/* Renders itself only if the server says this user is eligible and has
+          never been asked — see SusSurveyModal. */}
+      <SusSurveyModal />
     </AuthGuard>
   );
 }

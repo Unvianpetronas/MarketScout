@@ -42,6 +42,8 @@ public class PaymentService {
     static final String STATUS_EXPIRED   = "expired";
     static final String STATUS_COMPLETED = "completed";
 
+    static final String FREE_PLAN_NAME = "free";
+
     private static final String CODE_PREFIX = "MSQT";
     private static final String ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final Pattern CODE_PATTERN = Pattern.compile(CODE_PREFIX + "[A-Z0-9]+");
@@ -63,6 +65,7 @@ public class PaymentService {
     private final PaymentSettingsRepository paymentSettingsRepository;
     private final ObjectMapper objectMapper;
     private final PaymentEmailService paymentEmailService;
+    private final SubscriptionEmailService subscriptionEmailService;
 
     // ── Create top-up ──────────────────────────────────────────────────
 
@@ -172,28 +175,43 @@ public class PaymentService {
         Plan targetPlan = planRepository.findByNameIgnoreCase(planName)
                 .orElseThrow(() -> new AppException(AppException.ErrorCode.BAD_REQUEST, "Gói không hợp lệ"));
 
-        Subscription active = subscriptionRepository.findByUser_IdAndStatus(userId, "active")
-                .stream().findFirst()
-                .orElseThrow(() -> new AppException(AppException.ErrorCode.BAD_REQUEST,
-                        "Bạn chưa có gói trả phí đang hoạt động — hãy mua gói trực tiếp."));
-
-        if (active.getPlan() != null && active.getPlan().getId().equals(targetPlan.getId())) {
+        // Entitlement lives on users.plan — that is the column quota gating, the
+        // sidebar and the pricing page all read. The `subscriptions` table only
+        // records billing-cycle metadata, and a paid account can legitimately
+        // have no row there (accounts seeded straight into `users`, e.g. admins).
+        // Guarding on the subscription instead is what made every card on
+        // /pricing fail with "chưa có gói trả phí đang hoạt động".
+        Plan currentPlan = user.getPlan();
+        if (currentPlan == null || FREE_PLAN_NAME.equalsIgnoreCase(currentPlan.getName())) {
+            throw new AppException(AppException.ErrorCode.BAD_REQUEST,
+                    "Bạn đang dùng gói miễn phí — hãy mua gói trực tiếp.");
+        }
+        if (currentPlan.getId().equals(targetPlan.getId())) {
             throw new AppException(AppException.ErrorCode.BAD_REQUEST, "Bạn đang dùng gói này rồi.");
         }
+
+        // The subscription is consulted only for when the paid cycle ends; without
+        // one, users.cycle_reset_at is the same date quota gating already resets on.
+        Subscription active = activePaidSubscription(userId);
+        Instant effectiveAt = active != null ? active.getCurrentPeriodEnd() : user.getCycleResetAt();
 
         // Re-confirming overwrites any earlier pending choice — latest wins.
         user.setPendingPlan(targetPlan);
         user.setPendingPlanRequestedAt(Instant.now());
         usersRepository.save(user);
 
-        log.info("Plan change scheduled — user={} from={} to={} effectiveAt={}",
-                userId, active.getPlan() != null ? active.getPlan().getName() : null,
-                targetPlan.getName(), active.getCurrentPeriodEnd());
+        log.info("Plan change scheduled — user={} from={} to={} effectiveAt={} (subscriptionRow={})",
+                userId, currentPlan.getName(), targetPlan.getName(), effectiveAt, active != null);
+
+        String email = user.getEmail(), name = user.getFullName();
+        String fromName = currentPlan.getName(), toName = targetPlan.getName();
+        runAfterCommit(() -> subscriptionEmailService.sendPlanChangeScheduledEmail(
+                email, name, fromName, toName, effectiveAt));
 
         return PaymentDTO.ScheduledPlanChangeResponse.builder()
-                .currentPlanName(active.getPlan() != null ? active.getPlan().getName() : null)
+                .currentPlanName(currentPlan.getName())
                 .pendingPlanName(targetPlan.getName())
-                .effectiveAt(active.getCurrentPeriodEnd())
+                .effectiveAt(effectiveAt)
                 .build();
     }
 
@@ -241,10 +259,15 @@ public class PaymentService {
         return toSubscriptionResponse(active);
     }
 
+    // Bad data can leave more than one active row for a user, so pick the
+    // latest-ending one rather than whatever the database happened to return
+    // first — otherwise "which plan am I on" answers differently per request.
     private Subscription activePaidSubscription(UUID userId) {
         return subscriptionRepository.findByUser_IdAndStatus(userId, "active").stream()
-                .filter(s -> s.getPlan() != null && !"free".equalsIgnoreCase(s.getPlan().getName()))
-                .findFirst().orElse(null);
+                .filter(s -> s.getPlan() != null && !FREE_PLAN_NAME.equalsIgnoreCase(s.getPlan().getName()))
+                .max(java.util.Comparator.comparing(Subscription::getCurrentPeriodEnd,
+                        java.util.Comparator.nullsFirst(java.util.Comparator.naturalOrder())))
+                .orElse(null);
     }
 
     private PaymentDTO.SubscriptionResponse toSubscriptionResponse(Subscription s) {

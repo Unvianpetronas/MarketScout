@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, X, Zap, Star, ArrowRight, ChevronDown, ChevronUp, Globe, Clock, XCircle } from "lucide-react";
+import { Check, X, Zap, Star, ArrowRight, ChevronDown, ChevronUp, Globe, Clock, XCircle, BadgeCheck } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { toast } from "sonner";
 import { useAuth } from "@/providers/auth-provider";
@@ -19,8 +19,8 @@ function formatDate(v: string | number | null | undefined) {
 }
 
 function ScheduleChangeModal({
-  fromPlan, toPlanId, onClose, onScheduled,
-}: { fromPlan: string; toPlanId: string; onClose: () => void; onScheduled: () => void }) {
+  fromPlan, toPlanId, onClose, onSync,
+}: { fromPlan: string; toPlanId: string; onClose: () => void; onSync: () => void }) {
   const { t } = useLanguage();
   const [submitting, setSubmitting] = useState(false);
 
@@ -29,11 +29,16 @@ function ScheduleChangeModal({
     try {
       const resp = await schedulePlanChange(toPlanId);
       toast.success(t("pricing.schedule.toastSuccess", { plan: resp.pendingPlanName ?? toPlanId }));
-      onScheduled();
+      onSync();
       onClose();
     } catch (err) {
+      // The backend rejects on the user's *actual* plan, so a rejection means the
+      // cached profile driving these buttons is stale — re-fetch it, otherwise the
+      // page keeps offering an action that can only fail again.
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(msg || t("pricing.schedule.toastError"));
+      toast.error(msg ? `${msg} ${t("pricing.schedule.toastNextStep")}` : t("pricing.schedule.toastError"));
+      onSync();
+      onClose();
     } finally {
       setSubmitting(false);
     }
@@ -134,6 +139,26 @@ export default function PricingPage() {
   const isDeferred = (planId: string) =>
     hasActivePaidPlan && planId !== "enterprise" && planId !== currentPlanName;
 
+  // PLANS is ordered cheapest → most expensive, so its index doubles as the
+  // tier rank used to phrase a card's CTA as an upgrade or a downgrade.
+  const planRank = (planId?: string) => PLANS.findIndex((p) => p.id === planId);
+  const currentRank = planRank(currentPlanName);
+  const isCurrentPlan = (planId: string) =>
+    isAuthenticated && !!currentPlanName && planId === currentPlanName;
+
+  const ctaLabel = (planId: string) => {
+    if (isCurrentPlan(planId)) return t("pricing.currentPlan.cta");
+    // Enterprise is a "talk to us" action, not a self-serve tier change, so it
+    // keeps its own copy no matter which plan the viewer is on.
+    if (planId === "enterprise" || !isAuthenticated || currentRank < 0) {
+      return `${t(`pricing.plan.${planId}.cta`)} →`;
+    }
+    const planLabel = t(`pricing.plan.${planId}.name`);
+    return planRank(planId) > currentRank
+      ? t("pricing.cta.upgrade", { plan: planLabel })
+      : t("pricing.cta.downgrade", { plan: planLabel });
+  };
+
   const handleCancelPending = async () => {
     setCancelling(true);
     try {
@@ -200,6 +225,24 @@ export default function PricingPage() {
           </p>
         </div>
 
+        {/* ── Current plan banner ── */}
+        {isAuthenticated && currentPlanName && (
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-white border border-[#059669]/30 rounded-2xl px-6 py-4 mb-4 shadow-[0_2px_20px_rgba(16,22,43,0.03)]">
+            <div className="flex items-center gap-3">
+              <BadgeCheck className="w-5 h-5 text-[#059669] shrink-0" />
+              <p className="text-sm text-gray-700">
+                {t("pricing.currentPlan.banner", {
+                  plan: currentRank >= 0 ? t(`pricing.plan.${currentPlanName}.name`) : currentPlanName,
+                  n: user?.quotaRemaining ?? 0,
+                })}
+              </p>
+            </div>
+            <Link href="/profile" className="text-xs font-semibold text-[#059669] hover:text-[#047857] shrink-0">
+              {t("pricing.currentPlan.manage")} →
+            </Link>
+          </div>
+        )}
+
         {/* ── Pending plan change banner ── */}
         {user?.pendingPlanName && (
           <div className="flex items-center justify-between gap-4 bg-purple-50 border border-purple-200 rounded-2xl px-6 py-4 mb-8">
@@ -223,9 +266,13 @@ export default function PricingPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-16 stagger">
           {plans.map((plan) => (
             <div key={plan.id}
-              className={`relative flex flex-col rounded-2xl border p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)] transition-all hover:shadow-md ${plan.cardStyle}`}>
+              className={`relative flex flex-col rounded-2xl border p-6 shadow-[0_2px_20px_rgba(16,22,43,0.03)] transition-all hover:shadow-md ${plan.cardStyle} ${
+                isCurrentPlan(plan.id) ? "ring-2 ring-[#059669] ring-offset-2 ring-offset-[#faf9f6]" : ""
+              }`}>
 
-              {plan.isPopular && (
+              {/* The "most popular" ribbon is marketing; "this is your plan" is
+                  a fact about the viewer's account and outranks it. */}
+              {plan.isPopular && !isCurrentPlan(plan.id) && (
                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
                   <span className="gradient-brand text-white text-[10px] font-extrabold uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg flex items-center gap-1">
                     <Star className="w-3 h-3" /> {t("pricing.mostPopular")}
@@ -234,23 +281,33 @@ export default function PricingPage() {
               )}
 
               <div className="mb-5">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between gap-2 mb-2">
                   <p className="text-xs font-bold uppercase tracking-widest" style={{ color: plan.accentColor }}>{t(`pricing.plan.${plan.id}.name`)}</p>
+                  {isCurrentPlan(plan.id) && (
+                    <span className="flex items-center gap-1 shrink-0 bg-[#E7F6EF] text-[#059669] border border-[#059669]/30 text-[10px] font-extrabold uppercase tracking-wider px-2 py-1 rounded-full">
+                      <Check className="w-3 h-3" strokeWidth={3} /> {t("pricing.currentPlan.badge")}
+                    </span>
+                  )}
                 </div>
                 <p className={`text-xs mb-4 ${(plan as { isDark?: boolean }).isDark ? "text-gray-400" : "text-gray-400"}`}>{t(`pricing.plan.${plan.id}.tagline`)}</p>
                 <PriceDisplay vnd={plan.priceVnd} usd={plan.priceUsd} isFree={plan.isFree} isCustom={(plan as { isCustom?: boolean }).isCustom} isDark={(plan as { isDark?: boolean }).isDark} />
                 <p className="text-xs mt-2 font-semibold" style={{ color: plan.accentColor }}>{t(`pricing.plan.${plan.id}.quotaLabel`, plan.monthlyQuota != null ? { n: plan.monthlyQuota } : undefined)}</p>
               </div>
 
-              {isDeferred(plan.id) ? (
+              {isCurrentPlan(plan.id) ? (
+                <button disabled
+                  className="block w-full py-3 rounded-xl text-sm font-bold text-center mb-5 bg-[#E7F6EF] text-[#059669] border border-[#059669]/30 cursor-default">
+                  {ctaLabel(plan.id)}
+                </button>
+              ) : isDeferred(plan.id) ? (
                 <button onClick={() => setScheduleTarget(plan.id)}
                   className={`block w-full py-3 rounded-xl text-sm font-bold text-center transition-all mb-5 ${plan.ctaStyle}`}>
-                  {t(`pricing.plan.${plan.id}.cta`)} →
+                  {ctaLabel(plan.id)}
                 </button>
               ) : (
                 <Link href={plan.href}
                   className={`block w-full py-3 rounded-xl text-sm font-bold text-center transition-all mb-5 ${plan.ctaStyle}`}>
-                  {t(`pricing.plan.${plan.id}.cta`)} →
+                  {ctaLabel(plan.id)}
                 </Link>
               )}
 
@@ -357,7 +414,7 @@ export default function PricingPage() {
           fromPlan={user.planName}
           toPlanId={scheduleTarget}
           onClose={() => setScheduleTarget(null)}
-          onScheduled={refreshUser}
+          onSync={refreshUser}
         />
       )}
     </div>
