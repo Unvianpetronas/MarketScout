@@ -110,7 +110,13 @@ public class AdminDTO {
      */
     public record SusItem(int item, double avgAnswer, double contributionPct) {}
 
-    public record SusEntry(Double score, String comment, String userEmail, Instant createdAt) {}
+    /**
+     * @param answers the respondent's ten raw 1–5 answers in question order, so
+     *                an admin can read an individual response rather than only
+     *                the aggregate. Empty for a dismissal.
+     */
+    public record SusEntry(Double score, List<Short> answers, String comment,
+                           String userEmail, Instant createdAt) {}
 
     public record RecentTx(String customer, String email, String plan,
                            BigDecimal amount, String provider, String status, Instant date) {}

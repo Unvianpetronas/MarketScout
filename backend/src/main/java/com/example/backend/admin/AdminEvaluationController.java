@@ -121,7 +121,7 @@ public class AdminEvaluationController {
                 .findRecentSubmitted(PageRequest.of(0, 20)).stream()
                 .map(s -> new AdminDTO.SusEntry(
                         s.getScore() != null ? s.getScore().doubleValue() : null,
-                        s.getComment(), s.getUser().getEmail(), s.getCreatedAt()))
+                        s.answers(), s.getComment(), s.getUser().getEmail(), s.getCreatedAt()))
                 .toList();
 
         return new AdminDTO.SusSummary(

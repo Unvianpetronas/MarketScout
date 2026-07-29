@@ -90,6 +90,15 @@ public class SystemRating {
         return BigDecimal.valueOf(total * 2.5).setScale(2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * The ten answers in question order, or an empty list for a dismissal
+     * (which stores no answers at all — see the table's completeness CHECK).
+     */
+    public java.util.List<Short> answers() {
+        if (q1 == null) return java.util.List.of();
+        return java.util.List.of(q1, q2, q3, q4, q5, q6, q7, q8, q9, q10);
+    }
+
     public void applyAnswers(short[] answers) {
         q1 = answers[0]; q2 = answers[1]; q3 = answers[2]; q4 = answers[3]; q5 = answers[4];
         q6 = answers[5]; q7 = answers[6]; q8 = answers[7]; q9 = answers[8]; q10 = answers[9];
