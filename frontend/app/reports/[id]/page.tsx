@@ -837,6 +837,12 @@ export default function ReportDetailPage({ params }: Props) {
                 {/* ── AI Recommendations ── */}
                 <AiRecommendations recs={recs} loading={recsLoading} />
 
+                {/* ── Satisfaction rating ──
+                    Sits above the Copilot CTA on purpose: that CTA navigates
+                    away to /chat, so anything below it is effectively unseen —
+                    which is why almost no report was ever rated. */}
+                {!isProcessingStatus(report.status) && <ReportRatingCard reportId={id} />}
+
                 {/* ── AI CTA ── */}
                 <div className="bg-gradient-to-r from-[#0b1120] to-[#10162b] rounded-2xl p-6 flex items-center justify-between">
                   <div>
@@ -852,9 +858,6 @@ export default function ReportDetailPage({ params }: Props) {
                     {t("report.copilotCta")}
                   </Link>
                 </div>
-
-                {/* ── Satisfaction rating ── */}
-                {!isProcessingStatus(report.status) && <ReportRatingCard reportId={id} />}
 
               </div>
             )}
