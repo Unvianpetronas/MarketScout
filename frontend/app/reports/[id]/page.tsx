@@ -199,6 +199,11 @@ function PillarCard({ pillar }: { pillar: PillarResult }) {
   const st = pillarStatusStyle(pillar.status);
   const isNa = st.na || pillar.score == null;
   const score = pillar.score ?? 0;
+  // Grade against what was actually checkable. A pillar capped at 50 because no
+  // source publishes the other fields shouldn't render as though it lost points.
+  const obtainable = pillar.obtainablePoints ?? 100;
+  const partialCoverage = obtainable > 0 && obtainable < 100;
+  const barPct = obtainable > 0 ? Math.min(100, (score / obtainable) * 100) : 0;
   const Icon = PILLAR_ICONS[pillar.pillarNo] || Shield;
   const evidences = pillar.evidences ?? [];
   const findings = parseFindings(pillar.findings);
@@ -220,7 +225,10 @@ function PillarCard({ pillar }: { pillar: PillarResult }) {
             <div className="text-2xl font-extrabold text-gray-300">N/A</div>
           ) : (
             <>
-              <div className="text-2xl font-extrabold" style={{ color: st.color }}>{score}</div>
+              <div className="text-2xl font-extrabold" style={{ color: st.color }}>
+                {score}
+                {partialCoverage && <span className="text-sm font-bold text-gray-300">/{obtainable}</span>}
+              </div>
               <div className="text-[10px] text-gray-400">{t("report.scoreUnit")}</div>
             </>
           )}
@@ -228,9 +236,16 @@ function PillarCard({ pillar }: { pillar: PillarResult }) {
       </div>
 
       {!isNa && (
-        <div className="w-full bg-gray-100 rounded-full h-1.5 mb-3">
-          <div className="h-1.5 rounded-full transition-all duration-700" style={{ width: `${score}%`, backgroundColor: st.color }} />
-        </div>
+        <>
+          <div className="w-full bg-gray-100 rounded-full h-1.5 mb-3">
+            <div className="h-1.5 rounded-full transition-all duration-700" style={{ width: `${barPct}%`, backgroundColor: st.color }} />
+          </div>
+          {partialCoverage && (
+            <p className="text-[11px] text-gray-400 -mt-1.5 mb-3">
+              {t("report.partialCoverage", { obtainable })}
+            </p>
+          )}
+        </>
       )}
 
       <div className="flex items-center justify-between">

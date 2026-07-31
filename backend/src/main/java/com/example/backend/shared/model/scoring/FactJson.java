@@ -36,12 +36,21 @@ public class FactJson {
         private String domain;              // ground truth from P2Data — lets the rubric link evidence to the site/RDAP record
     }
 
+    /**
+     * Trade PRESENCE, not trade history. Customs manifest data (shipment counts,
+     * routes, volume trends) has no free source anywhere — the two the pipeline
+     * used to scrape are gone (ecosys.vcci.com.vn no longer resolves, importyeti
+     * blocks server-side clients). Everything here is an indirect signal that must
+     * carry a URL the customer can open, so the report never asserts trade activity
+     * it cannot show.
+     */
     @Data @NoArgsConstructor @AllArgsConstructor @Builder
     public static class P3Facts {
-        private Boolean hasTradeHistory;
-        private Integer shipmentCountYear;
-        private Boolean isIndustryMatched;
-        private String tradeTrend;         // GROWING | STABLE | DECLINING
+        private String b2bProfileUrl;        // Alibaba / Made-in-China / EC21 / TradeIndia profile
+        private String directoryUrl;         // industry directory or trade-fair exhibitor listing
+        private Boolean websiteHasTradeContent; // import/export or HS-code content on their own site
+        private Integer tradeNewsMentions;   // distinct trade-related news/press hits
+        private Boolean isIndustryMatched;   // declared trade lines vs the registry's recorded industry
     }
 
     @Data @NoArgsConstructor @AllArgsConstructor @Builder

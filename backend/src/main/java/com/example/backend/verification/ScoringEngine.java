@@ -2,8 +2,7 @@ package com.example.backend.verification;
 
 import com.example.backend.verification.crawler.p1.CrawlerP1Router;
 import com.example.backend.verification.crawler.p2.CrawlerP2;
-import com.example.backend.verification.crawler.p3.CrawlerP3Intl;
-import com.example.backend.verification.crawler.p3.CrawlerP3VN;
+import com.example.backend.verification.crawler.p3.CrawlerP3;
 import com.example.backend.verification.crawler.p4.CrawlerP4;
 import com.example.backend.verification.crawler.p5.CrawlerP5Router;
 import com.example.backend.verification.crawler.p6.CrawlerP6;
@@ -54,8 +53,7 @@ public class ScoringEngine {
 
     private final CrawlerP1Router crawlerP1;
     private final CrawlerP2 crawlerP2;
-    private final CrawlerP3VN crawlerP3VN;
-    private final CrawlerP3Intl crawlerP3Intl;
+    private final CrawlerP3 crawlerP3;
     private final CrawlerP4 crawlerP4;
     private final CrawlerP5Router crawlerP5Router;
     private final CrawlerP6 crawlerP6;
@@ -89,6 +87,11 @@ public class ScoringEngine {
             report.setHardStop(result.isHardStop());
             report.setStatus(result.getStatus());
             report.setRiskLevel(result.getRiskLevel());
+            // Show the registry's official name once we know it — a report started
+            // from a tax ID was titled "0107781148" on every screen it appeared on.
+            if (result.getCompanyName() != null && !result.getCompanyName().isBlank()) {
+                report.setEntityName(result.getCompanyName());
+            }
             if (result.getRegistrationId() != null && !result.getRegistrationId().isBlank()) {
                 if ("MST_VN".equals(result.getRegistrationType())) {
                     report.setTaxId(result.getRegistrationId());
@@ -142,50 +145,69 @@ public class ScoringEngine {
 
     private ScoringResult runPipeline(CompanyInput input, UUID reportId, Report report,
                                        Consumer<String> sseCallback, String language) {
-        emit(sseCallback, "crawler", "thinking", "Đang kiểm tra danh sách trừng phạt...");
+        boolean en = isEnglish(language);
+        emit(sseCallback, "crawler", "thinking",
+            en ? "Screening sanctions lists..." : "Đang kiểm tra danh sách trừng phạt...");
 
         // Step 1: P6 FIRST and sequential. A sanctioned company is a hard-stop, so
         // there's no point spending Gemini/Tavily/Places on the other 7 pillars.
         P6Data p6 = crawlerP6.fetch(input);
         if (p6.isSanctioned()) {
-            emit(sseCallback, "safety", "done", "HARD STOP — " + input.getName() + " nằm trong danh sách trừng phạt");
+            emit(sseCallback, "safety", "done", "HARD STOP — " + input.getName()
+                + (en ? " appears on a sanctions list" : " nằm trong danh sách trừng phạt"));
             return ScoringResult.builder()
                 .reportId(reportId).companyName(input.getName())
                 .overallScore(0).hardStop(true)
-                .hardStopReason("Nằm trong danh sách trừng phạt: " + p6.getSanctionSource())
+                .hardStopReason((en ? "Listed on a sanctions list: " : "Nằm trong danh sách trừng phạt: ")
+                    + p6.getSanctionSource())
                 .riskLevel("Nghiêm trọng").status("HARD_STOP")
                 .pillars(List.of(rubricLoader.getRubric().scoreP6(
                     FactJson.P6Facts.builder().isSanctionHit(true).build(), null, language)))
                 .build();
         }
 
-        // Step 2: not sanctioned — fan out the remaining crawlers on the dedicated pool.
-        emit(sseCallback, "crawler", "thinking", "Đang thu thập dữ liệu từ các nguồn còn lại...");
-        CompletableFuture<P1Data> p1f = CompletableFuture.supplyAsync(() -> crawlerP1.fetch(input), crawlerPool);
-        CompletableFuture<P2Data> p2f = CompletableFuture.supplyAsync(() -> crawlerP2.fetch(input), crawlerPool);
-        CompletableFuture<P3Data> p3f = CompletableFuture.supplyAsync(() ->
-            input.isVietnam() ? crawlerP3VN.fetch(input) : crawlerP3Intl.fetch(input), crawlerPool);
-        CompletableFuture<P4Data> p4f = CompletableFuture.supplyAsync(() -> crawlerP4.fetch(input), crawlerPool);
+        // Step 2: P1 next, also sequential. It is the only pillar that establishes
+        // WHICH company this is. Every other crawler searches by name, so running
+        // them on the caller's raw input made them search a bare tax ID like
+        // "0107781148" — P2 then locked onto the lookup site and ran RDAP/SSL
+        // against masothue.com as if it were the partner's own website.
+        emit(sseCallback, "crawler", "thinking",
+            en ? "Establishing the company's identity..." : "Đang xác định danh tính doanh nghiệp...");
+        P1Data p1 = crawlerP1.fetch(input);
+        CompanyInput resolved = resolveIdentity(input, p1);
+        if (!java.util.Objects.equals(resolved.getName(), input.getName())) {
+            log.info("Resolved '{}' → '{}' for report {}", input.getName(), resolved.getName(), reportId);
+            emit(sseCallback, "crawler", "done",
+                (en ? "Identified: " : "Đã xác định: ") + resolved.getName());
+        }
+
+        // Step 3: fan out the remaining crawlers — on the RESOLVED identity.
+        emit(sseCallback, "crawler", "thinking",
+            en ? "Collecting data from the remaining sources..." : "Đang thu thập dữ liệu từ các nguồn còn lại...");
+        CompletableFuture<P2Data> p2f = CompletableFuture.supplyAsync(() -> crawlerP2.fetch(resolved), crawlerPool);
+        CompletableFuture<P3Data> p3f = CompletableFuture.supplyAsync(() -> crawlerP3.fetch(resolved), crawlerPool);
+        CompletableFuture<P4Data> p4f = CompletableFuture.supplyAsync(() -> crawlerP4.fetch(resolved), crawlerPool);
         CompletableFuture<P5Data> p5f = CompletableFuture.supplyAsync(() ->
-            crawlerP5Router.fetch(input), crawlerPool);
-        CompletableFuture<P8Data> p8f = CompletableFuture.supplyAsync(() -> crawlerP8.fetch(input), crawlerPool);
+            crawlerP5Router.fetch(resolved), crawlerPool);
+        CompletableFuture<P8Data> p8f = CompletableFuture.supplyAsync(() -> crawlerP8.fetch(resolved), crawlerPool);
 
-        CompletableFuture.allOf(p1f, p2f, p3f, p4f, p5f, p8f).join();
+        CompletableFuture.allOf(p2f, p3f, p4f, p5f, p8f).join();
 
-        P1Data p1 = getOrSkip(p1f, input, "P1");
-        P2Data p2 = getOrSkip(p2f, input, "P2");
-        P3Data p3 = getOrSkip(p3f, input, "P3");
-        P4Data p4 = getOrSkip(p4f, input, "P4");
-        P5Data p5 = getOrSkip(p5f, input, "P5");
-        P8Data p8 = getOrSkip(p8f, input, "P8");
+        P2Data p2 = getOrSkip(p2f, resolved, "P2");
+        P3Data p3 = getOrSkip(p3f, resolved, "P3");
+        P4Data p4 = getOrSkip(p4f, resolved, "P4");
+        P5Data p5 = getOrSkip(p5f, resolved, "P5");
+        P8Data p8 = getOrSkip(p8f, resolved, "P8");
         // P7 has no crawler — a user has never provided transaction data at all on
         // a first scan, so this stays SKIP here. If a contract is later uploaded and
         // link-verified against this report, recomputeP7() replaces just this pillar
         // without re-running the rest of the pipeline (and without a second quota hit).
         P7Data p7 = P7Data.builder().state(PillarData.DataState.SKIP).companyName(input.getName())
-            .errorMsg("Chưa có thông tin giao dịch từ user").fetchedAt(java.time.LocalDateTime.now()).build();
+            .errorMsg(en ? "No transaction information provided yet" : "Chưa có thông tin giao dịch từ user")
+            .fetchedAt(java.time.LocalDateTime.now()).build();
 
-        emit(sseCallback, "scoring", "thinking", "Đang phân tích và tính điểm...");
+        emit(sseCallback, "scoring", "thinking",
+            en ? "Analysing and scoring..." : "Đang phân tích và tính điểm...");
 
         // Step 3: Extract facts
         FactJson facts = factExtractor.extract(p1, p2, p3, p4, p5, p6, p7, p8);
@@ -212,11 +234,38 @@ public class ScoringEngine {
         String riskLevel = rubric.getRiskLevel(overallScore);
 
         return ScoringResult.builder()
-            .reportId(reportId).companyName(input.getName())
+            .reportId(reportId).companyName(resolved.getName())
             .overallScore(overallScore).hardStop(false).riskLevel(riskLevel)
             .status("DONE").pillars(pillars)
             .registrationId(p1.getRegistrationId())
             .registrationType(p1.getRegistrationType())
+            .build();
+    }
+
+    /**
+     * Swaps the caller's identity for the registry's own once P1 has found it.
+     * A Deep Verify usually starts from a tax ID or an approximate name, while
+     * every downstream crawler searches by name — so the registry's official name
+     * is what they must be given. Falls back to the caller's input untouched when
+     * P1 found nothing, so an unresolvable company still gets scanned.
+     */
+    private CompanyInput resolveIdentity(CompanyInput input, P1Data p1) {
+        if (p1 == null || !p1.isFound()) return input;
+        String registryName = p1.getCompanyName();
+        if (registryName == null || registryName.isBlank()) return input;
+        String taxId = input.getTaxId() != null ? input.getTaxId()
+            : ("MST_VN".equals(p1.getRegistrationType()) ? p1.getRegistrationId() : null);
+        // Discover the website once here rather than letting P2, P3 and P8 each
+        // guess at it independently — one shared answer, one Tavily call.
+        String website = input.getWebsite() != null && !input.getWebsite().isBlank()
+            ? input.getWebsite()
+            : crawlerP2.discoverWebsite(registryName, input.getCountry());
+        return CompanyInput.builder()
+            .companyName(registryName)
+            .taxId(taxId)
+            .country(input.getCountry())
+            .website(website)
+            .registryAddress(p1.getAddress())
             .build();
     }
 
@@ -228,6 +277,8 @@ public class ScoringEngine {
             pr.setReport(report);
             pr.setPillarNo((short) ps.getPillarNo());
             pr.setScore(ps.getScore() != null ? ps.getScore().shortValue() : null);
+            pr.setObtainablePoints(ps.getObtainablePoints() != null
+                ? ps.getObtainablePoints().shortValue() : null);
             pr.setFindings(ps.getFindings());
             pr.setStatus(ps.getStatus());
             pr.setConfidence(ps.getConfidence());
@@ -312,6 +363,16 @@ public class ScoringEngine {
             T skip = (T) PillarData.skip(input, label + " future error");
             return skip;
         }
+    }
+
+    /**
+     * Deep Verify progress text and the hard-stop reason follow the user's UI
+     * language. Report.riskLevel deliberately does NOT — it stays canonical
+     * Vietnamese because other code compares it literally and the frontend
+     * translates it for display.
+     */
+    private static boolean isEnglish(String language) {
+        return "en".equalsIgnoreCase(language);
     }
 
     private void emit(Consumer<String> sseCallback, String agent, String status, String message) {

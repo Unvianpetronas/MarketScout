@@ -42,10 +42,13 @@ const EXAMPLE_QUERIES = [
   "Alibaba Group, CN",
 ];
 
-function getRiskColor(score: number | null | undefined) {
+// Trust-based color for a report score: higher = more trustworthy = green.
+// Thresholds mirror trustStyle() on the report detail page so one report never
+// shows a different colour on two screens.
+function getTrustColor(score: number | null | undefined) {
   if (!score && score !== 0) return "#9CA3AF";
-  if (score < 40) return "#059669";
-  if (score < 70) return "#F59E0B";
+  if (score >= 75) return "#059669";
+  if (score >= 40) return "#F59E0B";
   return "#EF4444";
 }
 
@@ -53,8 +56,8 @@ function ScoreRing({ score }: { score: number | null | undefined }) {
   if (!score && score !== 0) return (
     <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-xs text-gray-300 shrink-0">—</div>
   );
-  const color = getRiskColor(score);
-  const bg = score < 40 ? "#E7F6EF" : score < 70 ? "#FFF8E7" : "#FFF1F0";
+  const color = getTrustColor(score);
+  const bg = score >= 75 ? "#E7F6EF" : score >= 40 ? "#FFF8E7" : "#FFF1F0";
   const r = 18; const circ = 2 * Math.PI * r;
   const offset = circ - (score / 100) * circ;
   return (

@@ -48,12 +48,12 @@ public class CrawlerP1Router {
                 log.info("P1 CASE 1: VN + MST {} → VietQR", input.getTaxId());
                 return crawlerP1VN.fetchByMST(input.getTaxId());
             } else {
-                log.info("P1 CASE 2: VN + name only → masothue.vn search for {}", input.getName());
+                log.info("P1 CASE 2: VN + name only → MST lookup for {}", input.getName());
                 P1Data result = crawlerP1VN.findMSTByName(input.getName());
-                // CASE 2b: masothue.vn không tìm thấy và tên không có dấu tiếng Việt
+                // CASE 2b: không tra được MST và tên không có dấu tiếng Việt
                 // → có thể là công ty nước ngoài bị route nhầm, thử GLEIF
                 if (!result.isFound() && looksLikeForeignName(input.getName())) {
-                    log.info("P1 CASE 2b: masothue.vn not found + no VN diacritics → trying GLEIF for '{}'", input.getName());
+                    log.info("P1 CASE 2b: no VN match + no VN diacritics → trying GLEIF for '{}'", input.getName());
                     return crawlerP1Intl.fetchByName(input.getName(), input.getCountry());
                 }
                 return result;

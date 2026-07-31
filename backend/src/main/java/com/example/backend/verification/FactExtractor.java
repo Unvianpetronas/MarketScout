@@ -90,9 +90,9 @@ public class FactExtractor {
             if (p1 != null && p1.isFound()) {
                 var p1n = node.path("p1");
                 f.setP1(FactJson.P1Facts.builder()
-                    .status(text(p1n, "status"))
-                    .ageYears(doubleVal(p1n, "age_years"))
-                    .hasLegalRepresentative(boolVal(p1n, "has_legal_representative"))
+                    .status(pick(p1.getStatus(), text(p1n, "status")))
+                    .ageYears(pick(p1.getAgeYears(), doubleVal(p1n, "age_years")))
+                    .hasLegalRepresentative(pick(p1.getHasLegalRepresentative(), boolVal(p1n, "has_legal_representative")))
                     .industryMatch(text(p1n, "industry_match"))
                     .registrationId(p1.getRegistrationId())
                     .registrationType(p1.getRegistrationType())
@@ -105,11 +105,11 @@ public class FactExtractor {
             if (p2 != null && p2.isFound()) {
                 var p2n = node.path("p2");
                 f.setP2(FactJson.P2Facts.builder()
-                    .hasOfficialWebsite(boolVal(p2n, "has_official_website"))
-                    .domainAgeMonths(intVal(p2n, "domain_age_months"))
-                    .usesFreeEmail(boolVal(p2n, "uses_free_email"))
-                    .hasSsl(boolVal(p2n, "has_ssl"))
-                    .socialMediaScore(text(p2n, "social_media_score"))
+                    .hasOfficialWebsite(pick(p2.getHasOfficialWebsite(), boolVal(p2n, "has_official_website")))
+                    .domainAgeMonths(pick(p2.getDomainAgeMonths(), intVal(p2n, "domain_age_months")))
+                    .usesFreeEmail(pick(p2.getUsesFreeEmail(), boolVal(p2n, "uses_free_email")))
+                    .hasSsl(pick(p2.getHasSsl(), boolVal(p2n, "has_ssl")))
+                    .socialMediaScore(pick(p2.getSocialMediaScore(), text(p2n, "social_media_score")))
                     .facebookPages(p2.getFacebookPages())
                     .domain(p2.getDomain())
                     .build());
@@ -118,11 +118,14 @@ public class FactExtractor {
             // P3
             if (p3 != null && p3.isFound()) {
                 var p3n = node.path("p3");
+                // URLs are ground truth only — a link Gemini "remembered" would be a
+                // fabricated citation, which is the one thing P3 must never produce.
                 f.setP3(FactJson.P3Facts.builder()
-                    .hasTradeHistory(boolVal(p3n, "has_trade_history"))
-                    .shipmentCountYear(intVal(p3n, "shipment_count_year"))
-                    .isIndustryMatched(boolVal(p3n, "is_industry_matched"))
-                    .tradeTrend(text(p3n, "trade_trend"))
+                    .b2bProfileUrl(p3.getB2bProfileUrl())
+                    .directoryUrl(p3.getDirectoryUrl())
+                    .websiteHasTradeContent(pick(p3.getWebsiteHasTradeContent(), boolVal(p3n, "website_has_trade_content")))
+                    .tradeNewsMentions(pick(p3.getTradeNewsMentions(), intVal(p3n, "trade_news_mentions")))
+                    .isIndustryMatched(pick(p3.getIsIndustryMatched(), boolVal(p3n, "is_industry_matched")))
                     .build());
             }
 
@@ -130,9 +133,9 @@ public class FactExtractor {
             if (p4 != null && p4.isFound()) {
                 var p4n = node.path("p4");
                 f.setP4(FactJson.P4Facts.builder()
-                    .identityMatchLevel(text(p4n, "identity_match_level"))
-                    .addressVerified(boolVal(p4n, "address_verified"))
-                    .ceoVerified(boolVal(p4n, "ceo_verified"))
+                    .identityMatchLevel(pick(p4.getIdentityMatchLevel(), text(p4n, "identity_match_level")))
+                    .addressVerified(pick(p4.getAddressVerified(), boolVal(p4n, "address_verified")))
+                    .ceoVerified(pick(p4.getCeoVerified(), boolVal(p4n, "ceo_verified")))
                     .build());
             }
 
@@ -142,10 +145,10 @@ public class FactExtractor {
             if (p5 != null && p5.isFound()) {
                 var p5n = node.path("p5");
                 f.setP5(FactJson.P5Facts.builder()
-                    .taxComplianceStatus(text(p5n, "tax_compliance_status"))
-                    .registeredCapitalUsd(doubleVal(p5n, "registered_capital_usd"))
-                    .hasFinancialReport(boolVal(p5n, "has_financial_report"))
-                    .revenueTrend(text(p5n, "revenue_trend"))
+                    .taxComplianceStatus(pick(p5.getTaxComplianceStatus(), text(p5n, "tax_compliance_status")))
+                    .registeredCapitalUsd(pick(p5.getRegisteredCapitalUsd(), doubleVal(p5n, "registered_capital_usd")))
+                    .hasFinancialReport(pick(p5.getHasFinancialReport(), boolVal(p5n, "has_financial_report")))
+                    .revenueTrend(pick(p5.getRevenueTrend(), text(p5n, "revenue_trend")))
                     .dataSource(p5.getDataSource())
                     .build());
             }
@@ -179,10 +182,10 @@ public class FactExtractor {
             if (p8 != null && p8.isFound()) {
                 var p8n = node.path("p8");
                 f.setP8(FactJson.P8Facts.builder()
-                    .hasVerifiedLocation(boolVal(p8n, "has_verified_location"))
-                    .isStockImageUsed(boolVal(p8n, "is_stock_image_used"))
-                    .hasPhysicalEvidence(boolVal(p8n, "has_physical_evidence"))
-                    .employeeCountRange(text(p8n, "employee_count_range"))
+                    .hasVerifiedLocation(pick(p8.getHasVerifiedLocation(), boolVal(p8n, "has_verified_location")))
+                    .isStockImageUsed(pick(p8.getIsStockImageUsed(), boolVal(p8n, "is_stock_image_used")))
+                    .hasPhysicalEvidence(pick(p8.getHasPhysicalEvidence(), boolVal(p8n, "has_physical_evidence")))
+                    .employeeCountRange(pick(p8.getEmployeeCountRange(), text(p8n, "employee_count_range")))
                     .build());
             }
 
@@ -212,8 +215,10 @@ public class FactExtractor {
         }
         if (p3 != null && p3.isFound()) {
             f.setP3(FactJson.P3Facts.builder()
-                .hasTradeHistory(p3.getHasTradeHistory()).shipmentCountYear(p3.getShipmentCountYear())
-                .isIndustryMatched(p3.getIsIndustryMatched()).tradeTrend(p3.getTradeTrend()).build());
+                .b2bProfileUrl(p3.getB2bProfileUrl()).directoryUrl(p3.getDirectoryUrl())
+                .websiteHasTradeContent(p3.getWebsiteHasTradeContent())
+                .tradeNewsMentions(p3.getTradeNewsMentions())
+                .isIndustryMatched(p3.getIsIndustryMatched()).build());
         }
         if (p4 != null && p4.isFound()) {
             f.setP4(FactJson.P4Facts.builder()
@@ -241,6 +246,20 @@ public class FactExtractor {
                 .hasPhysicalEvidence(p8.getHasPhysicalEvidence()).employeeCountRange(p8.getEmployeeCountRange()).build());
         }
         return f;
+    }
+
+    /**
+     * Crawler ground truth wins; Gemini only fills what the crawler left null.
+     *
+     * The crawlers already hold these as typed fields, but every one of them used
+     * to be re-derived from Gemini's reading of a formatted rawText string. That is
+     * how one report could state "no official website" next to "domain is 127
+     * months old" and "has an SSL certificate" — three independent LLM reads of the
+     * same sentence, disagreeing with each other and with the crawler that measured
+     * them. Gemini stays useful for what only prose can answer.
+     */
+    private <T> T pick(T groundTruth, T geminiRead) {
+        return groundTruth != null ? groundTruth : geminiRead;
     }
 
     private String text(com.fasterxml.jackson.databind.JsonNode node, String field) {

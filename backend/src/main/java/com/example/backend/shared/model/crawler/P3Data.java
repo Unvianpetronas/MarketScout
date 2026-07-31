@@ -11,10 +11,16 @@ import lombok.experimental.SuperBuilder;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
+/**
+ * Trade presence signals. Shipment counts and volume trends were removed with the
+ * scrapers that once (nominally) supplied them — no free source publishes customs
+ * manifests, so those fields could only ever be null or invented.
+ */
 public class P3Data extends PillarData {
-    private Boolean hasTradeHistory;
-    private Integer shipmentCountYear;
+    private String b2bProfileUrl;
+    private String directoryUrl;
+    private Boolean websiteHasTradeContent;
+    private Integer tradeNewsMentions;
     private Boolean isIndustryMatched;
-    private String tradeTrend; // GROWING | STABLE | DECLINING
     private String tradeCountries;
 }

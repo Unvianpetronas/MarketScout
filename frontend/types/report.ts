@@ -25,6 +25,9 @@ export interface PillarResult {
   pillarNo: number;
   pillarName: string;
   score: number | null;
+  /** Points this pillar could earn given available data. Null on reports scored
+   *  before coverage was tracked — those still render out of 100. */
+  obtainablePoints?: number | null;
   status?: string;
   confidence?: string;
   findings?: string;       // raw JSON string from backend

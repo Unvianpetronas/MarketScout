@@ -102,6 +102,8 @@ public class ReportDTO {
         private int pillarNo;
         private String pillarName;
         private Integer score;
+        /** Points this pillar could earn given available data; null on pre-V11 reports. */
+        private Integer obtainablePoints;
         private String status;
         private String confidence;
         private String findings;

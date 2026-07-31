@@ -45,19 +45,47 @@ public class ReportRecommendationService {
         2. Cần YÊU CẦU ĐỐI TÁC CUNG CẤP THÊM tài liệu/thông tin gì.
         3. Cần TỰ XÁC MINH ĐỘC LẬP thông tin gì (và bằng cách nào).
 
-        Quy tắc:
-        - Ưu tiên các trụ cột có trạng thái FAIL/WARN hoặc điểm thấp.
-        - KHÔNG bịa đặt; chỉ dựa trên dữ liệu được cung cấp.
-        - Mỗi mục ngắn gọn, hành động được, bằng tiếng Việt.
+        QUY TẮC CÁ BIỆT HOÁ — quan trọng nhất, quyết định chất lượng đầu ra:
+        - Mỗi mục PHẢI neo vào một dữ kiện có thật trong hồ sơ bên dưới: nhắc tên
+          công ty, mã trụ cột (P1..P8), hoặc đúng phát hiện/thông tin còn thiếu đã
+          nêu. Người đọc phải thấy đây là lời khuyên cho RIÊNG hồ sơ này, không
+          phải một danh sách dùng được cho bất kỳ công ty nào.
+        - Khi khuyên tra cứu, PHẢI gọi đúng tên cơ quan đăng ký / cổng tra cứu
+          chính thức của nước ghi ở mục QUỐC GIA (ví dụ VN → Cổng thông tin quốc
+          gia về đăng ký doanh nghiệp, tra cứu mã số thuế của Tổng cục Thuế;
+          GB → Companies House; US → SEC EDGAR và Secretary of State của bang;
+          SG → ACRA; KR → DART). TUYỆT ĐỐI KHÔNG viết chung chung kiểu "các cổng
+          thông tin chính phủ" hay "cơ quan có thẩm quyền".
+        - KHÔNG yêu cầu đối tác cung cấp thứ đã nằm trong mục ĐỊNH DANH ĐÃ CÓ.
+        - CẤM câu rỗng nghĩa ("kiểm tra kỹ", "xác minh cẩn thận", "đảm bảo tính
+          chính xác", "thu thập thêm thông tin") nếu không kèm ĐỐI TƯỢNG cụ thể
+          và CÁCH LÀM cụ thể.
+        - KHÔNG lấn sân Deal Safety: bỏ hẳn lời khuyên về Incoterm, phương thức
+          thanh toán (L/C, T/T, escrow), tỷ lệ đặt cọc, an toàn tài khoản ngân
+          hàng — báo cáo đã có mục riêng cho những thứ đó.
+        - KHÔNG bịa; chỉ dùng dữ liệu được cung cấp. Thiếu dữ kiện thì trả ít mục,
+          không độn thêm cho đủ số lượng.
+
+        HIỆU CHỈNH THEO MỨC ĐỘ RỦI RO:
+        - Trụ cột đã PASS: KHÔNG sinh khuyến nghị cho trụ cột đó.
+        - Điểm tổng >= 75 và không có trụ cột FAIL: giọng nhẹ, 2 mục mỗi danh sách
+          là đủ, chỉ nêu khâu còn thiếu. Không doạ rủi ro vô căn cứ.
+        - Có trụ cột FAIL hoặc điểm tổng < 40: nêu rõ điều kiện tiên quyết bắt
+          buộc xử lý xong TRƯỚC khi giao dịch.
+        - Có BỐI CẢNH GIAO DỊCH: cân mức độ thẩm định cho tương xứng giá trị giao
+          dịch — đừng bắt làm thẩm định nặng cho một đơn hàng nhỏ.
+
+        ĐỊNH DẠNG:
+        - Mỗi mục là 1 câu, mở đầu bằng động từ, tối đa 30 từ, bằng tiếng Việt.
+        - Mỗi danh sách 2-5 mục, đúng bằng số vấn đề thực có.
         - CHỈ trả về JSON hợp lệ theo đúng schema sau, KHÔNG kèm giải thích,
           KHÔNG markdown, KHÔNG ```:
         {
-          "summary": "1-2 câu tóm tắt nên ưu tiên xử lý điều gì",
+          "summary": "1-2 câu nêu đúng việc cần ưu tiên nhất cho hồ sơ này",
           "actionItems": ["...", "..."],
           "infoToProvide": ["...", "..."],
           "infoToVerify": ["...", "..."]
         }
-        Mỗi danh sách 2-5 mục.
         """;
 
     private static final String SYSTEM_PROMPT_EN = """
@@ -72,19 +100,48 @@ public class ReportRecommendationService {
         2. What should be REQUESTED FROM THE PARTNER as additional documents/info.
         3. What should be INDEPENDENTLY VERIFIED (and how).
 
-        Rules:
-        - Prioritize pillars with FAIL/WARN status or a low score.
-        - DO NOT fabricate; base everything only on the data provided.
-        - Each item should be short and actionable, in English.
+        SPECIFICITY RULES — the most important part; they decide output quality:
+        - Every item MUST anchor to a real fact in the dossier below: name the
+          company, the pillar code (P1..P8), or the exact finding/missing item
+          reported. The reader must see advice written for THIS dossier, not a
+          checklist that would fit any company.
+        - When advising a lookup, name the actual registry / official portal of
+          the country given under COUNTRY (e.g. VN → National Business
+          Registration Portal and the General Department of Taxation tax-ID
+          lookup; GB → Companies House; US → SEC EDGAR and the state Secretary
+          of State; SG → ACRA; KR → DART). NEVER write vague phrases like
+          "government portals" or "the competent authority".
+        - DO NOT ask the partner for anything already listed under IDENTIFIERS
+          ALREADY KNOWN.
+        - BANNED empty phrasing ("check carefully", "verify thoroughly", "ensure
+          accuracy", "gather more information") unless paired with a concrete
+          OBJECT and a concrete METHOD.
+        - DO NOT encroach on Deal Safety: drop all advice about Incoterms,
+          payment method (L/C, T/T, escrow), deposit percentage, or bank-account
+          safety — the report has a dedicated section for those.
+        - DO NOT fabricate; use only the data provided. If facts are thin, return
+          fewer items rather than padding the list.
+
+        CALIBRATION BY RISK:
+        - A pillar that PASSED: emit NO recommendation for it.
+        - Overall >= 75 with no FAIL pillar: light tone, 2 items per list is
+          enough, cover only what is genuinely missing. No unfounded alarm.
+        - Any FAIL pillar or overall < 40: state the prerequisites that must be
+          cleared BEFORE transacting.
+        - If DEAL CONTEXT is present: scale the diligence to the deal value —
+          do not demand heavy diligence for a small order.
+
+        FORMAT:
+        - Each item is one sentence, starts with a verb, max 30 words, in English.
+        - Each list has 2-5 items, matching the number of real issues.
         - Return ONLY valid JSON matching the schema below, NO explanation,
           NO markdown, NO ```:
         {
-          "summary": "1-2 sentences on what to prioritize",
+          "summary": "1-2 sentences on the single highest priority for this dossier",
           "actionItems": ["...", "..."],
           "infoToProvide": ["...", "..."],
           "infoToVerify": ["...", "..."]
         }
-        Each list should have 2-5 items.
         """;
 
     private final GeminiService geminiService;
@@ -135,23 +192,86 @@ public class ReportRecommendationService {
     private String buildPrompt(Report report, List<PillarResult> pillars) {
         StringBuilder sb = new StringBuilder();
         sb.append("CÔNG TY: ").append(report.getEntityName()).append("\n");
+        // The country decides WHICH registry the advice should name; without it
+        // the model can only fall back to "government portals" boilerplate.
+        sb.append("QUỐC GIA: ").append(orDash(report.getCountryIso2())).append("\n");
         sb.append("ĐIỂM TỔNG: ").append(report.getOverallScore()).append("/100\n");
         sb.append("MỨC RỦI RO: ").append(report.getRiskLevel()).append("\n");
         if (Boolean.TRUE.equals(report.getHardStop())) sb.append("CẢNH BÁO: HARD STOP\n");
+
+        appendIdentifiers(sb, report);
+        appendDealContext(sb, report);
+
         sb.append("\nKẾT QUẢ TỪNG TRỤ CỘT:\n");
         if (pillars != null) {
             for (PillarResult p : pillars) {
-                sb.append(String.format("- P%d %s: %s (%s)",
+                sb.append(String.format("- P%d %s: %s (%s%s)",
                     p.getPillarNo(), p.getPillarName(),
                     p.getScore() != null ? p.getScore() + "/100" : "N/A",
-                    p.getStatus()));
+                    p.getStatus(),
+                    p.getConfidence() != null && !p.getConfidence().isBlank()
+                        ? ", độ tin cậy " + p.getConfidence() : ""));
                 if (p.getFindings() != null && !p.getFindings().isBlank()) {
                     sb.append(" — ").append(p.getFindings());
+                }
+                // Which sources were already consulted, so "verify independently"
+                // points somewhere new instead of repeating what we just did.
+                if (p.getSourcesUsed() != null && !p.getSourcesUsed().isBlank()) {
+                    sb.append("\n  Nguồn đã tra: ").append(truncate(p.getSourcesUsed(), 200));
                 }
                 sb.append("\n");
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * Splits the identifiers we already hold from the ones still missing, so the
+     * model stops telling customers to collect a tax ID we printed on the report.
+     */
+    private void appendIdentifiers(StringBuilder sb, Report report) {
+        List<String> known = new ArrayList<>();
+        List<String> missing = new ArrayList<>();
+        classify("website", report.getWebsite(), known, missing);
+        classify("mã số thuế", report.getTaxId(), known, missing);
+        classify("mã LEI", report.getLei(), known, missing);
+        sb.append("\nĐỊNH DANH ĐÃ CÓ (KHÔNG yêu cầu đối tác cung cấp lại): ")
+          .append(known.isEmpty() ? "chưa có gì" : String.join("; ", known)).append("\n");
+        sb.append("ĐỊNH DANH CÒN THIẾU: ")
+          .append(missing.isEmpty() ? "không thiếu" : String.join(", ", missing)).append("\n");
+    }
+
+    private void classify(String label, String value, List<String> known, List<String> missing) {
+        if (value != null && !value.isBlank()) known.add(label + " = " + value);
+        else missing.add(label);
+    }
+
+    /**
+     * Self-reported deal facts. Advisory only — they never touch scoring, but
+     * they let the advice scale to the size of the deal instead of prescribing
+     * the same diligence for a $2k sample order and a $2m contract.
+     */
+    private void appendDealContext(StringBuilder sb, Report report) {
+        List<String> parts = new ArrayList<>();
+        if (report.getSelfReportDealValueUsd() != null) {
+            parts.add("giá trị giao dịch khoảng " + report.getSelfReportDealValueUsd().toPlainString() + " USD");
+        }
+        if (report.getSelfReportHasWrittenContract() != null) {
+            parts.add(Boolean.TRUE.equals(report.getSelfReportHasWrittenContract())
+                ? "đã có hợp đồng thành văn" : "CHƯA có hợp đồng thành văn");
+        }
+        if (!parts.isEmpty()) {
+            sb.append("\nBỐI CẢNH GIAO DỊCH (khách tự khai): ")
+              .append(String.join("; ", parts)).append("\n");
+        }
+    }
+
+    private String orDash(String s) {
+        return s == null || s.isBlank() ? "—" : s;
+    }
+
+    private String truncate(String s, int max) {
+        return s.length() <= max ? s : s.substring(0, max) + "…";
     }
 
     /** Strip a leading/trailing ```json ... ``` fence Gemini sometimes adds. */

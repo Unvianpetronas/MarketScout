@@ -67,8 +67,20 @@ public class ContractExtractor {
         Tên công ty lấy đầy đủ tên pháp lý (kèm loại hình: TNHH, Cổ phần, JSC, Ltd, Inc, GmbH...), không
         viết tắt trừ khi văn bản chỉ ghi tên viết tắt.
 
+        Giá trị hợp đồng: tìm tổng giá trị/tổng tiền thanh toán ("Tổng giá trị hợp đồng", "Tổng cộng",
+        "Total contract value", "Total amount", "Grand total"). Ghi SỐ THUẦN vào "contractValue" (không
+        dấu phân cách, không ký hiệu tiền tệ — "1.250.000.000" → 1250000000) và mã tiền tệ ISO vào
+        "contractCurrency" ("VND", "USD", "EUR", "CNY"...). Nếu văn bản ghi cả tiền và chữ mà hai bên
+        KHÔNG khớp nhau, hạ confidence xuống dưới 0.5. Nếu chỉ có đơn giá mà không có tổng, để null.
+
+        depositPercent phải là PHẦN TRĂM dạng số nguyên (30 nghĩa là 30%), không phải tỷ lệ thập phân.
+        Nếu hợp đồng chỉ ghi số tiền đặt cọc, hãy quy ra phần trăm của tổng giá trị hợp đồng; không quy
+        được thì để null.
+
         {
           "incoterms": {"value": String|null, "confidence": Number, "sourceText": String|null},
+          "contractValue": {"value": Number|null, "confidence": Number, "sourceText": String|null},
+          "contractCurrency": {"value": String|null, "confidence": Number, "sourceText": String|null},
           "depositPercent": {"value": Number|null, "confidence": Number, "sourceText": String|null},
           "paymentMethod": {"value": String|null, "confidence": Number, "sourceText": String|null},
           "hasArbitrationClause": {"value": Boolean|null, "confidence": Number, "sourceText": String|null},
