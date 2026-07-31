@@ -3,12 +3,12 @@
 import Link from "next/link";
 import {
   BarChart2, Users, DollarSign, Database, CreditCard, FileWarning,
-  Gauge, History, Terminal, ArrowLeft, Search,
+  Gauge, ArrowLeft, Search,
 } from "lucide-react";
 
 export type AdminNavId =
   | "overview" | "customers" | "revenue" | "quota" | "billing" | "reports"
-  | "evaluation" | "history" | "logs";
+  | "evaluation";
 
 type NavItem = { id: AdminNavId; label: string; href: string; icon: React.ElementType };
 
@@ -23,13 +23,6 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       { id: "billing",   label: "Billing",          href: "/admin/billing",   icon: CreditCard },
       { id: "reports",   label: "Reports & Flags",  href: "/admin/reports",   icon: FileWarning },
       { id: "evaluation", label: "Đánh giá",        href: "/admin/evaluation", icon: Gauge },
-    ],
-  },
-  {
-    label: "KIỂM TOÁN & NHẬT KÝ",
-    items: [
-      { id: "history", label: "Lịch sử",     href: "/admin/history", icon: History },
-      { id: "logs",    label: "System Logs", href: "/admin/logs",    icon: Terminal },
     ],
   },
 ];
