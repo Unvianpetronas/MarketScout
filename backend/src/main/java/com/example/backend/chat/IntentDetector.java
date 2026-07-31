@@ -25,7 +25,11 @@ public class IntentDetector {
         - VERIFY_PARTNER: thẩm định TOÀN DIỆN, đánh giá rủi ro đối tác, chấm điểm đầy đủ 8 trụ cột.
         - COMPARE_PARTNERS: so sánh, A vs B, cái nào tốt hơn
         - EXPLAIN_REPORT: tại sao điểm thấp, giải thích điểm, kết quả báo cáo
-        - GENERAL_QA: LC là gì, FOB là gì, Incoterms, tư vấn thương mại
+        - GENERAL_QA: mọi câu hỏi/trao đổi KHÔNG nhắm vào một công ty cụ thể — nghiệp vụ xuất nhập
+          khẩu (L/C, Incoterms, FOB/CIF, thanh toán, vận tải, hải quan, chứng từ), tìm hiểu một
+          thị trường hay ngành hàng, kinh nghiệm làm việc với đối tác nước ngoài, hỏi nối tiếp
+          trong cuộc trò chuyện, và cả trò chuyện thông thường. Đây cũng là intent mặc định khi
+          không rõ người dùng muốn gì.
 
         Phân biệt LOOKUP_COMPANY vs VERIFY_PARTNER:
         - "tra/kiểm tra/có thật/MST/thông tin của X" → LOOKUP_COMPANY (rẻ hơn, không tốn quota).

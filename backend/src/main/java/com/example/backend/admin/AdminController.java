@@ -260,7 +260,13 @@ public class AdminController {
      * explaining the correction is mandatory (also required to clear one),
      * and every call is written to the audit log.
      */
+    // Session-open (OSIV is disabled) so toReportSummary can read the lazy
+    // user/overriddenBy associations when building the response. Without it the
+    // correction was written and committed, then the response mapping threw
+    // LazyInitializationException — so the admin saw "Không thể lưu điều chỉnh"
+    // on a save that had in fact already gone through.
     @PatchMapping("/reports/{id}/override")
+    @Transactional
     public ResponseEntity<AdminDTO.ReportSummary> overrideReport(
             @PathVariable UUID id,
             @Valid @RequestBody AdminDTO.ReportOverrideRequest req,
