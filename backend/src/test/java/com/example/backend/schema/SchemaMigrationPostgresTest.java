@@ -95,11 +95,26 @@ class SchemaMigrationPostgresTest {
   }
 
   @Test
-  void everyMigrationAppliesCleanlyToAnEmptyDatabase() {
+  void everyMigrationAppliesCleanlyToAnEmptyDatabase() throws Exception {
     assertThat(migrateResult.success).isTrue();
     assertThat(migrateResult.migrationsExecuted)
         .as("all V*.sql files in db/migration should apply")
-        .isEqualTo(10);
+        .isEqualTo(migrationFileCount());
+  }
+
+  /**
+   * Counted off disk rather than hardcoded. A literal here turns every new
+   * migration into a CI failure unrelated to the migration itself, which trains
+   * people to bump the number instead of reading what broke — while still not
+   * catching the thing it was meant to catch, a migration Flyway skipped.
+   */
+  private static int migrationFileCount() throws Exception {
+    Path dir = Path.of("target", "classes", "db", "migration");
+    assertThat(Files.isDirectory(dir)).as("compiled migrations on the classpath").isTrue();
+    try (Stream<Path> files = Files.list(dir)) {
+      return (int)
+          files.filter(p -> p.getFileName().toString().matches("V\\d+__.*\\.sql")).count();
+    }
   }
 
   /**

@@ -17,11 +17,16 @@ import org.springframework.web.client.RestTemplate;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -103,18 +108,23 @@ public class CrawlerP4 {
         // as if its identity had actually been cross-checked.
         if (!nominatimSucceeded && tavilyResults.isEmpty()) {
             return P4Data.builder().state(PillarData.DataState.SKIP).companyName(input.getName())
-                .errorMsg("Không tìm được dữ liệu định danh từ Nominatim hoặc Tavily").fetchedAt(LocalDateTime.now()).build();
+                .errorMsg("P4_NO_SOURCE").fetchedAt(LocalDateTime.now()).build();
         }
 
-        String identityMatch = osmName != null
-            ? evaluateMatch(input.getName(), osmName)
-            : (combined.contains(input.getName().toLowerCase().substring(0, Math.min(5, input.getName().length())))
-                ? "COMPLETELY_MATCHED" : "MINOR_MISMATCH");
-        boolean ceoVerified = combined.contains("ceo") || combined.contains("director") || combined.contains("founder");
+        // Consistency needs two independent statements of the same fact. The one
+        // that matters is the registry's address vs. where that address actually
+        // geocodes to. Comparing the company NAME against an OSM place name — what
+        // this used to do — compares two different things and proves nothing.
+        String identityMatch = compareRegistryToGeocode(input.getRegistryAddress(), verifiedAddress, osmName, input.getName());
+
+        // Previously: `combined.contains("ceo") || contains("director")`, i.e. the
+        // word appearing anywhere in search text scored "Người đại diện được xác
+        // minh". That verified nothing, so the claim is no longer made at all.
+        Boolean ceoVerified = null;
 
         String rawText = String.format(
-            "Company: %s | OSM Address: %s | IdentityMatch: %s | Tavily: %s",
-            input.getName(), verifiedAddress, identityMatch,
+            "Company: %s | Registry address: %s | Geocoded: %s | OSM name: %s | IdentityMatch: %s | Tavily: %s",
+            input.getName(), input.getRegistryAddress(), verifiedAddress, osmName, identityMatch,
             combined.substring(0, Math.min(200, combined.length()))
         );
 
@@ -131,10 +141,63 @@ public class CrawlerP4 {
             .build();
     }
 
+    /**
+     * Grades registry address against geocoder result.
+     *
+     * Returns null (unknown) rather than a verdict when there is nothing to compare
+     * — a company whose registry address we never obtained has not been found
+     * inconsistent, and "MINOR_MISMATCH" would say that it has.
+     */
+    static String compareRegistryToGeocode(String registryAddress, String geocodedAddress,
+                                           String osmName, String companyName) {
+        if (registryAddress == null || registryAddress.isBlank() || geocodedAddress == null) {
+            // Fall back to the weaker name-vs-place-name signal only when it is
+            // actually available; otherwise admit we do not know.
+            if (osmName == null || companyName == null) return null;
+            return tokenOverlapVerdict(companyName, osmName);
+        }
+        return tokenOverlapVerdict(registryAddress, geocodedAddress);
+    }
+
+    /**
+     * Compares two address strings by shared significant tokens. Substring matching
+     * on the first five characters — the previous approach — returns "matched" for
+     * any two Vietnamese company names, since they all begin "Công ty".
+     */
+    private static String tokenOverlapVerdict(String a, String b) {
+        Set<String> ta = significantTokens(a);
+        Set<String> tb = significantTokens(b);
+        if (ta.isEmpty() || tb.isEmpty()) return null;
+        long shared = ta.stream().filter(tb::contains).count();
+        double ratio = (double) shared / Math.min(ta.size(), tb.size());
+        if (ratio >= 0.6) return "COMPLETELY_MATCHED";
+        if (ratio >= 0.3) return "MINOR_MISMATCH";
+        return "MAJOR_MISMATCH";
+    }
+
+    /** Lowercased, diacritic-stripped tokens, minus filler words that match everything. */
+    private static Set<String> significantTokens(String s) {
+        String normalized = Normalizer.normalize(s, Normalizer.Form.NFD)
+            .replaceAll("\\p{M}", "").replace("đ", "d").replace("Đ", "D")
+            .toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ");
+        return Arrays.stream(normalized.split(" "))
+            .filter(t -> t.length() > 2)
+            .filter(t -> !FILLER_TOKENS.contains(t))
+            .collect(Collectors.toSet());
+    }
+
+    private static final Set<String> FILLER_TOKENS = Set.of(
+        "cong", "phuong", "quan", "duong", "pho", "ngo", "thanh", "tinh", "huyen",
+        "street", "road", "ward", "district", "city", "province", "the", "and", "ltd", "company");
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> queryNominatim(CompanyInput input) {
         throttle();
-        String query = input.getName() + (input.getCountry() != null ? " " + input.getCountry() : "");
+        // Geocode the registry's address when we have it — that is the fact we are
+        // trying to corroborate. A company name is not a geocodable place.
+        String base = input.getRegistryAddress() != null && !input.getRegistryAddress().isBlank()
+            ? input.getRegistryAddress() : input.getName();
+        String query = base + (input.getCountry() != null ? " " + input.getCountry() : "");
         String url = nominatimUrl + "/search?q=" + URLEncoder.encode(query, StandardCharsets.UTF_8)
             + "&format=json&limit=1&addressdetails=1&namedetails=1";
 
@@ -156,13 +219,4 @@ public class CrawlerP4 {
         }
     }
 
-    private String evaluateMatch(String input, String result) {
-        if (result == null) return "MINOR_MISMATCH";
-        String a = input.toLowerCase().replaceAll("[^a-z0-9]", "");
-        String b = result.toLowerCase().replaceAll("[^a-z0-9]", "");
-        if (a.equals(b)) return "COMPLETELY_MATCHED";
-        if (a.contains(b.substring(0, Math.min(5, b.length()))) || b.contains(a.substring(0, Math.min(5, a.length()))))
-            return "MINOR_MISMATCH";
-        return "MAJOR_MISMATCH";
-    }
 }

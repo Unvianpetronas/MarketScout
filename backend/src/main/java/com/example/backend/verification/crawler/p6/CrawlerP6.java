@@ -72,18 +72,21 @@ public class CrawlerP6 {
 
         if (apiKey == null || apiKey.isBlank()) {
             log.warn("P6: OPENSANCTIONS_API_KEY chưa set — bỏ qua kiểm tra trừng phạt cho {}", input.getName());
-            return skip(input.getName(), "Chưa cấu hình OPENSANCTIONS_API_KEY");
+            // Stable code, not prose: this reason is shown to the customer, and the
+            // crawler has no idea which language they read the report in. ScoringRubric
+            // translates it where the user's language is actually known.
+            return skip(input.getName(), "P6_NO_API_KEY");
         }
 
         if (reserveBudget(1) < 1) {
             log.warn("P6: đã đạt trần {} request/ngày — SKIP {}", dailyBudget, input.getName());
-            return skip(input.getName(), "Đã đạt trần OpenSanctions trong ngày");
+            return skip(input.getName(), "P6_DAILY_CAP");
         }
 
         Map<String, P6Data> res = callOpenSanctions(List.of(new QueryItem(key, input.getName(), input.getCountry())));
         P6Data data = res.get(key);
         if (data == null) {
-            return skip(input.getName(), "OpenSanctions không phản hồi — bỏ qua kiểm tra trừng phạt");
+            return skip(input.getName(), "P6_SOURCE_DOWN");
         }
         cacheService.set(key, data, Duration.ofDays(1), (short) 6, "opensanctions_api", input.getCountry());
         return data;

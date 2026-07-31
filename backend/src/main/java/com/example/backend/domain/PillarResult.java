@@ -32,6 +32,10 @@ public class PillarResult {
     @Column(name = "score")
     private Short score;
 
+    /** Max points this pillar could earn given available data; null for pre-V11 rows. */
+    @Column(name = "obtainable_points")
+    private Short obtainablePoints;
+
     @Column(name = "findings", columnDefinition = "text")
     private String findings;
 

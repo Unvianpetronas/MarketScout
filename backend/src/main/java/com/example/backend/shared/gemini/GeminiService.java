@@ -137,7 +137,11 @@ public class GeminiService {
         Map<String, Object> body = Map.of(
             "systemInstruction", Map.of("parts", List.of(Map.of("text", systemPrompt))),
             "contents", contents,
-            "generationConfig", Map.of("temperature", 0.0, "maxOutputTokens", 4096)
+            // 8192, not 4096: a contract yields ~10 fields each carrying a verbatim
+            // sourceText snippet, and Vietnamese tokenizes poorly — at 4096 long
+            // contracts got truncated mid-JSON, which surfaced to the user as a
+            // flat extraction failure on a perfectly readable file.
+            "generationConfig", Map.of("temperature", 0.0, "maxOutputTokens", 8192)
         );
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

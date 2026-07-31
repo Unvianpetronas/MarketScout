@@ -13,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLException;
 import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -90,11 +92,13 @@ public class CrawlerP2 {
                 if (rdap != null) {
                     domainAgeMonths = extractRegistrationAgeMonths(rdap);
                     registrar = extractRegistrarName(rdap);
-                    hasSsl = hasWebsite;
                 }
             } catch (Exception e) {
                 log.debug("RDAP lookup failed for {}: {}", domain, e.getMessage());
             }
+            // Outside the RDAP block on purpose: an RDAP outage must not also wipe
+            // out the certificate check, they are independent signals.
+            hasSsl = checkSsl(domain);
         }
 
         // Supplement with Tavily
@@ -139,7 +143,7 @@ public class CrawlerP2 {
             .domainAgeMonths(domainAgeMonths)
             .usesFreeEmail(usesFreeEmail)
             .facebookPages(facebookPages)
-            .hasSsl(hasSsl != null ? hasSsl : hasWebsite)
+            .hasSsl(hasSsl)
             .socialMediaScore(socialMediaScore)
             .domain(domain)
             .registrar(registrar)
@@ -147,6 +151,34 @@ public class CrawlerP2 {
             .dataSource("rdap + tavily")
             .fetchedAt(LocalDateTime.now())
             .build();
+    }
+
+    /**
+     * Real TLS handshake against the domain. This used to be `hasSsl = hasWebsite`,
+     * i.e. the report asserted "Website có chứng chỉ SSL" and awarded points without
+     * ever testing anything. A handshake failure is a genuine negative; any other
+     * error returns null (unknown) so a timeout never reads as "no certificate".
+     */
+    Boolean checkSsl(String domain) {
+        HttpsURLConnection conn = null;
+        try {
+            conn = (HttpsURLConnection) URI.create("https://" + domain).toURL().openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.setInstanceFollowRedirects(false);
+            conn.setRequestMethod("HEAD");
+            conn.setRequestProperty("User-Agent", "MarketScout-Verification/1.0");
+            conn.connect();
+            return conn.getServerCertificates().length > 0;
+        } catch (SSLException e) {
+            log.debug("TLS handshake refused by {}: {}", domain, e.getMessage());
+            return false;
+        } catch (Exception e) {
+            log.debug("TLS check inconclusive for {}: {}", domain, e.getMessage());
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
 
     /** Finds the "registration" event in an RDAP response and returns its age in months. */
@@ -189,7 +221,16 @@ public class CrawlerP2 {
     private static final List<String> EXCLUDED_DOMAIN_FRAGMENTS = List.of(
         "linkedin.", "facebook.", "instagram.", "twitter.", "x.com", "youtube.",
         "wikipedia.", "crunchbase.", "bloomberg.", "glassdoor.", "indeed.",
-        "tiktok.", "pinterest.", "github.com", "medium.com", "yelp.", "google.com/maps"
+        "tiktok.", "pinterest.", "github.com", "medium.com", "yelp.", "google.com/maps",
+        // Registry and company-lookup sites. These rank first for a company name or
+        // tax ID, so without them P2 adopted masothue.com as the partner's own site
+        // and reported ITS domain age and certificate as the partner's.
+        "masothue.", "thongtindoanhnghiep.", "dangkykinhdoanh.", "dkkd.gov",
+        "infodoanhnghiep.", "tratencongty.", "vietnamcredit.", "hsctvn.",
+        "opencorporates.", "gleif.org", "sec.gov", "company-information.service.gov.uk",
+        "dnb.com", "zoominfo.", "importyeti.", "panjiva.",
+        // Marketplace profiles — relevant to P3 trade presence, never a homepage.
+        "alibaba.", "made-in-china.", "europages.", "kompass."
     );
 
     /**
@@ -202,8 +243,13 @@ public class CrawlerP2 {
      * company names; a caller-supplied website (form input) always wins over this.
      */
     private String discoverWebsite(CompanyInput input) {
-        String query = input.getName() + " official website"
-            + (input.getCountry() != null && !input.getCountry().isBlank() ? " " + input.getCountry() : "");
+        return discoverWebsite(input.getName(), input.getCountry());
+    }
+
+    /** Callable by ScoringEngine so the domain is resolved once and shared with P3/P4/P8. */
+    public String discoverWebsite(String companyName, String country) {
+        String query = companyName + " official website"
+            + (country != null && !country.isBlank() ? " " + country : "");
         List<String> urls = tavilyClient.searchUrls(query, 5);
         for (String url : urls) {
             String candidate = extractDomain(url);

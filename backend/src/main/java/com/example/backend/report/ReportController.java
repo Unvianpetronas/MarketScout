@@ -275,6 +275,7 @@ public class ReportController {
         return ReportDTO.PillarResultDTO.builder()
             .pillarNo(pr.getPillarNo()).pillarName(pr.getPillarName())
             .score(pr.getScore() != null ? pr.getScore().intValue() : null)
+            .obtainablePoints(pr.getObtainablePoints() != null ? pr.getObtainablePoints().intValue() : null)
             .status(pr.getStatus()).confidence(pr.getConfidence())
             .findings(pr.getFindings()).sourcesUsed(pr.getSourcesUsed())
             .evidences(evidences).build();
