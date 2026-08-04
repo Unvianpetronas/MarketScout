@@ -34,6 +34,7 @@ public class FactJson {
         private String socialMediaScore;   // LOW | MEDIUM | HIGH
         private List<String> facebookPages; // candidate URLs — unverified, see P2Data
         private String domain;              // ground truth from P2Data — lets the rubric link evidence to the site/RDAP record
+        private Boolean websiteVerified;    // FALSE = a candidate domain was found but rejected, see P2Data
     }
 
     /**

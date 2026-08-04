@@ -105,13 +105,19 @@ public class FactExtractor {
             if (p2 != null && p2.isFound()) {
                 var p2n = node.path("p2");
                 f.setP2(FactJson.P2Facts.builder()
-                    .hasOfficialWebsite(pick(p2.getHasOfficialWebsite(), boolVal(p2n, "has_official_website")))
-                    .domainAgeMonths(pick(p2.getDomainAgeMonths(), intVal(p2n, "domain_age_months")))
+                    // The three domain facts are crawler-only, including when the crawler
+                    // says null: null means it rejected the candidate domain (or never
+                    // confirmed one), and letting Gemini fill that gap would put back the
+                    // very claim — "has an official website", with its age and its SSL —
+                    // that verification just refused to make.
+                    .hasOfficialWebsite(p2.getHasOfficialWebsite())
+                    .domainAgeMonths(p2.getDomainAgeMonths())
+                    .hasSsl(p2.getHasSsl())
                     .usesFreeEmail(pick(p2.getUsesFreeEmail(), boolVal(p2n, "uses_free_email")))
-                    .hasSsl(pick(p2.getHasSsl(), boolVal(p2n, "has_ssl")))
                     .socialMediaScore(pick(p2.getSocialMediaScore(), text(p2n, "social_media_score")))
                     .facebookPages(p2.getFacebookPages())
                     .domain(p2.getDomain())
+                    .websiteVerified(p2.getWebsiteVerified())
                     .build());
             }
 
@@ -211,7 +217,7 @@ public class FactExtractor {
                 .hasOfficialWebsite(p2.getHasOfficialWebsite()).domainAgeMonths(p2.getDomainAgeMonths())
                 .usesFreeEmail(p2.getUsesFreeEmail()).hasSsl(p2.getHasSsl())
                 .socialMediaScore(p2.getSocialMediaScore()).facebookPages(p2.getFacebookPages())
-                .domain(p2.getDomain()).build());
+                .domain(p2.getDomain()).websiteVerified(p2.getWebsiteVerified()).build());
         }
         if (p3 != null && p3.isFound()) {
             f.setP3(FactJson.P3Facts.builder()
