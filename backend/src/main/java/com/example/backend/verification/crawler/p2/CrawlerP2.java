@@ -15,12 +15,21 @@ import org.springframework.web.client.RestTemplate;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -61,21 +70,33 @@ public class CrawlerP2 {
 
     @SuppressWarnings("unchecked")
     private P2Data doFetch(CompanyInput input, String domain) {
-        boolean hasWebsite = domain != null && !domain.isBlank();
         boolean websiteDiscovered = false;
 
         // No website was supplied by the caller — Deep Verify almost never has one
         // (see discoverWebsite() doc). Without this, RDAP (the pillar's strongest
         // signal) would never run and every company would score as if it had no
         // official website, regardless of whether it actually does.
-        if (!hasWebsite) {
-            String discovered = discoverWebsite(input);
-            if (discovered != null) {
-                domain = discovered;
-                hasWebsite = true;
-                websiteDiscovered = true;
-            }
+        if (domain == null || domain.isBlank()) {
+            domain = discoverWebsite(input);
+            websiteDiscovered = domain != null;
         }
+
+        // Whatever the domain's source, it has to be shown to belong to THIS company
+        // before its registration date and its certificate are reported as the
+        // company's own. Search ranks the Hanoi stock exchange first for "Vingroup
+        // official website" (hnx.vn hosts VIC's listing page), and the pillar used to
+        // adopt it, then credit Vingroup with hnx.vn's 2005 domain age and its TLS
+        // certificate — 75/75 at HIGH confidence, all of it wrong. A rejected domain
+        // is dropped rather than kept, so nothing downstream can link to it or score
+        // it; it survives only in rawText so a reviewer can see what was discarded.
+        Boolean websiteVerified = domain != null ? verifyDomain(domain, input.getName()) : null;
+        String rejectedDomain = null;
+        if (domain != null && !Boolean.TRUE.equals(websiteVerified)) {
+            log.debug("P2 rejected candidate domain {} for '{}' (verified={})", domain, input.getName(), websiteVerified);
+            rejectedDomain = domain;
+            domain = null;
+        }
+        boolean hasWebsite = domain != null;
 
         Integer domainAgeMonths = null;
         Boolean hasSsl = null;
@@ -130,16 +151,20 @@ public class CrawlerP2 {
             .toList();
 
         String rawText = String.format(
-            "Company: %s | Domain: %s%s | DomainAgeMonths: %s | HasSSL: %s | SocialMedia: %s | Registrar: %s | Facebook: %s | Tavily: %s",
+            "Company: %s | Domain: %s%s | DomainAgeMonths: %s | HasSSL: %s | SocialMedia: %s | Registrar: %s | Facebook: %s%s | Tavily: %s",
             input.getName(), domain, websiteDiscovered ? " (auto-discovered)" : "",
             domainAgeMonths, hasSsl, socialMediaScore, registrar, facebookPages,
+            rejectedDomain != null ? " | RejectedDomain: " + rejectedDomain + " (không xác minh được thuộc về công ty)" : "",
             String.join(" ", tavilyResults)
         );
 
         return P2Data.builder()
             .state(PillarData.DataState.FOUND)
             .companyName(input.getName())
-            .hasOfficialWebsite(hasWebsite)
+            // null, never false: neither "search found nothing" nor "the candidate
+            // failed verification" establishes that the company has no website.
+            .hasOfficialWebsite(hasWebsite ? Boolean.TRUE : null)
+            .websiteVerified(websiteVerified)
             .domainAgeMonths(domainAgeMonths)
             .usesFreeEmail(usesFreeEmail)
             .facebookPages(facebookPages)
@@ -216,8 +241,33 @@ public class CrawlerP2 {
         return null;
     }
 
+    /** Minimum {@link #nameAffinity} for a domain to be adopted without reading its homepage. */
+    private static final int NAME_MATCH_MIN = 40;
+    /** Homepages fetched when no candidate carries the name — bounds discovery latency. */
+    private static final int MAX_IDENTITY_CHECKS = 2;
+    private static final int IDENTITY_READ_LIMIT = 64 * 1024;
+
+    private static final Pattern TITLE_TAG =
+        Pattern.compile("<title[^>]*>(.*?)</title>", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern META_TAG = Pattern.compile("<meta\\b[^>]*>", Pattern.CASE_INSENSITIVE);
+    private static final Pattern IDENTITY_META = Pattern.compile(
+        "(?:property|name)\\s*=\\s*[\"'](?:og:site_name|og:title|description|application-name)[\"']",
+        Pattern.CASE_INSENSITIVE);
+    private static final Pattern META_CONTENT =
+        Pattern.compile("content\\s*=\\s*[\"']([^\"']*)[\"']", Pattern.CASE_INSENSITIVE);
+
+    // Legal-form words carry no identity: every second Vietnamese company is a
+    // "Công ty Cổ phần", and none of them put that in their domain.
+    private static final Set<String> LEGAL_FORM_TOKENS = Set.of(
+        "cong", "ty", "co", "phan", "cophan", "tnhh", "mtv", "cp", "tap", "doan", "dn",
+        "jsc", "joint", "stock", "company", "corporation", "corp", "limited", "ltd",
+        "inc", "plc", "llc", "gmbh", "pte", "sdn", "bhd", "nv", "bv", "ag", "srl", "spa"
+    );
+
     // Domains that show up in "official website" searches but are never actually
-    // the company's own site — a directory/social profile is not a homepage.
+    // the company's own site — a directory/social profile is not a homepage. This
+    // is only a cheap pre-filter now; nameAffinity() is what actually decides, so
+    // sites missing from this list (exchanges, newspapers) no longer slip through.
     private static final List<String> EXCLUDED_DOMAIN_FRAGMENTS = List.of(
         "linkedin.", "facebook.", "instagram.", "twitter.", "x.com", "youtube.",
         "wikipedia.", "crunchbase.", "bloomberg.", "glassdoor.", "indeed.",
@@ -251,15 +301,158 @@ public class CrawlerP2 {
         String query = companyName + " official website"
             + (country != null && !country.isBlank() ? " " + country : "");
         List<String> urls = tavilyClient.searchUrls(query, 5);
+
+        List<String> unmatched = new ArrayList<>();
+        String best = null;
+        int bestScore = 0;
         for (String url : urls) {
             String candidate = extractDomain(url);
             if (candidate == null) continue;
             String lower = candidate.toLowerCase();
-            if (EXCLUDED_DOMAIN_FRAGMENTS.stream().noneMatch(lower::contains)) {
-                return candidate;
+            if (EXCLUDED_DOMAIN_FRAGMENTS.stream().anyMatch(lower::contains)) continue;
+
+            int score = nameAffinity(candidate, companyName);
+            if (score < NAME_MATCH_MIN) {
+                if (!unmatched.contains(candidate)) unmatched.add(candidate);
+                continue;
+            }
+            // Tie-breakers only — they can never promote a domain that doesn't
+            // carry the company's name in the first place.
+            String cc = normalize(country).replace(" ", "");
+            if (cc.length() == 2 && lower.endsWith("." + cc)) score += 10;
+            if (isHomepage(url)) score += 10;
+            if (score > bestScore) {
+                bestScore = score;
+                best = candidate;
             }
         }
+        if (best != null) return best;
+
+        // Nothing carried the name. A legal name that differs from the brand is
+        // completely normal ("Công ty CP Sữa Việt Nam" → vinamilk.com.vn), so the
+        // top few get a chance to prove it from their own homepage before the
+        // pillar gives up — otherwise the name test would drop correct answers.
+        for (String candidate : unmatched.stream().limit(MAX_IDENTITY_CHECKS).toList()) {
+            if (Boolean.TRUE.equals(homepageMentions(candidate, companyName))) return candidate;
+        }
+        log.debug("No verifiable official website for '{}' among {}", companyName, urls);
         return null;
+    }
+
+    /**
+     * TRUE only on positive evidence that the domain belongs to the company: either
+     * the domain carries its name, or the homepage says so. Null means the homepage
+     * could not be read — unknown, never "not theirs", so an outage or a bot wall
+     * cannot turn into a finding against the company.
+     */
+    Boolean verifyDomain(String domain, String companyName) {
+        if (nameAffinity(domain, companyName) >= NAME_MATCH_MIN) return Boolean.TRUE;
+        return homepageMentions(domain, companyName);
+    }
+
+    /**
+     * How much a domain looks like it belongs to this company, 0-60. This is the
+     * check that replaces the old blocklist: enumerating every stock exchange,
+     * newspaper and aggregator that outranks a company's own site is impossible,
+     * but requiring the company's name in the domain rejects all of them at once.
+     */
+    static int nameAffinity(String domain, String companyName) {
+        if (domain == null || domain.isBlank()) return 0;
+        String label = normalize(domain.split("\\.")[0]).replace(" ", "");
+        if (label.isEmpty()) return 0;
+
+        List<String> tokens = nameTokens(companyName);
+        if (tokens.isEmpty()) return 0;
+        String compact = String.join("", tokens);
+
+        if (compact.length() >= 4 && label.contains(compact)) return 60;
+        if (label.length() >= 4 && compact.contains(label)) return 60;
+        // "VCB" for "Vietcombank Joint Stock Commercial Bank" and the like.
+        if (tokens.size() >= 3) {
+            String acronym = tokens.stream().map(t -> t.substring(0, 1)).reduce("", String::concat);
+            if (acronym.length() >= 3 && label.equals(acronym)) return 50;
+        }
+        // A single distinctive word is enough: "vinfast" inside "vinfastauto".
+        if (tokens.stream().anyMatch(t -> t.length() >= 4 && label.contains(t))) return 40;
+        return 0;
+    }
+
+    /**
+     * Reads the homepage's own identity text (title / og:site_name / description)
+     * and asks whether it names this company. Deliberately not the whole body: any
+     * news or directory page mentions the company somewhere in its text, but a
+     * stock exchange's homepage does not put a listed company in its own title.
+     *
+     * Known limit, measured rather than assumed: sites behind Cloudflare (vingroup.net
+     * among them) answer a Java client with a 403 challenge page no matter what
+     * headers are sent — it fingerprints the TLS handshake, and chasing that is an
+     * arms race, not verification. Those come back null (unknown) and are simply not
+     * adopted through this path; in practice they are already caught by
+     * {@link #nameAffinity}, which is why this is a fallback and not the main test.
+     */
+    Boolean homepageMentions(String domain, String companyName) {
+        HttpURLConnection conn = null;
+        try {
+            conn = (HttpURLConnection) URI.create("https://" + domain).toURL().openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.setInstanceFollowRedirects(true);
+            conn.setRequestProperty("User-Agent", "MarketScout-Verification/1.0");
+            String html;
+            try (InputStream in = conn.getInputStream()) {
+                html = new String(in.readNBytes(IDENTITY_READ_LIMIT), StandardCharsets.UTF_8);
+            }
+            String identity = normalize(extractIdentityText(html));
+            if (identity.isBlank()) return null;
+
+            List<String> tokens = nameTokens(companyName);
+            String compact = String.join("", tokens);
+            if (compact.length() >= 4 && identity.replace(" ", "").contains(compact)) return Boolean.TRUE;
+            List<String> significant = tokens.stream().filter(t -> t.length() >= 3).toList();
+            return !significant.isEmpty() && significant.stream().allMatch(identity::contains);
+        } catch (Exception e) {
+            log.debug("Homepage identity check inconclusive for {}: {}", domain, e.getMessage());
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private static String extractIdentityText(String html) {
+        StringBuilder sb = new StringBuilder();
+        Matcher title = TITLE_TAG.matcher(html);
+        if (title.find()) sb.append(title.group(1)).append(' ');
+        Matcher meta = META_TAG.matcher(html);
+        while (meta.find()) {
+            String tag = meta.group();
+            if (!IDENTITY_META.matcher(tag).find()) continue;
+            Matcher content = META_CONTENT.matcher(tag);
+            if (content.find()) sb.append(content.group(1)).append(' ');
+        }
+        return sb.toString();
+    }
+
+    /** Diacritic-free, punctuation-free lowercase — "Tập đoàn" and "tap doan" must compare equal. */
+    static String normalize(String s) {
+        if (s == null) return "";
+        String stripped = Normalizer.normalize(s, Normalizer.Form.NFD)
+            .replaceAll("\\p{M}", "")
+            .toLowerCase()
+            .replace('đ', 'd');   // NFD does not decompose đ
+        return stripped.replaceAll("[^a-z0-9]+", " ").trim();
+    }
+
+    /** Company name minus its legal form, so "Công ty CP Vingroup" compares as "vingroup". */
+    private static List<String> nameTokens(String companyName) {
+        List<String> all = Arrays.stream(normalize(companyName).split(" "))
+            .filter(t -> !t.isBlank()).toList();
+        List<String> core = all.stream().filter(t -> !LEGAL_FORM_TOKENS.contains(t)).toList();
+        return core.isEmpty() ? all : core;   // a name made only of legal words keeps them
+    }
+
+    private static boolean isHomepage(String url) {
+        String path = url.replaceFirst("^https?://[^/]+", "");
+        return path.isBlank() || path.equals("/");
     }
 
     private String evaluateSocialMedia(List<String> results) {

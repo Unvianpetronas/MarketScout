@@ -15,6 +15,11 @@ import java.util.List;
 @AllArgsConstructor
 public class P2Data extends PillarData {
     private Boolean hasOfficialWebsite;
+    // Did the domain prove it belongs to this company (name in the domain, or the
+    // homepage naming the company)? FALSE means a candidate was found and rejected —
+    // reported as such instead of silently crediting the company with a stranger's
+    // domain age and certificate. Null = nothing to check, or the check failed.
+    private Boolean websiteVerified;
     private Integer domainAgeMonths;
     private Boolean usesFreeEmail;
     private Boolean hasSsl;

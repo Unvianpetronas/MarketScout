@@ -100,6 +100,14 @@ public class ScoringRubric {
         if (Boolean.TRUE.equals(f.getHasOfficialWebsite())) {
             score += 30;
             ev.add(Evidence.builder().type("PASS").text(en ? "Has an official website" : "Có website chính thức").source("P2").url(websiteUrl).build());
+        } else if (Boolean.FALSE.equals(f.getWebsiteVerified())) {
+            // A domain turned up but could not be shown to belong to this company —
+            // the case that used to be reported as a confirmed official website,
+            // complete with the other site's domain age and certificate.
+            ev.add(Evidence.builder().type("WARN")
+                .text(en ? "Found a candidate website but could not confirm it belongs to this company"
+                         : "Có website khả dĩ nhưng chưa xác minh được thuộc về doanh nghiệp này")
+                .source("P2").build());
         } else if (Boolean.FALSE.equals(f.getHasOfficialWebsite())) {
             ev.add(Evidence.builder().type("FAIL").text(en ? "No official website" : "Không có website chính thức").source("P2").build());
         } else {
